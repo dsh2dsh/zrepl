@@ -694,10 +694,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 		elemType = inlineMap.Type().Elem()
 	}
 
-	var doneFields []bool
-	if strict {
-		doneFields = make([]bool, len(sinfo.FieldsList))
-	}
+	doneFields := make([]bool, len(sinfo.FieldsList))
 	for i := 0; i < l; i += 2 {
 		ni := n.children[i]
 		if isMerge(ni) {
@@ -713,8 +710,8 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 					d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s already set in type %s", ni.line+1, name.String(), out.Type()))
 					continue
 				}
-				doneFields[info.Id] = true
 			}
+			doneFields[info.Id] = true
 			var field reflect.Value
 			if info.Inline == nil {
 				field = out.Field(info.Num)
