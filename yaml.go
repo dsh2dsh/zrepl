@@ -29,8 +29,11 @@ type MapItem struct {
 // method receives a function that may be called to unmarshal the original
 // YAML value into a field or variable. It is safe to call the unmarshal
 // function parameter more than once if necessary.
+// You can set not_strict to disable strict checking for this call of the
+// unmarshal function. Otherwise the strict setting given to the yaml library
+// is used.
 type Unmarshaler interface {
-	UnmarshalYAML(unmarshal func(interface{}) error) error
+	UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) error) error
 }
 
 // The Marshaler interface may be implemented by types to customize their
@@ -117,7 +120,7 @@ func (dec *Decoder) SetStrict(strict bool) {
 // See the documentation for Unmarshal for details about the
 // conversion of YAML into a Go value.
 func (dec *Decoder) Decode(v interface{}) (err error) {
-	d := newDecoder(dec.strict)
+	d := newDecoder()
 	defer handleErr(&err)
 	node := dec.parser.parse()
 	if node == nil {
@@ -127,7 +130,7 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 	if out.Kind() == reflect.Ptr && !out.IsNil() {
 		out = out.Elem()
 	}
-	d.unmarshal(node, out)
+	d.unmarshal(node, out, dec.strict)
 	if len(d.terrors) > 0 {
 		return &TypeError{d.terrors}
 	}
@@ -136,7 +139,7 @@ func (dec *Decoder) Decode(v interface{}) (err error) {
 
 func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 	defer handleErr(&err)
-	d := newDecoder(strict)
+	d := newDecoder()
 	p := newParser(in)
 	defer p.destroy()
 	node := p.parse()
@@ -145,7 +148,7 @@ func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 		if v.Kind() == reflect.Ptr && !v.IsNil() {
 			v = v.Elem()
 		}
-		d.unmarshal(node, v)
+		d.unmarshal(node, v, strict)
 	}
 	if len(d.terrors) > 0 {
 		return &TypeError{d.terrors}
