@@ -304,8 +304,8 @@ type fieldInfo struct {
 	Id int
 
 	// Inline holds the field index if the field is part of an inlined struct.
-	Inline []int
-	Required bool
+	Inline   []int
+	Optional bool
 	Default  string
 }
 
@@ -347,6 +347,7 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 				if strings.HasPrefix(flag, "default=") {
 					defaultStr := flag[len("default="):]
 					info.Default = defaultStr
+					info.Optional = true
 				} else {
 					switch flag {
 					case "omitempty":
@@ -355,8 +356,8 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 						info.Flow = true
 					case "inline":
 						inline = true
-					case "required":
-						info.Required = true
+					case "optional":
+						info.Optional = true
 					default:
 						return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
 					}

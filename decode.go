@@ -733,7 +733,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 
 	//Check if required fields are set
 	for _, e := range sinfo.FieldsList {
-		if e.Required {
+		if !e.Optional && strict {
 			if !doneFields[e.Id] {
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but not given", n.line, e.Key))
 			}
@@ -747,7 +747,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 					field = out.FieldByIndex(e.Inline)
 				}
 				p := newParser([]byte(e.Default))
-				func(){
+				func() {
 					defer p.destroy()
 					node := p.parse()
 					d.unmarshal(node, field, strict)
