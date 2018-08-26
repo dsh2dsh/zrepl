@@ -12,7 +12,7 @@ import (
 	"os"
 
 	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
+	yaml "github.com/zrepl/yaml-config"
 )
 
 var marshalIntTest = 123

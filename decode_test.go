@@ -9,7 +9,7 @@ import (
 	"time"
 
 	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
+	yaml "github.com/zrepl/yaml-config"
 )
 
 var unmarshalIntTest = 123
@@ -885,8 +885,8 @@ type unmarshalerType struct {
 	value interface{}
 }
 
-func (o *unmarshalerType) UnmarshalYAML(unmarshal func(v interface{}) error) error {
-	if err := unmarshal(&o.value); err != nil {
+func (o *unmarshalerType) UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) error) error {
+	if err := unmarshal(&o.value, false); err != nil {
 		return err
 	}
 	if i, ok := o.value.(int); ok {
@@ -1011,7 +1011,7 @@ type failingUnmarshaler struct{}
 
 var failingErr = errors.New("failingErr")
 
-func (ft *failingUnmarshaler) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (ft *failingUnmarshaler) UnmarshalYAML(unmarshal func(interface{}, bool) error) error {
 	return failingErr
 }
 
@@ -1022,16 +1022,16 @@ func (s *S) TestUnmarshalerError(c *C) {
 
 type sliceUnmarshaler []int
 
-func (su *sliceUnmarshaler) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (su *sliceUnmarshaler) UnmarshalYAML(unmarshal func(interface{}, bool) error) error {
 	var slice []int
-	err := unmarshal(&slice)
+	err := unmarshal(&slice, false)
 	if err == nil {
 		*su = slice
 		return nil
 	}
 
 	var intVal int
-	err = unmarshal(&intVal)
+	err = unmarshal(&intVal, false)
 	if err == nil {
 		*su = []int{intVal}
 		return nil
