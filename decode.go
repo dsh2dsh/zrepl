@@ -733,6 +733,15 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 			d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s not found in type %s", ni.line+1, name.String(), out.Type()))
 		}
 	}
+
+	//Check if required fields are set
+	for _, e := range sinfo.FieldsList {
+		if e.Required {
+			if !doneFields[e.Id] {
+				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but not given", n.line, e.Key))
+			}
+		}
+	}
 	return true
 }
 
