@@ -741,6 +741,22 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but not given", n.line, e.Key))
 			}
 		}
+		if e.Default != "" {
+			if !doneFields[e.Id] {
+				var field reflect.Value
+				if e.Inline == nil {
+					field = out.Field(e.Num)
+				} else {
+					field = out.FieldByIndex(e.Inline)
+				}
+				p := newParser([]byte(e.Default))
+				func(){
+					defer p.destroy()
+					node := p.parse()
+					d.unmarshal(node, field, strict)
+				}()
+			}
+		}
 	}
 	return true
 }

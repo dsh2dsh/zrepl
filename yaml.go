@@ -306,6 +306,7 @@ type fieldInfo struct {
 	// Inline holds the field index if the field is part of an inlined struct.
 	Inline []int
 	Required bool
+	Default  string
 }
 
 var structMap = make(map[reflect.Type]*structInfo)
@@ -343,17 +344,22 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 		fields := strings.Split(tag, ",")
 		if len(fields) > 1 {
 			for _, flag := range fields[1:] {
-				switch flag {
-				case "omitempty":
-					info.OmitEmpty = true
-				case "flow":
-					info.Flow = true
-				case "inline":
-					inline = true
-				case "required":
-					info.Required = true
-				default:
-					return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
+				if strings.HasPrefix(flag, "default=") {
+					defaultStr := flag[len("default="):]
+					info.Default = defaultStr
+				} else {
+					switch flag {
+					case "omitempty":
+						info.OmitEmpty = true
+					case "flow":
+						info.Flow = true
+					case "inline":
+						inline = true
+					case "required":
+						info.Required = true
+					default:
+						return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
+					}
 				}
 			}
 			tag = fields[0]
