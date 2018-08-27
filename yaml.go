@@ -305,8 +305,11 @@ type fieldInfo struct {
 
 	// Inline holds the field index if the field is part of an inlined struct.
 	Inline   []int
-	Optional bool
 	Default  string
+
+	//Validation
+	Optional bool
+	Positive bool
 }
 
 var structMap = make(map[reflect.Type]*structInfo)
@@ -358,6 +361,8 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 						inline = true
 					case "optional":
 						info.Optional = true
+					case "positive":
+						info.Positive = true
 					default:
 						return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
 					}

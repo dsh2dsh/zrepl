@@ -733,25 +733,43 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 
 	//Check if required fields are set
 	for _, e := range sinfo.FieldsList {
+		var field reflect.Value
+		if e.Inline == nil {
+			field = out.Field(e.Num)
+		} else {
+			field = out.FieldByIndex(e.Inline)
+		}
+
 		if !e.Optional && strict {
 			if !doneFields[e.Id] {
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but not given", n.line, e.Key))
+			} else if isZero(field) {
+				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but has zero value", n.line, e.Key))
 			}
 		}
+
 		if e.Default != "" {
 			if !doneFields[e.Id] {
-				var field reflect.Value
-				if e.Inline == nil {
-					field = out.Field(e.Num)
-				} else {
-					field = out.FieldByIndex(e.Inline)
-				}
+
 				p := newParser([]byte(e.Default))
 				func() {
 					defer p.destroy()
 					node := p.parse()
 					d.unmarshal(node, field, strict)
 				}()
+			}
+		}
+
+		if e.Positive && strict {
+			isPositive := true
+			switch v := field.Interface().(type) {
+			case time.Duration:
+				isPositive = v > 0
+			default:
+				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be positive but check is not implemented for given type", n.line, e.Key))
+			}
+			if !isPositive {
+				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be positive", n.line, e.Key))
 			}
 		}
 	}
