@@ -678,6 +678,10 @@ func (d *decoder) mappingSlice(n *node, out reflect.Value, strict bool) (good bo
 	return true
 }
 
+type Defaulter interface {
+	SetDefault()
+}
+
 func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good bool) {
 	sinfo, err := getStructInfo(out.Type())
 	if err != nil {
@@ -738,6 +742,32 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 			field = out.Field(e.Num)
 		} else {
 			field = out.FieldByIndex(e.Inline)
+		}
+
+
+		if e.FromDefaults && (!doneFields[e.Id] || isZero(field)) {
+			supported := false
+			supported = supported || (field.Kind() == reflect.Ptr && field.Type().Elem().Kind() == reflect.Struct)
+			_, defaulterOK := field.Interface().(Defaulter)
+			if defaulterOK {
+				supported = true
+			}
+			if !supported {
+				panic(fmt.Sprintf("fromdefaults not supported at field '%s' %v", e.Key, field.Type()))
+			}
+
+			v := reflect.New(field.Type().Elem())
+			if defaulterOK {
+				v.Interface().(Defaulter).SetDefault()
+			} else {
+				y := `{}`
+				err := UnmarshalStrict([]byte(y), v.Interface())
+				if err != nil {
+					panic(fmt.Sprintf("fromdefaults failed for field '%s' %v: %s", e.Key, field.Type(), err))
+				}
+			}
+			field.Set(v)
+			continue
 		}
 
 		if !e.Optional && strict {

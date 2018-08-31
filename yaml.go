@@ -306,6 +306,7 @@ type fieldInfo struct {
 	// Inline holds the field index if the field is part of an inlined struct.
 	Inline   []int
 	Default  string
+	FromDefaults bool
 
 	//Validation
 	Optional bool
@@ -359,6 +360,8 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 						info.Flow = true
 					case "inline":
 						inline = true
+					case "fromdefaults":
+						info.FromDefaults = true
 					case "optional":
 						info.Optional = true
 					case "positive":
