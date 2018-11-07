@@ -790,16 +790,24 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 			}
 		}
 
-		if e.Positive && strict {
+		if (e.Positive || e.ZeroPositive) && strict {
 			isPositive := true
+			isZeroPositive := true
 			switch v := field.Interface().(type) {
 			case time.Duration:
 				isPositive = v > 0
+				isZeroPositive = v >= 0
+			case int:
+				isPositive = v > 0
+				isZeroPositive = v>= 0
 			default:
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be positive but check is not implemented for given type", n.line, e.Key))
 			}
-			if !isPositive {
+			if e.Positive && !isPositive {
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be positive", n.line, e.Key))
+			}
+			if e.ZeroPositive && !isZeroPositive {
+				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be 0 or positive", n.line, e.Key))
 			}
 		}
 	}

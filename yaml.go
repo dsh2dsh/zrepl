@@ -309,8 +309,9 @@ type fieldInfo struct {
 	FromDefaults bool
 
 	//Validation
-	Optional bool
-	Positive bool
+	Optional     bool
+	Positive     bool
+	ZeroPositive bool
 }
 
 var structMap = make(map[reflect.Type]*structInfo)
@@ -366,6 +367,8 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 						info.Optional = true
 					case "positive":
 						info.Positive = true
+					case "zeropositive":
+						info.ZeroPositive = true
 					default:
 						return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
 					}
