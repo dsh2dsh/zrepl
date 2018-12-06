@@ -800,6 +800,9 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 			case int:
 				isPositive = v > 0
 				isZeroPositive = v>= 0
+			case uint32:
+				isPositive = v > 0
+				isZeroPositive = v >= 0
 			default:
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be positive but check is not implemented for given type", n.line, e.Key))
 			}
