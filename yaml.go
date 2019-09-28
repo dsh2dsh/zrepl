@@ -304,14 +304,15 @@ type fieldInfo struct {
 	Id int
 
 	// Inline holds the field index if the field is part of an inlined struct.
-	Inline   []int
-	Default  string
+	Inline       []int
+	Default      string
 	FromDefaults bool
 
 	//Validation
 	Optional     bool
 	Positive     bool
 	ZeroPositive bool
+	HostPort     bool
 }
 
 var structMap = make(map[reflect.Type]*structInfo)
@@ -369,6 +370,8 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 						info.Positive = true
 					case "zeropositive":
 						info.ZeroPositive = true
+					case "hostport":
+						info.HostPort = true
 					default:
 						return nil, errors.New(fmt.Sprintf("Unsupported flag %q in tag %q of type %s", flag, tag, st))
 					}

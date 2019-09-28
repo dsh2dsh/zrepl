@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"reflect"
 	"strconv"
 	"time"
@@ -744,7 +745,6 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 			field = out.FieldByIndex(e.Inline)
 		}
 
-
 		if e.FromDefaults && (!doneFields[e.Id] || isZero(field)) {
 			supported := false
 			supported = supported || (field.Kind() == reflect.Ptr && field.Type().Elem().Kind() == reflect.Struct)
@@ -799,7 +799,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 				isZeroPositive = v >= 0
 			case int:
 				isPositive = v > 0
-				isZeroPositive = v>= 0
+				isZeroPositive = v >= 0
 			case uint32:
 				isPositive = v > 0
 				isZeroPositive = v >= 0
@@ -813,6 +813,14 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be 0 or positive", n.line, e.Key))
 			}
 		}
+
+		if e.HostPort {
+			_, _, err := net.SplitHostPort(field.Interface().(string))
+			if err != nil {
+				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s: %s", n.line, e.Key, err))
+			}
+		}
+
 	}
 	return true
 }
