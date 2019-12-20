@@ -774,7 +774,16 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 			if !doneFields[e.Id] {
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but not given", n.line, e.Key))
 			} else if isZero(field) {
-				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but has zero value", n.line, e.Key))
+				if field.Kind() == reflect.Bool {
+					// since doneFields[e.Id], we know the input specifies this field
+					// but a bool's zero value is false, and we cannot distinguish user-specified false
+					// from zero value
+					//
+					// technically, this applies to ints as well, but zrepl doesn't have a use case
+					// for user-specified zero values
+				} else {
+					d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s is required but has zero value", n.line, e.Key))
+				}
 			}
 		}
 
