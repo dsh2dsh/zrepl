@@ -426,6 +426,7 @@ type FileLoggingOutlet struct {
 	FileName            string `yaml:"filename"`
 	Time                bool   `yaml:"time,default=true"`
 	LogLevel            bool   `yaml:"log_level,default=true"`
+	Template            string `yaml:"template"`
 }
 
 type StdoutLoggingOutlet struct {
@@ -673,7 +674,6 @@ var ConfigFileDefaultLocations = []string{
 }
 
 func ParseConfig(path string) (i *Config, err error) {
-
 	if path == "" {
 		// Try default locations
 		for _, l := range ConfigFileDefaultLocations {
