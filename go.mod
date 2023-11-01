@@ -1,4 +1,4 @@
-module github.com/dsh2dsh/zrepl
+module github.com/zrepl/zrepl
 
 go 1.12
 
