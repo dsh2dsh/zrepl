@@ -28,14 +28,13 @@ func waitPreLogging(c *Cmd, now time.Time) {
 }
 
 func waitPostLogging(c *Cmd, u usage, err error, now time.Time) {
-
 	log := c.log().
 		WithField("total_time_s", u.total_secs).
 		WithField("systemtime_s", u.system_secs).
 		WithField("usertime_s", u.user_secs)
 
 	if err == nil {
-		log.Info("command exited without error")
+		log.Debug("command exited without error")
 	} else {
 		log.WithError(err).Info("command exited with error")
 	}
