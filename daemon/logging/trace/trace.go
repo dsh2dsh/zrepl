@@ -409,7 +409,7 @@ func (this *traceNode) TaskAndSpanStack(kind *StackKind) (spanIdStack string) {
 	}
 
 	taskStack := strings.Join(taskIdsRev, "-")
-	return fmt.Sprintf("%s$%s", taskStack, strings.Join(spanIdsRev, "."))
+	return fmt.Sprintf("%s:%s", taskStack, strings.Join(spanIdsRev, "."))
 }
 
 func GetSpanStackOrDefault(ctx context.Context, kind StackKind, def string) string {
