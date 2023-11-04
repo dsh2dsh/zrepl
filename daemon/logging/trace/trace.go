@@ -408,7 +408,7 @@ func (this *traceNode) TaskAndSpanStack(kind *StackKind) (spanIdStack string) {
 		spanIdsRev = append(spanIdsRev, kind.symbolizeSpan(spansInTask[i]))
 	}
 
-	taskStack := strings.Join(taskIdsRev, "$")
+	taskStack := strings.Join(taskIdsRev, "-")
 	return fmt.Sprintf("%s$%s", taskStack, strings.Join(spanIdsRev, "."))
 }
 
