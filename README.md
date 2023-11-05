@@ -11,6 +11,31 @@
 # zrepl
 zrepl is a one-stop ZFS backup & replication solution.
 
+## Changes from [upstream](https://github.com/zrepl/zrepl):
+
+  * Go 1.21 and updated dependencies
+
+  * `last_n` keep rule fixed. See
+    [#691](https://github.com/zrepl/zrepl/pull/750)
+
+  * Added support of shell patterns for datasets definitions. See
+    [#755](https://github.com/zrepl/zrepl/pull/755).
+
+  * Added ability to log into a file. See
+    [#756](https://github.com/zrepl/zrepl/pull/756)
+
+  * Replication jobs (without periodic snapshotting) can be configured for
+    periodic run. See [#758](https://github.com/zrepl/zrepl/pull/758)
+
+  * Added ability to configure command piplines between `zfs send` and `zfs recv`.
+    See [#761](https://github.com/zrepl/zrepl/pull/761).
+
+  * Added Icinga/Nagios checks for checking the daemon is alive, latests or
+    oldest snapshots are not too old. See
+    [#765](https://github.com/zrepl/zrepl/pull/765)
+
+  * Small cosmetic changes
+
 ## User Documentation
 
 **User Documentation** can be found at [zrepl.github.io](https://zrepl.github.io).
