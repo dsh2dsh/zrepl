@@ -15,8 +15,8 @@ zrepl is a one-stop ZFS backup & replication solution.
 
   * Go 1.21 and updated dependencies
 
-  * `last_n` keep rule fixed. See
-    [#691](https://github.com/zrepl/zrepl/pull/750)
+  * ~~`last_n` keep rule fixed. See
+    [#691](https://github.com/zrepl/zrepl/pull/750)~~ Merged.
 
   * Added support of shell patterns for datasets definitions. See
     [#755](https://github.com/zrepl/zrepl/pull/755).
