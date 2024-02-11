@@ -13,7 +13,7 @@ zrepl is a one-stop ZFS backup & replication solution.
 
 ## Changes from [upstream](https://github.com/zrepl/zrepl):
 
-  * Go 1.21 and updated dependencies
+  * Go 1.22 and updated dependencies
 
   * ~~`last_n` keep rule fixed. See
     [#691](https://github.com/zrepl/zrepl/pull/750)~~ Merged.
