@@ -34,7 +34,7 @@ require (
 	golang.org/x/sys v0.17.0
 	golang.org/x/tools v0.17.0
 	google.golang.org/grpc v1.61.0
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.32.0
 )
 
 require (
