@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/bits-and-blooms/bitset v1.13.0
 	github.com/fatih/color v1.16.0
-	github.com/gdamore/tcell/v2 v2.6.0
+	github.com/gdamore/tcell/v2 v2.7.0
 	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
 	github.com/go-logfmt/logfmt v0.6.0
 	github.com/go-playground/validator/v10 v10.16.0
@@ -31,7 +31,7 @@ require (
 	gitlab.com/tslocum/cview v1.5.3
 	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.5.0
-	golang.org/x/sys v0.14.0
+	golang.org/x/sys v0.15.0
 	golang.org/x/tools v0.14.0
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
@@ -62,7 +62,7 @@ require (
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/onsi/ginkgo v1.10.2 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -75,7 +75,7 @@ require (
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	gitlab.com/tslocum/cbind v0.1.4 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/term v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
