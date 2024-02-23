@@ -5,7 +5,7 @@ go 1.22
 require (
 	github.com/bits-and-blooms/bitset v1.13.0
 	github.com/fatih/color v1.16.0
-	github.com/gdamore/tcell/v2 v2.7.0
+	github.com/gdamore/tcell/v2 v2.7.1
 	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
 	github.com/go-logfmt/logfmt v0.6.0
 	github.com/go-playground/validator/v10 v10.18.0
