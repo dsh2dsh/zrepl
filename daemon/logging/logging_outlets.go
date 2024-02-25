@@ -182,21 +182,18 @@ func (o *SyslogOutlet) WriteEntry(entry logger.Entry) error {
 // --------------------------------------------------
 
 func newFileOutlet(filename string) (*FileOutlet, error) {
+	orderedFields := [...]string{JobField, SubsysField, SpanField}
+	outlet := new(FileOutlet).withOrderedFields(orderedFields[:])
+
 	if filename != "" {
 		f, err := newLogFile(filename)
 		if err != nil {
 			return nil, err
 		}
-		f.WithErrorHandler(func(err error) error {
-			log.SetOutput(os.Stderr)
-			slog.LogAttrs(context.Background(), slog.LevelError,
-				"error writing log message", slog.Any("error", err))
-			return err
-		})
+		f.WithErrorHandler(outlet.writeError)
 		log.SetOutput(f)
 	}
-	orderedFields := [...]string{JobField, SubsysField, SpanField}
-	return new(FileOutlet).withOrderedFields(orderedFields[:]), nil
+	return outlet, nil
 }
 
 type FileOutlet struct {
@@ -204,6 +201,8 @@ type FileOutlet struct {
 
 	ordered     []string
 	skipOrdered map[string]struct{}
+
+	lastErr error
 }
 
 func (self *FileOutlet) WithHideFields(fields []string) *FileOutlet {
@@ -240,9 +239,21 @@ func (self *FileOutlet) level(l logger.Level) slog.Level {
 	return slog.LevelError
 }
 
+func (self *FileOutlet) writeError(err error) error {
+	self.lastErr = err
+	return err
+}
+
 func (self *FileOutlet) WriteEntry(e logger.Entry) error {
 	attrs := self.attrs(&e)
 	slog.LogAttrs(context.Background(), self.level(e.Level), e.Message, attrs...)
+	if self.lastErr != nil {
+		log.SetOutput(os.Stderr)
+		slog.LogAttrs(context.Background(), slog.LevelError,
+			"error writing log message", slog.Any("error", self.lastErr))
+		self.lastErr = nil
+		slog.LogAttrs(context.Background(), self.level(e.Level), e.Message, attrs...)
+	}
 	return nil
 }
 
@@ -305,7 +316,10 @@ func (self *logFile) Write(p []byte) (int, error) {
 		return 0, self.handleError(err)
 	}
 	n, err := self.file.Write(p)
-	return n, self.handleError(err)
+	if err != nil {
+		return n, self.handleError(err)
+	}
+	return n, nil
 }
 
 func (self *logFile) reopenIfNotExists() error {
