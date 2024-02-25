@@ -235,11 +235,11 @@ func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Lev
 		}
 		o, err = parseSyslogOutlet(v, f)
 	case *config.FileLoggingOutlet:
-		level, f, err = parseCommon(v.LoggingOutletCommon)
+		level, _, err = parseCommon(v.LoggingOutletCommon)
 		if err != nil {
 			break
 		}
-		o, err = parseFileOutlet(v, f)
+		o, err = parseFileOutlet(v, level)
 	default:
 		panic(v)
 	}
@@ -308,32 +308,11 @@ func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter EntryFormatter)
 	return out, nil
 }
 
-func parseFileOutlet(
-	in *config.FileLoggingOutlet, formatter EntryFormatter,
+func parseFileOutlet(in *config.FileLoggingOutlet, level logger.Level,
 ) (*FileOutlet, error) {
-	flags := MetadataNone
-	if in.Time {
-		flags |= MetadataTime
-	}
-	if in.LogLevel {
-		flags |= MetadataLevel
-	}
-
-	formatter.SetMetadataFlags(flags)
-	outlet := FileOutlet{
-		filename:  in.FileName,
-		formatter: formatter,
-	}
-
-	if in.Template != "" {
-		if err := outlet.ParseTemplate(in.Template); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := outlet.Open(); err != nil {
+	outlet, err := newFileOutlet(in.FileName)
+	if err != nil {
 		return nil, err
 	}
-
-	return &outlet, nil
+	return outlet.WithHideFields(in.HideFields).WithLevel(level), nil
 }

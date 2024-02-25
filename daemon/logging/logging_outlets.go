@@ -2,15 +2,18 @@ package logging
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
+	"log/slog"
 	"log/syslog"
 	"net"
 	"os"
+	"slices"
 	"syscall"
-	"text/template"
 	"time"
 
 	"github.com/pkg/errors"
@@ -176,41 +179,148 @@ func (o *SyslogOutlet) WriteEntry(entry logger.Entry) error {
 	}
 }
 
-type FileOutlet struct {
-	file      *os.File
-	filename  string
-	formatter EntryFormatter
-	template  *template.Template
+// --------------------------------------------------
+
+func newFileOutlet(filename string) (*FileOutlet, error) {
+	if filename != "" {
+		f, err := newLogFile(filename)
+		if err != nil {
+			return nil, err
+		}
+		f.WithErrorHandler(func(err error) error {
+			log.SetOutput(os.Stderr)
+			slog.LogAttrs(context.Background(), slog.LevelError,
+				"error writing log message", slog.Any("error", err))
+			return err
+		})
+		log.SetOutput(f)
+	}
+	orderedFields := [...]string{JobField, SubsysField, SpanField}
+	return new(FileOutlet).withOrderedFields(orderedFields[:]), nil
 }
 
-func (self *FileOutlet) WriteEntry(entry logger.Entry) error {
-	bytes, err := self.formatter.Format(&entry)
-	if err != nil {
-		return err
-	}
+type FileOutlet struct {
+	hide map[string]struct{}
 
-	if err := self.reOpenIfNotExists(); err != nil {
-		return err
-	}
+	ordered     []string
+	skipOrdered map[string]struct{}
+}
 
-	if self.template == nil {
-		if _, err := fmt.Fprintln(self.file, string(bytes)); err != nil {
-			return fmt.Errorf("failed write to %q: %w", self.filename, err)
-		}
-		return nil
+func (self *FileOutlet) WithHideFields(fields []string) *FileOutlet {
+	self.hide = make(map[string]struct{}, len(fields))
+	for _, field := range fields {
+		self.hide[field] = struct{}{}
 	}
+	return self
+}
 
-	if err := self.writeTemplate(entry.Time, string(bytes)); err != nil {
-		return err
+func (self *FileOutlet) WithLevel(l logger.Level) *FileOutlet {
+	slog.SetLogLoggerLevel(self.level(l))
+	return self
+}
+
+func (self *FileOutlet) withOrderedFields(fields []string) *FileOutlet {
+	self.ordered = fields
+	self.skipOrdered = make(map[string]struct{}, len(fields))
+	for _, k := range fields {
+		self.skipOrdered[k] = struct{}{}
 	}
+	return self
+}
 
+func (self *FileOutlet) level(l logger.Level) slog.Level {
+	switch l {
+	case logger.Debug:
+		return slog.LevelDebug
+	case logger.Info:
+		return slog.LevelInfo
+	case logger.Warn:
+		return slog.LevelWarn
+	}
+	return slog.LevelError
+}
+
+func (self *FileOutlet) WriteEntry(e logger.Entry) error {
+	attrs := self.attrs(&e)
+	slog.LogAttrs(context.Background(), self.level(e.Level), e.Message, attrs...)
 	return nil
 }
 
-func (self *FileOutlet) reOpenIfNotExists() error {
+func (self *FileOutlet) attrs(e *logger.Entry) []slog.Attr {
+	attrs := make([]slog.Attr, 0, len(e.Fields))
+	for _, k := range self.ordered {
+		if !self.hiddenField(k) {
+			if v, ok := e.Fields[k]; ok {
+				attrs = append(attrs, slog.Any(k, v))
+			}
+		}
+	}
+
+	orderedLen := len(attrs)
+	for k, v := range e.Fields {
+		if !self.orderedField(k) && !self.hiddenField(k) {
+			attrs = append(attrs, slog.Any(k, v))
+		}
+	}
+
+	if len(attrs) > orderedLen {
+		slices.SortFunc(attrs[orderedLen:], func(a, b slog.Attr) int {
+			return cmp.Compare(a.Key, b.Key)
+		})
+	}
+	return attrs
+}
+
+func (self *FileOutlet) hiddenField(name string) bool {
+	_, hide := self.hide[name]
+	return hide
+}
+
+func (self *FileOutlet) orderedField(name string) bool {
+	_, ok := self.skipOrdered[name]
+	return ok
+}
+
+// --------------------------------------------------
+
+func newLogFile(filename string) (f *logFile, err error) {
+	f = &logFile{filename: filename}
+	err = f.Open()
+	return
+}
+
+type logFile struct {
+	file         *os.File
+	filename     string
+	errorHandler func(err error) error
+}
+
+func (self *logFile) WithErrorHandler(fn func(err error) error) *logFile {
+	self.errorHandler = fn
+	return self
+}
+
+func (self *logFile) Write(p []byte) (int, error) {
+	if err := self.reopenIfNotExists(); err != nil {
+		return 0, self.handleError(err)
+	}
+	n, err := self.file.Write(p)
+	return n, self.handleError(err)
+}
+
+func (self *logFile) reopenIfNotExists() error {
+	if ok, err := self.exists(); err != nil {
+		return err
+	} else if ok {
+		return nil
+	}
+	return self.reopen()
+}
+
+func (self *logFile) exists() (bool, error) {
 	finfo, err := self.file.Stat()
 	if err != nil {
-		return fmt.Errorf("failed stat of %q: %w", self.filename, err)
+		return false, fmt.Errorf("stat of %q: %w", self.filename, err)
 	}
 
 	nlink := uint64(0)
@@ -219,60 +329,28 @@ func (self *FileOutlet) reOpenIfNotExists() error {
 			nlink = stat.Nlink
 		}
 	}
-	if nlink > 0 {
-		return nil
-	}
-
-	return self.reOpen()
+	return nlink > 0, nil
 }
 
-func (self *FileOutlet) reOpen() error {
+func (self *logFile) reopen() error {
 	if err := self.file.Close(); err != nil {
-		return fmt.Errorf("failed close %q: %w", self.filename, err)
+		return fmt.Errorf("close %q: %w", self.filename, err)
 	}
-
 	return self.Open()
 }
 
-func (self *FileOutlet) Open() error {
+func (self *logFile) Open() error {
 	f, err := os.OpenFile(self.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("file outlet: %w", err)
+		return fmt.Errorf("open file: %w", err)
 	}
 	self.file = f
-
 	return nil
 }
 
-func (self *FileOutlet) ParseTemplate(templateText string) error {
-	tmpl, err := template.New("").Parse(templateText)
-	if err != nil {
-		return fmt.Errorf("failed parse template %q: %w", templateText, err)
+func (self *logFile) handleError(err error) error {
+	if self.errorHandler != nil {
+		return self.errorHandler(err)
 	}
-	self.template = tmpl
-
-	return nil
-}
-
-func (self *FileOutlet) writeTemplate(t time.Time, msg string) error {
-	data := struct {
-		Time    time.Time
-		Pid     int
-		Message string
-	}{
-		Time:    t,
-		Pid:     os.Getpid(),
-		Message: msg,
-	}
-
-	var b bytes.Buffer
-	if err := self.template.Execute(&b, data); err != nil {
-		return fmt.Errorf("failed execute template: %w", err)
-	}
-
-	if _, err := fmt.Fprintln(self.file, b.String()); err != nil {
-		return fmt.Errorf("failed write to %q: %w", self.filename, err)
-	}
-
-	return nil
+	return err
 }

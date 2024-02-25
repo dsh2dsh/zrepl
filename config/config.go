@@ -440,10 +440,8 @@ type LoggingOutletCommon struct {
 
 type FileLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	FileName            string `yaml:"filename"`
-	Time                bool   `yaml:"time,default=true"`
-	LogLevel            bool   `yaml:"log_level,default=true"`
-	Template            string `yaml:"template"`
+	FileName            string   `yaml:"filename,optional"`
+	HideFields          []string `yaml:"hide_fields,optional"`
 }
 
 type StdoutLoggingOutlet struct {
