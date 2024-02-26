@@ -307,12 +307,3 @@ func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter EntryFormatter)
 	out.RetryInterval = in.RetryInterval
 	return out, nil
 }
-
-func parseFileOutlet(in *config.FileLoggingOutlet, level logger.Level,
-) (*FileOutlet, error) {
-	outlet, err := newFileOutlet(in.FileName)
-	if err != nil {
-		return nil, err
-	}
-	return outlet.WithHideFields(in.HideFields).WithLevel(level), nil
-}
