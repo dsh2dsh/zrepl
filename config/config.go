@@ -442,6 +442,7 @@ type FileLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
 	FileName            string   `yaml:"filename,optional"`
 	HideFields          []string `yaml:"hide_fields,optional"`
+	Time                bool     `yaml:"time,default=true"`
 }
 
 type StdoutLoggingOutlet struct {

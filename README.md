@@ -23,6 +23,22 @@ zrepl is a one-stop ZFS backup & replication solution.
 
   * Added ability to log into a file. See
     [#756](https://github.com/zrepl/zrepl/pull/756)
+    Configuration example:
+
+    ``` yaml
+    logging:
+      - type: "file"              # without filename logs to stderr
+        level:  "error"           # copy all errors to stderr
+        format: "human"
+        time: false               # don't prepend with date and time
+        hide_fields: &hide-log-fields
+          - "span"
+      - type: "file"
+        level:  "info"
+        format: "human"
+        filename: "/var/log/zrepl.log"
+        hide_fields: *hide-log-fields
+    ```
 
   * Replication jobs (without periodic snapshotting) can be configured for
     periodic run. See [#758](https://github.com/zrepl/zrepl/pull/758)
