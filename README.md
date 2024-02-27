@@ -19,11 +19,22 @@ zrepl is a one-stop ZFS backup & replication solution.
     [#691](https://github.com/zrepl/zrepl/pull/750)~~ Merged.
 
   * Added support of shell patterns for datasets definitions. See
-    [#755](https://github.com/zrepl/zrepl/pull/755).
+    [#755](https://github.com/zrepl/zrepl/pull/755). Configuration example:
+
+    ``` yaml
+    filesystems:
+      "zroot/bastille/jails</*/root": true
+    ```
+
+    This configuration includes `zroot/bastille/jails/a/root`,
+    `zroot/bastille/jails/b/root` zfs datasets and so on, and excludes
+    `zroot/bastille/jails/a`, `zroot/bastille/jails/b` zfs datasets and so on.
+
+    See [Match](https://pkg.go.dev/path/filepath@go1.22.0#Match) for details
+    about patterns.
 
   * Added ability to log into a file. See
-    [#756](https://github.com/zrepl/zrepl/pull/756)
-    Configuration example:
+    [#756](https://github.com/zrepl/zrepl/pull/756). Configuration example:
 
     ``` yaml
     logging:
@@ -41,14 +52,75 @@ zrepl is a one-stop ZFS backup & replication solution.
     ```
 
   * Replication jobs (without periodic snapshotting) can be configured for
-    periodic run. See [#758](https://github.com/zrepl/zrepl/pull/758)
+    periodic run. See [#758](https://github.com/zrepl/zrepl/pull/758).
+    Configuration example:
+
+    ``` yaml
+    - name: "zroot-to-server"
+      type: "push"
+      interval: "1h"
+      snapshotting:
+        type: "manual"
+    ```
 
   * Added ability to configure command piplines between `zfs send` and `zfs recv`.
-    See [#761](https://github.com/zrepl/zrepl/pull/761).
+    See [#761](https://github.com/zrepl/zrepl/pull/761). Configuration example:
+
+    ``` yaml
+    send:
+      execpipe:
+        # zfs send | zstd | mbuffer
+        - [ "zstd", "-3" ]
+        - [ "/usr/local/bin/mbuffer", "-q", "-s", "128k", "-m", "100M" ]
+    ```
+
+    ``` yaml
+    recv:
+      execpipe:
+        # mbuffer | unzstd | zfs receive
+        - [ "/usr/local/bin/mbuffer", "-q", "-s", "128k", "-m", "100M" ]
+        - [ "unzstd" ]
+    ```
 
   * Added Icinga/Nagios checks for checking the daemon is alive, latests or
     oldest snapshots are not too old. See
-    [#765](https://github.com/zrepl/zrepl/pull/765)
+    [#765](https://github.com/zrepl/zrepl/pull/765). Configuration example:
+
+    ``` yaml
+    monitor:
+      latest:
+        - prefix: "zrepl_frequently_"
+          critical: "48h"       # 2d
+        - prefix: "zrepl_hourly_"
+          critical: "48h"
+        - prefix: "zrepl_daily_"
+          critical: "48h"
+        - prefix: "zrepl_monthly_"
+          critical: "768h"      # 32d
+      oldest:
+        - prefix: "zrepl_frequently_"
+          critical: "48h"       # 2d
+        - prefix: "zrepl_hourly_"
+          critical: "168h"      # 7d
+        - prefix: "zrepl_daily_"
+          critical: "2208h"     # 90d + 2d
+        - prefix: "zrepl_monthly_"
+          critical: "8688h"     # 30 * 12 = 360d + 2d
+        - prefix: ""            # everything else
+          critical: "168h"      # 7d
+    ```
+
+    Example of a daily script:
+
+    ``` shell
+    echo
+    echo "zrepl status:"
+    zrepl monitor alive
+    zrepl monitor snapshots latest --job zdisk
+    zrepl monitor snapshots oldest --job zdisk
+    zrepl monitor snapshots latest --job zroot-to-zdisk
+    zrepl monitor snapshots oldest --job zroot-to-zdisk
+    ```
 
   * Small cosmetic changes
 
