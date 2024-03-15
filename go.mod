@@ -9,7 +9,7 @@ require (
 	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
 	github.com/go-logfmt/logfmt v0.6.0
 	github.com/go-playground/validator/v10 v10.19.0
-	github.com/go-sql-driver/mysql v1.7.1
+	github.com/go-sql-driver/mysql v1.8.0
 	github.com/google/uuid v1.6.0
 	github.com/inexio/go-monitoringplugin v1.0.13
 	github.com/jinzhu/copier v0.4.0
@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
