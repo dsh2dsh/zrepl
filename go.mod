@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/bits-and-blooms/bitset v1.13.0
+	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.16.0
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
@@ -11,7 +12,6 @@ require (
 	github.com/go-playground/validator/v10 v10.19.0
 	github.com/go-sql-driver/mysql v1.8.0
 	github.com/google/uuid v1.6.0
-	github.com/inexio/go-monitoringplugin v1.0.13
 	github.com/jinzhu/copier v0.4.0
 	github.com/juju/ratelimit v1.0.2
 	github.com/kr/pretty v0.3.1

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inexio/go-monitoringplugin"
+	"github.com/dsh2dsh/go-monitoringplugin/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/zrepl/zrepl/cli"
@@ -71,7 +71,8 @@ func newOldestSnapshotsCmd(runner *monitorSnapshots) *cli.Subcommand {
 	return &cli.Subcommand{
 		Use:   "oldest",
 		Short: "check oldest snapshots are not too old, according to rules",
-		Run: func(ctx context.Context, subcmd *cli.Subcommand, args []string) error {
+		Run: func(ctx context.Context, subcmd *cli.Subcommand, args []string,
+		) error {
 			runner.oldest = true
 			return runner.run(ctx, subcmd, args)
 		},
@@ -229,7 +230,6 @@ func (self *monitorSnapshots) checkSnapshots(
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -321,7 +321,6 @@ func (self *monitorSnapshots) outputAndExit(err error) {
 			resp.UpdateStatus(monitoringplugin.UNKNOWN, status)
 		}
 	}
-
 	resp.OutputAndExit()
 }
 
@@ -331,6 +330,8 @@ func (self *monitorSnapshots) snapshotType() string {
 	}
 	return "latest"
 }
+
+// --------------------------------------------------
 
 func newMonitorCriticalf(msg string, v ...interface{}) monitorCheckResult {
 	return monitorCheckResult{
@@ -355,6 +356,8 @@ type monitorCheckResult struct {
 func (self monitorCheckResult) Error() string {
 	return self.msg
 }
+
+// --------------------------------------------------
 
 type monitorAlive struct{}
 
