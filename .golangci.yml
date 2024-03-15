@@ -7,6 +7,7 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
+        - wrapcheck
     # Disable staticcheck 'Empty body in an if or else branch' as it's useful
     # to put a comment into an empty else-clause that explains why whatever
     # is done in the if-caluse is not necessary if the condition is false.
