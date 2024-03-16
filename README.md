@@ -33,22 +33,36 @@ zrepl is a one-stop ZFS backup & replication solution.
     See [Match](https://pkg.go.dev/path/filepath@go1.22.0#Match) for details
     about patterns.
 
+  * Added new log formatters: `json` and `text`. Both formatters use
+    [slog](https://pkg.go.dev/log/slog) for formatting log entries. The new
+    `json` formatter replaces old `json` formatter. Configuration example:
+
+    ``` yaml
+    logging:
+      - type: "file"
+        format: "text"            # or "json"
+        time: false               # don't prepend with date and time
+        hide_fields:
+          - "span"                # don't log "span" field
+    ```
+
   * Added ability to log into a file. See
     [#756](https://github.com/zrepl/zrepl/pull/756). Configuration example:
 
     ``` yaml
     logging:
-      - type: "file"              # without filename logs to stderr
-        level:  "error"           # copy all errors to stderr
-        format: "human"
+      - type: "file"
+        format: "text"            # or "json"
         time: false               # don't prepend with date and time
         hide_fields: &hide-log-fields
-          - "span"
+          - "span"                # don't log "span" field
+        level:  "error"           # log errors only
+        # without filename logs to stderr
       - type: "file"
-        level:  "info"
-        format: "human"
-        filename: "/var/log/zrepl.log"
+        format: "text"
         hide_fields: *hide-log-fields
+        level:  "info"
+        filename: "/var/log/zrepl.log"
     ```
 
   * Replication jobs (without periodic snapshotting) can be configured for

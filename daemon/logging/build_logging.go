@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"log/syslog"
 	"os"
 
@@ -17,7 +18,6 @@ import (
 )
 
 func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error) {
-
 	outlets := logger.NewOutlets()
 
 	if len(in) == 0 {
@@ -55,7 +55,6 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 	}
 
 	return outlets, nil
-
 }
 
 type Subsystem string
@@ -147,10 +146,10 @@ func GetLoggers(ctx context.Context) SubsystemLoggers {
 }
 
 func GetLogger(ctx context.Context, subsys Subsystem) logger.Logger {
-	return getLoggerImpl(ctx, subsys, true)
+	return getLoggerImpl(ctx, subsys)
 }
 
-func getLoggerImpl(ctx context.Context, subsys Subsystem, panicIfEnded bool) logger.Logger {
+func getLoggerImpl(ctx context.Context, subsys Subsystem) logger.Logger {
 	loggers, ok := ctx.Value(contextKeyLoggers).(SubsystemLoggers)
 	if !ok || loggers == nil {
 		return logger.NewNullLogger()
@@ -173,30 +172,23 @@ func getLoggerImpl(ctx context.Context, subsys Subsystem, panicIfEnded bool) log
 	return l
 }
 
-func parseLogFormat(i interface{}) (f EntryFormatter, err error) {
-	var is string
-	switch j := i.(type) {
-	case string:
-		is = j
-	default:
-		return nil, errors.Errorf("invalid log format: wrong type: %T", i)
-	}
-
-	switch is {
+func parseLogFormat(common config.LoggingOutletCommon,
+) (f EntryFormatter, err error) {
+	switch common.Format {
 	case "human":
 		return &HumanFormatter{}, nil
 	case "logfmt":
 		return &LogfmtFormatter{}, nil
 	case "json":
-		return &JSONFormatter{}, nil
+		return parseSlogFormatter(&common).WithJsonHandler(), nil
+	case "text":
+		return parseSlogFormatter(&common).WithTextHandler(), nil
 	default:
-		return nil, errors.Errorf("invalid log format: '%s'", is)
+		return nil, fmt.Errorf("invalid log format: '%s'", common.Format)
 	}
-
 }
 
 func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Level, err error) {
-
 	parseCommon := func(common config.LoggingOutletCommon) (logger.Level, EntryFormatter, error) {
 		if common.Level == "" || common.Format == "" {
 			return 0, nil, errors.Errorf("must specify 'level' and 'format' field")
@@ -206,7 +198,7 @@ func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Lev
 		if err != nil {
 			return 0, nil, errors.Wrap(err, "cannot parse 'level' field")
 		}
-		formatter, err := parseLogFormat(common.Format)
+		formatter, err := parseLogFormat(common)
 		if err != nil {
 			return 0, nil, errors.Wrap(err, "cannot parse 'formatter' field")
 		}
@@ -235,11 +227,11 @@ func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Lev
 		}
 		o, err = parseSyslogOutlet(v, f)
 	case *config.FileLoggingOutlet:
-		level, _, err = parseCommon(v.LoggingOutletCommon)
+		level, f, err = parseCommon(v.LoggingOutletCommon)
 		if err != nil {
 			break
 		}
-		o, err = parseFileOutlet(v, level)
+		o, err = parseFileOutlet(v, f)
 	default:
 		panic(v)
 	}
@@ -296,7 +288,6 @@ func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter) (out 
 
 	formatter.SetMetadataFlags(MetadataAll)
 	return NewTCPOutlet(formatter, in.Net, in.Address, tlsConfig, in.RetryInterval), nil
-
 }
 
 func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter EntryFormatter) (out *SyslogOutlet, err error) {

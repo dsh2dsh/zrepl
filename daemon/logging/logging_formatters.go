@@ -2,8 +2,8 @@ package logging
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/fatih/color"
@@ -36,13 +36,32 @@ const (
 	MetadataAll  MetadataFlags = ^0
 )
 
+// --------------------------------------------------
+
 type NoFormatter struct{}
 
 func (f NoFormatter) SetMetadataFlags(flags MetadataFlags) {}
 
+func (f NoFormatter) Write(w io.Writer, e *logger.Entry) error {
+	return writeFormatEntry(w, e, f)
+}
+
+func writeFormatEntry(w io.Writer, e *logger.Entry, f EntryFormatter) error {
+	b, err := f.Format(e)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(b); err != nil {
+		return fmt.Errorf("write formatted entry: %w", err)
+	}
+	return nil
+}
+
 func (f NoFormatter) Format(e *logger.Entry) ([]byte, error) {
 	return []byte(e.Message), nil
 }
+
+// --------------------------------------------------
 
 type HumanFormatter struct {
 	metadataFlags MetadataFlags
@@ -72,7 +91,6 @@ func (f *HumanFormatter) ignored(field string) bool {
 }
 
 func (f *HumanFormatter) Format(e *logger.Entry) (out []byte, err error) {
-
 	var line bytes.Buffer
 	col := color.New()
 	if f.metadataFlags&MetadataColor != 0 {
@@ -116,38 +134,11 @@ func (f *HumanFormatter) Format(e *logger.Entry) (out []byte, err error) {
 	return line.Bytes(), nil
 }
 
-type JSONFormatter struct {
-	metadataFlags MetadataFlags
+func (f *HumanFormatter) Write(w io.Writer, e *logger.Entry) error {
+	return writeFormatEntry(w, e, f)
 }
 
-func (f *JSONFormatter) SetMetadataFlags(flags MetadataFlags) {
-	f.metadataFlags = flags
-}
-
-func (f *JSONFormatter) Format(e *logger.Entry) ([]byte, error) {
-	data := make(logger.Fields, len(e.Fields)+3)
-	for k, v := range e.Fields {
-		switch v := v.(type) {
-		case error:
-			// Otherwise errors are ignored by `encoding/json`
-			// https://github.com/sirupsen/logrus/issues/137
-			data[k] = v.Error()
-		default:
-			_, err := json.Marshal(v)
-			if err != nil {
-				return nil, errors.Errorf("field is not JSON encodable: %s", k)
-			}
-			data[k] = v
-		}
-	}
-
-	data[FieldMessage] = e.Message
-	data[FieldTime] = e.Time.Format(time.RFC3339)
-	data[FieldLevel] = e.Level
-
-	return json.Marshal(data)
-
-}
+// --------------------------------------------------
 
 type LogfmtFormatter struct {
 	metadataFlags MetadataFlags
@@ -204,7 +195,6 @@ func (f *LogfmtFormatter) Format(e *logger.Entry) ([]byte, error) {
 }
 
 func logfmtTryEncodeKeyval(enc *logfmt.Encoder, field, value interface{}) error {
-
 	err := enc.EncodeKeyval(field, value)
 	switch err {
 	case nil: // ok
@@ -217,5 +207,8 @@ func logfmtTryEncodeKeyval(enc *logfmt.Encoder, field, value interface{}) error 
 		return nil
 	}
 	return errors.Wrapf(err, "cannot encode field '%s'", field)
+}
 
+func (f *LogfmtFormatter) Write(w io.Writer, e *logger.Entry) error {
+	return writeFormatEntry(w, e, f)
 }

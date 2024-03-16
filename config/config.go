@@ -304,7 +304,7 @@ format: "human"
 	if err != nil {
 		panic(err)
 	}
-	*l = []LoggingOutletEnum{LoggingOutletEnum{Ret: s}}
+	*l = []LoggingOutletEnum{{Ret: s}}
 }
 
 var _ yaml.Defaulter = &LoggingOutletEnumList{}
@@ -358,8 +358,8 @@ type SSHStdinserverConnect struct {
 	User                 string        `yaml:"user"`
 	Port                 uint16        `yaml:"port"`
 	IdentityFile         string        `yaml:"identity_file"`
-	TransportOpenCommand []string      `yaml:"transport_open_command,optional"` //TODO unused
-	SSHCommand           string        `yaml:"ssh_command,optional"`            //TODO unused
+	TransportOpenCommand []string      `yaml:"transport_open_command,optional"` // TODO unused
+	SSHCommand           string        `yaml:"ssh_command,optional"`            // TODO unused
 	Options              []string      `yaml:"options,optional"`
 	DialTimeout          time.Duration `yaml:"dial_timeout,zeropositive,default=10s"`
 }
@@ -433,16 +433,16 @@ type LoggingOutletEnum struct {
 }
 
 type LoggingOutletCommon struct {
-	Type   string `yaml:"type"`
-	Level  string `yaml:"level"`
-	Format string `yaml:"format"`
+	Type       string   `yaml:"type"`
+	Level      string   `yaml:"level"`
+	Format     string   `yaml:"format"`
+	HideFields []string `yaml:"hide_fields,optional"`
+	Time       bool     `yaml:"time,default=true"`
 }
 
 type FileLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	FileName            string   `yaml:"filename,optional"`
-	HideFields          []string `yaml:"hide_fields,optional"`
-	Time                bool     `yaml:"time,default=true"`
+	FileName            string `yaml:"filename,optional"`
 }
 
 type StdoutLoggingOutlet struct {

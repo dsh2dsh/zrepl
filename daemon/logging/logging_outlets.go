@@ -17,6 +17,7 @@ import (
 type EntryFormatter interface {
 	SetMetadataFlags(flags MetadataFlags)
 	Format(e *logger.Entry) ([]byte, error)
+	Write(w io.Writer, e *logger.Entry) error
 }
 
 type WriterOutlet struct {
@@ -25,16 +26,7 @@ type WriterOutlet struct {
 }
 
 func (h WriterOutlet) WriteEntry(entry logger.Entry) error {
-	bytes, err := h.formatter.Format(&entry)
-	if err != nil {
-		return err
-	}
-	_, err = h.writer.Write(bytes)
-	if err != nil {
-		return err
-	}
-	_, err = h.writer.Write([]byte("\n"))
-	return err
+	return h.formatter.Write(h.writer, &entry)
 }
 
 type TCPOutlet struct {
@@ -46,7 +38,6 @@ type TCPOutlet struct {
 }
 
 func NewTCPOutlet(formatter EntryFormatter, network, address string, tlsConfig *tls.Config, retryInterval time.Duration) *TCPOutlet {
-
 	connect := func(ctx context.Context) (conn net.Conn, err error) {
 		deadl, ok := ctx.Deadline()
 		if !ok {
@@ -82,7 +73,6 @@ func (h *TCPOutlet) Close() {
 }
 
 func (h *TCPOutlet) outLoop(retryInterval time.Duration) {
-
 	var retry time.Time
 	var conn net.Conn
 	for msg := range h.entryChan {
@@ -110,15 +100,10 @@ func (h *TCPOutlet) outLoop(retryInterval time.Duration) {
 }
 
 func (h *TCPOutlet) WriteEntry(e logger.Entry) error {
-
-	ebytes, err := h.formatter.Format(&e)
-	if err != nil {
+	buf := new(bytes.Buffer)
+	if err := h.formatter.Write(buf, &e); err != nil {
 		return err
 	}
-
-	buf := new(bytes.Buffer)
-	buf.Write(ebytes)
-	buf.WriteString("\n")
 
 	select {
 	case h.entryChan <- buf:
@@ -137,7 +122,6 @@ type SyslogOutlet struct {
 }
 
 func (o *SyslogOutlet) WriteEntry(entry logger.Entry) error {
-
 	bytes, err := o.Formatter.Format(&entry)
 	if err != nil {
 		return err
