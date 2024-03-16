@@ -5,8 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/util/bandwidthlimit"
 )
@@ -29,7 +27,7 @@ func JobsFromConfig(c *config.Config, parseFlags config.ParseFlags) ([]Job, erro
 
 func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags) (j Job, err error) {
 	cannotBuildJob := func(e error, name string) (Job, error) {
-		return nil, errors.Wrapf(e, "cannot build job %q", name)
+		return nil, fmt.Errorf("cannot build job %q: %w", name, e)
 	}
 	// FIXME prettify this
 	switch v := in.Ret.(type) {
@@ -62,7 +60,6 @@ func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags)
 		panic(fmt.Sprintf("implementation error: unknown job type %T", v))
 	}
 	return j, nil
-
 }
 
 func validateReceivingSidesDoNotOverlap(receivingRootFSs []string) error {

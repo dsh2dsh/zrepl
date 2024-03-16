@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 func controlHttpClient(sockpath string) (client http.Client, err error) {
@@ -37,7 +36,7 @@ func jsonRequestResponse(c http.Client, endpoint string, req interface{}, res in
 	if resp.StatusCode != http.StatusOK {
 		var msg bytes.Buffer
 		_, _ = io.CopyN(&msg, resp.Body, 4096) // ignore error, just display what we got
-		return errors.Errorf("%s", msg.String())
+		return errors.New(msg.String())
 	}
 
 	decodeError := json.NewDecoder(resp.Body).Decode(&res)

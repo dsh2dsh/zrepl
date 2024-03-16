@@ -6,7 +6,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
@@ -44,16 +43,16 @@ func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob, err er
 	j = &SnapJob{}
 	fsf, err := filters.DatasetMapFilterFromConfig(in.Filesystems)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build filesystem filter")
+		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}
 	j.fsfilter = fsf
 
 	if j.snapper, err = snapper.FromConfig(g, fsf, in.Snapshotting); err != nil {
-		return nil, errors.Wrap(err, "cannot build snapper")
+		return nil, fmt.Errorf("cannot build snapper: %w", err)
 	}
 	j.name, err = endpoint.MakeJobID(in.Name)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid job name")
+		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
 	j.promPruneSecs = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace:   "zrepl",
@@ -64,7 +63,7 @@ func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob, err er
 	}, []string{"prune_side"})
 	j.prunerFactory, err = pruner.NewLocalPrunerFactory(in.Pruning, j.promPruneSecs)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build snapjob pruning rules")
+		return nil, fmt.Errorf("cannot build snapjob pruning rules: %w", err)
 	}
 	return j, nil
 }

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
@@ -183,17 +182,17 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 
 	m.senderConfig, err = buildSenderConfig(in, jobID)
 	if err != nil {
-		return nil, errors.Wrap(err, "sender config")
+		return nil, fmt.Errorf("sender config: %w", err)
 	}
 
 	replicationConfig, err := logic.ReplicationConfigFromConfig(in.Replication)
 	if err != nil {
-		return nil, errors.Wrap(err, "field `replication`")
+		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
 
 	conflictResolution, err := logic.ConflictResolutionFromConfig(in.ConflictResolution)
 	if err != nil {
-		return nil, errors.Wrap(err, "field `conflict_resolution`")
+		return nil, fmt.Errorf("field `conflict_resolution`: %w", err)
 	}
 
 	m.plannerPolicy = &logic.PlannerPolicy{
@@ -202,11 +201,11 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 		SizeEstimationConcurrency: in.Replication.Concurrency.SizeEstimates,
 	}
 	if err := m.plannerPolicy.Validate(); err != nil {
-		return nil, errors.Wrap(err, "cannot build planner policy")
+		return nil, fmt.Errorf("cannot build planner policy: %w", err)
 	}
 
 	if m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting); err != nil {
-		return nil, errors.Wrap(err, "cannot build snapper")
+		return nil, fmt.Errorf("cannot build snapper: %w", err)
 	}
 
 	return m, nil
@@ -292,12 +291,12 @@ func modePullFromConfig(g *config.Global, in *config.PullJob, jobID endpoint.Job
 
 	replicationConfig, err := logic.ReplicationConfigFromConfig(in.Replication)
 	if err != nil {
-		return nil, errors.Wrap(err, "field `replication`")
+		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
 
 	conflictResolution, err := logic.ConflictResolutionFromConfig(in.ConflictResolution)
 	if err != nil {
-		return nil, errors.Wrap(err, "field `conflict_resolution`")
+		return nil, fmt.Errorf("field `conflict_resolution`: %w", err)
 	}
 
 	m.plannerPolicy = &logic.PlannerPolicy{
@@ -306,7 +305,7 @@ func modePullFromConfig(g *config.Global, in *config.PullJob, jobID endpoint.Job
 		SizeEstimationConcurrency: in.Replication.Concurrency.SizeEstimates,
 	}
 	if err := m.plannerPolicy.Validate(); err != nil {
-		return nil, errors.Wrap(err, "cannot build planner policy")
+		return nil, fmt.Errorf("cannot build planner policy: %w", err)
 	}
 
 	m.receiverConfig, err = buildReceiverConfig(in, jobID)
@@ -328,11 +327,10 @@ func replicationDriverConfigFromConfig(in *config.Replication) (c driver.Config,
 }
 
 func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, parseFlags config.ParseFlags) (j *ActiveSide, err error) {
-
 	j = &ActiveSide{}
 	j.name, err = endpoint.MakeJobID(in.Name)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid job name")
+		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
 
 	switch v := configJob.(type) {
@@ -378,7 +376,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 
 	j.connecter, err = fromconfig.ConnecterFromConfig(g, in.Connect, parseFlags)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build client")
+		return nil, fmt.Errorf("cannot build client: %w", err)
 	}
 
 	j.promPruneSecs = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -395,7 +393,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 
 	j.replicationDriverConfig, err = replicationDriverConfigFromConfig(in.Replication)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build replication driver config")
+		return nil, fmt.Errorf("cannot build replication driver config: %w", err)
 	}
 
 	return j, nil
@@ -500,7 +498,6 @@ outer:
 }
 
 func (j *ActiveSide) do(ctx context.Context) {
-
 	j.mode.ConnectEndpoints(ctx, j.connecter)
 	defer j.mode.DisconnectEndpoints()
 
@@ -542,7 +539,7 @@ func (j *ActiveSide) do(ctx context.Context) {
 		repCancel()   // always cancel to free up context resources
 
 		replicationReport := j.tasks.replicationReport()
-		var numErrors = replicationReport.GetFailedFilesystemsCountInLatestAttempt()
+		numErrors := replicationReport.GetFailedFilesystemsCountInLatestAttempt()
 		j.promReplicationErrors.Set(float64(numErrors))
 		if numErrors == 0 {
 			j.promLastSuccessful.SetToCurrentTime()
@@ -593,5 +590,4 @@ func (j *ActiveSide) do(ctx context.Context) {
 	j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.state = ActiveSideDone
 	})
-
 }

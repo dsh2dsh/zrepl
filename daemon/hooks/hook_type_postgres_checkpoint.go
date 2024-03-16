@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/filters"
@@ -24,11 +23,11 @@ type PgChkptHook struct {
 func PgChkptHookFromConfig(in *config.HookPostgresCheckpoint) (*PgChkptHook, error) {
 	filesystems, err := filters.DatasetMapFilterFromConfig(in.Filesystems)
 	if err != nil {
-		return nil, errors.Wrap(err, "`filesystems` invalid")
+		return nil, fmt.Errorf("`filesystems` invalid: %w", err)
 	}
 	cn, err := pq.NewConnector(in.DSN)
 	if err != nil {
-		return nil, errors.Wrap(err, "`dsn` invalid")
+		return nil, fmt.Errorf("`dsn` invalid: %w", err)
 	}
 
 	return &PgChkptHook{
@@ -71,7 +70,6 @@ func (h *PgChkptHook) Run(ctx context.Context, edge Edge, phase Phase, dryRun bo
 }
 
 func (h *PgChkptHook) doRunPre(ctx context.Context, fs *zfs.DatasetPath, dry bool) error {
-
 	if pass, err := h.filesystems.Filter(fs); err != nil || !pass {
 		getLogger(ctx).Debug("filesystem does not match filter, skipping")
 		return err

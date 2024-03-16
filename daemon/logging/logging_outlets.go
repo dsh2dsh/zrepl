@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"log/syslog"
 	"net"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/logger"
 )

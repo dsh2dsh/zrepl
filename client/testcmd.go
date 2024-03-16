@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/zrepl/zrepl/cli"
@@ -40,7 +39,6 @@ var testFilter = &cli.Subcommand{
 }
 
 func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []string) error {
-
 	if testFilterArgs.job == "" {
 		return fmt.Errorf("must specify --job flag")
 	}
@@ -80,7 +78,6 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 			return fmt.Errorf("could not list ZFS filesystems: %s", err)
 		}
 		for _, row := range out {
-
 			fsnames = append(fsnames, row[0])
 		}
 	}
@@ -137,7 +134,6 @@ var testPlaceholder = &cli.Subcommand{
 }
 
 func runTestPlaceholder(ctx context.Context, subcommand *cli.Subcommand, args []string) error {
-
 	var checkDPs []*zfs.DatasetPath
 	var datasetWasExplicitArgument bool
 
@@ -146,7 +142,7 @@ func runTestPlaceholder(ctx context.Context, subcommand *cli.Subcommand, args []
 		datasetWasExplicitArgument = false
 		out, err := zfs.ZFSList(ctx, []string{"name"})
 		if err != nil {
-			return errors.Wrap(err, "could not list ZFS filesystems")
+			return fmt.Errorf("could not list ZFS filesystems: %w", err)
 		}
 		for _, row := range out {
 			dp, err := zfs.NewDatasetPath(row[0])
@@ -171,11 +167,11 @@ func runTestPlaceholder(ctx context.Context, subcommand *cli.Subcommand, args []
 	for _, dp := range checkDPs {
 		ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, dp)
 		if err != nil {
-			return errors.Wrap(err, "cannot get placeholder state")
+			return fmt.Errorf("cannot get placeholder state: %w", err)
 		}
 		if !ph.FSExists {
 			if datasetWasExplicitArgument {
-				return errors.Errorf("filesystem %q does not exist", ph.FS)
+				return fmt.Errorf("filesystem %q does not exist", ph.FS)
 			} else {
 				// got deleted between ZFSList and ZFSGetFilesystemPlaceholderState
 				continue

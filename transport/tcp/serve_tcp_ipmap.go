@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/zrepl/zrepl/transport"
@@ -26,12 +25,11 @@ type ipMap struct {
 }
 
 func ipMapFromConfig(clients map[string]string) (*ipMap, error) {
-
 	entries := make([]*ipMapEntry, 0, len(clients))
 	for clientInput, clientIdent := range clients {
 		userIPMapEntry, err := newIPMapEntry(clientInput, clientIdent)
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot not parse %q:%q", clientInput, clientIdent)
+			return nil, fmt.Errorf("cannot not parse %q:%q: %w", clientInput, clientIdent, err)
 		}
 
 		entries = append(entries, userIPMapEntry)
@@ -51,7 +49,7 @@ func (m *ipMap) Get(ipAddr *net.IPAddr) (string, error) {
 			return zfsDatasetPathComponentCompatibleRepresentation(e.ident, ipAddr), nil
 		}
 	}
-	return "", errors.Errorf("no identity mapping for client IP: %s%%%s", ipAddr.IP, ipAddr.Zone)
+	return "", fmt.Errorf("no identity mapping for client IP: %s%%%s", ipAddr.IP, ipAddr.Zone)
 }
 
 var ipv6FullySpecifiedMask = bytes.Repeat([]byte{0xff}, net.IPv6len)
@@ -75,12 +73,12 @@ func newIPMapEntry(input string, ident string) (*ipMapEntry, error) {
 		}
 
 		if err := transport.ValidateClientIdentity(ident); err != nil {
-			return nil, errors.Wrapf(err, "invalid client identity %q for IP %q", ident, ip)
+			return nil, fmt.Errorf("invalid client identity %q for IP %q: %w", ident, ip, err)
 		}
 
 		parsedIP := net.ParseIP(ip)
 		if parsedIP == nil {
-			return nil, errors.Wrapf(err, "invalid client address %q", ip)
+			return nil, fmt.Errorf("invalid client address %q: %w", ip, err)
 		}
 		parsedIP = parsedIP.To16()
 
@@ -98,7 +96,7 @@ func newIPMapEntry(input string, ident string) (*ipMapEntry, error) {
 
 	if strings.Count(ident, "*") != 1 {
 		err = fmt.Errorf("CIDRs require 1 IP placeholder")
-		return nil, errors.Wrapf(err, "invalid client identity %q for IP %q", ident, ip)
+		return nil, fmt.Errorf("invalid client identity %q for IP %q: %w", ident, ip, err)
 	}
 
 	longestIPAddr := net.IPAddr{
@@ -108,7 +106,7 @@ func newIPMapEntry(input string, ident string) (*ipMapEntry, error) {
 	longestIdent := zfsDatasetPathComponentCompatibleRepresentation(ident, &longestIPAddr)
 
 	if err := transport.ValidateClientIdentity(longestIdent); err != nil {
-		return nil, errors.Wrapf(err, "invalid client identity for IP %q", ip)
+		return nil, fmt.Errorf("invalid client identity for IP %q: %w", ip, err)
 	}
 
 	ones, _ := subnet.Mask.Size()
@@ -152,7 +150,6 @@ type byPrefixlen []*ipMapEntry
 
 func (m byPrefixlen) Len() int { return len(m) }
 func (m byPrefixlen) Less(i, j int) bool {
-
 	if m[i].PrefixLen() != m[j].PrefixLen() {
 		return m[i].PrefixLen() > m[j].PrefixLen()
 	}

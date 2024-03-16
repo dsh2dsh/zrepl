@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/zfs/zfscmd"
 )
 
@@ -166,7 +164,6 @@ func ZFSMigrateHashBasedPlaceholderToCurrent(ctx context.Context, fs *DatasetPat
 }
 
 func ZFSListPlaceholderFilesystemsWithAdditionalProps(ctx context.Context, root string, additionalProps []string) (map[string]*ZFSProperties, error) {
-
 	props := []string{PlaceholderPropertyName}
 	if len(additionalProps) > 0 {
 		props = append(props, additionalProps...)
@@ -174,7 +171,7 @@ func ZFSListPlaceholderFilesystemsWithAdditionalProps(ctx context.Context, root 
 
 	propsByFS, err := zfsGetRecursive(ctx, root, -1, []string{"filesystem", "volume"}, props, SourceAny)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot get placeholder filesystems under %q", root)
+		return nil, fmt.Errorf("cannot get placeholder filesystems under %q: %w", root, err)
 	}
 
 	filtered := make(map[string]*ZFSProperties)
@@ -185,7 +182,7 @@ func ZFSListPlaceholderFilesystemsWithAdditionalProps(ctx context.Context, root 
 		}
 		fsp, err := NewDatasetPath(fs)
 		if err != nil {
-			return nil, errors.Wrapf(err, "zfs get returned invalid dataset path %q", fs)
+			return nil, fmt.Errorf("zfs get returned invalid dataset path %q: %w", fs, err)
 		}
 		if !isLocalPlaceholderPropertyValuePlaceholder(fsp, details.Value) {
 			continue

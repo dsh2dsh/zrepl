@@ -2,9 +2,8 @@ package endpoint
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/replication/logic/pdu"
 	"github.com/zrepl/zrepl/zfs"
@@ -21,11 +20,11 @@ func replicationGuaranteeOptionsFromPDU(in *pdu.ReplicationConfigProtection) (o 
 	}
 	initial, err := replicationGuaranteeKindFromPDU(in.GetInitial())
 	if err != nil {
-		return o, errors.Wrap(err, "pdu.ReplicationConfigProtection: field Initial")
+		return o, fmt.Errorf("pdu.ReplicationConfigProtection: field Initial: %w", err)
 	}
 	incremental, err := replicationGuaranteeKindFromPDU(in.GetIncremental())
 	if err != nil {
-		return o, errors.Wrap(err, "pdu.ReplicationConfigProtection: field Incremental")
+		return o, fmt.Errorf("pdu.ReplicationConfigProtection: field Incremental: %w", err)
 	}
 	o = ReplicationGuaranteeOptions{
 		Initial:     initial,
@@ -46,7 +45,7 @@ func replicationGuaranteeKindFromPDU(in pdu.ReplicationGuaranteeKind) (k Replica
 	case pdu.ReplicationGuaranteeKind_GuaranteeInvalid:
 		fallthrough
 	default:
-		return k, errors.Errorf("%q", in.String())
+		return k, fmt.Errorf("%q", in.String())
 	}
 }
 
@@ -189,7 +188,6 @@ func (g ReplicationGuaranteeResumability) SenderPostRecvConfirmed(ctx context.Co
 
 // helper function used by multiple strategies
 func senderPostRecvConfirmedCommon(ctx context.Context, jid JobID, fs string, to zfs.FilesystemVersion) (keep []Abstraction, err error) {
-
 	log := getLogger(ctx).WithField("toVersion", to.FullPath(fs))
 
 	toReplicationCursor, err := CreateReplicationCursor(ctx, fs, to, jid)
@@ -199,7 +197,7 @@ func senderPostRecvConfirmedCommon(ctx context.Context, jid JobID, fs string, to
 		} else {
 			msg := "cannot move replication cursor, keeping hold on `to` until successful"
 			log.WithError(err).Error(msg)
-			err = errors.Wrap(err, msg)
+			err = fmt.Errorf("%s: %w", msg, err)
 			return nil, err
 		}
 	} else {

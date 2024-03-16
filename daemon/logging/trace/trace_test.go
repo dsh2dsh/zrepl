@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/gitchander/permutation"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -99,11 +98,10 @@ func TestTaskEndWithActiveChildTaskNotAllowed(t *testing.T) {
 			require.NotNil(t, r)
 			err, ok := r.(error)
 			require.True(t, ok)
-			require.Equal(t, ErrTaskStillHasActiveChildTasks, errors.Cause(err))
+			require.ErrorIs(t, err, ErrTaskStillHasActiveChildTasks)
 		}()
 		endC()
 	}()
-
 }
 
 func TestIdempotentEndTask(t *testing.T) {

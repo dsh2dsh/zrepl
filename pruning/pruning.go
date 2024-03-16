@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/config"
 )
 
@@ -21,7 +19,6 @@ type Snapshot interface {
 
 // The returned snapshot list is guaranteed to only contains elements of input parameter snaps
 func PruneSnapshots(snaps []Snapshot, keepRules []KeepRule) []Snapshot {
-
 	if len(keepRules) == 0 {
 		return []Snapshot{}
 	}
@@ -49,7 +46,7 @@ func RulesFromConfig(in []config.PruningEnum) (rules []KeepRule, err error) {
 	for i := range in {
 		rules[i], err = RuleFromConfig(in[i])
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot build rule #%d", i)
+			return nil, fmt.Errorf("cannot build rule #%d: %w", i, err)
 		}
 	}
 	return rules, nil

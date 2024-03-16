@@ -3,10 +3,9 @@ package tls
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/tlsconf"
@@ -17,7 +16,6 @@ import (
 type TLSListenerFactory struct{}
 
 func TLSListenerFactoryFromConfig(c *config.Global, in *config.TLSServe, parseFlags config.ParseFlags) (transport.AuthenticatedListenerFactory, error) {
-
 	address := in.Listen
 	handshakeTimeout := in.HandshakeTimeout
 
@@ -31,18 +29,18 @@ func TLSListenerFactoryFromConfig(c *config.Global, in *config.TLSServe, parseFl
 
 	clientCA, err := tlsconf.ParseCAFile(in.Ca)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse ca file")
+		return nil, fmt.Errorf("cannot parse ca file: %w", err)
 	}
 
 	serverCert, err := tls.LoadX509KeyPair(in.Cert, in.Key)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse cert/key pair")
+		return nil, fmt.Errorf("cannot parse cert/key pair: %w", err)
 	}
 
 	clientCNs := make(map[string]struct{}, len(in.ClientCNs))
 	for i, cn := range in.ClientCNs {
 		if err := transport.ValidateClientIdentity(cn); err != nil {
-			return nil, errors.Wrapf(err, "unsuitable client_cn #%d %q", i, cn)
+			return nil, fmt.Errorf("unsuitable client_cn #%d %q: %w", i, cn, err)
 		}
 		// dupes are ok fr now
 		clientCNs[cn] = struct{}{}

@@ -2,6 +2,7 @@ package zfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -9,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/util/envconst"
 	"github.com/zrepl/zrepl/zfs/zfscmd"
@@ -30,12 +29,16 @@ type ResumeToken struct {
 
 var resumeTokenNVListRE = regexp.MustCompile(`\t(\S+) = (.*)`)
 
-var resumeTokenContentsRE = regexp.MustCompile(`resume token contents:\nnvlist version: 0`)
-var resumeTokenIsCorruptRE = regexp.MustCompile(`resume token is corrupt`)
+var (
+	resumeTokenContentsRE  = regexp.MustCompile(`resume token contents:\nnvlist version: 0`)
+	resumeTokenIsCorruptRE = regexp.MustCompile(`resume token is corrupt`)
+)
 
-var ResumeTokenCorruptError = errors.New("resume token is corrupt")
-var ResumeTokenDecodingNotSupported = errors.New("zfs binary does not allow decoding resume token or zrepl cannot scrape zfs output")
-var ResumeTokenParsingError = errors.New("zrepl cannot parse resume token values")
+var (
+	ResumeTokenCorruptError         = errors.New("resume token is corrupt")
+	ResumeTokenDecodingNotSupported = errors.New("zfs binary does not allow decoding resume token or zrepl cannot scrape zfs output")
+	ResumeTokenParsingError         = errors.New("zrepl cannot parse resume token values")
+)
 
 var resumeSendSupportedCheck struct {
 	once      sync.Once
@@ -49,7 +52,7 @@ func ResumeSendSupported(ctx context.Context) (bool, error) {
 		cmd := zfscmd.CommandContext(ctx, "zfs", "send")
 		output, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
-			resumeSendSupportedCheck.err = errors.Wrap(err, "resumable send cli support feature check failed")
+			resumeSendSupportedCheck.err = fmt.Errorf("resumable send cli support feature check failed: %w", err)
 		}
 		def := strings.Contains(string(output), "receive_resume_token")
 		resumeSendSupportedCheck.supported = envconst.Bool("ZREPL_EXPERIMENTAL_ZFS_SEND_RESUME_SUPPORTED", def)
@@ -104,7 +107,7 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 	}
 
 	if sup.flagSupport.err != nil {
-		return false, errors.Wrap(sup.flagSupport.err, "zfs recv feature check for resumable send & recv failed")
+		return false, fmt.Errorf("zfs recv feature check for resumable send & recv failed: %w", sup.flagSupport.err)
 	} else if !sup.flagSupport.supported || fs == nil {
 		return sup.flagSupport.supported, nil
 	}
@@ -114,7 +117,7 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 
 	pool, err := fs.Pool()
 	if err != nil {
-		return false, errors.Wrap(err, "resume recv check requires pool of dataset")
+		return false, fmt.Errorf("resume recv check requires pool of dataset: %w", err)
 	}
 
 	if sup.poolSupported == nil {
@@ -148,7 +151,7 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 	}
 
 	if poolSup.err != nil {
-		return false, errors.Wrapf(poolSup.err, "pool %q check for feature@extensible_dataset feature failed", pool)
+		return false, fmt.Errorf("pool %q check for feature@extensible_dataset feature failed: %w", pool, poolSup.err)
 	}
 
 	return poolSup.supported, nil
@@ -158,7 +161,6 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 //
 // FIXME: implement nvlist unpacking in Go and read through libzfs_sendrecv.c
 func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
-
 	if supported, err := ResumeSendSupported(ctx); err != nil {
 		return nil, err
 	} else if !supported {
@@ -269,13 +271,12 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	}
 
 	return rt, nil
-
 }
 
 // if string is empty and err == nil, the feature is not supported
 func ZFSGetReceiveResumeTokenOrEmptyStringIfNotSupported(ctx context.Context, fs *DatasetPath) (string, error) {
 	if supported, err := ResumeRecvSupported(ctx, fs); err != nil {
-		return "", errors.Wrap(err, "cannot determine zfs recv resume support")
+		return "", fmt.Errorf("cannot determine zfs recv resume support: %w", err)
 	} else if !supported {
 		return "", nil
 	}
@@ -300,7 +301,7 @@ func (t *ResumeToken) ToNameSplit() (fs *DatasetPath, snapName string, err error
 	}
 	dp, err := NewDatasetPath(comps[0])
 	if err != nil {
-		return nil, "", errors.Wrap(err, "resume token field `toname` dataset path invalid")
+		return nil, "", fmt.Errorf("resume token field `toname` dataset path invalid: %w", err)
 	}
 	return dp, comps[1], nil
 }

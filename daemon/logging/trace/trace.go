@@ -96,7 +96,6 @@ import (
 	"time"
 
 	"github.com/kr/pretty"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/util/chainlock"
@@ -169,7 +168,6 @@ var ErrTaskStillHasActiveChildTasks = fmt.Errorf("end task: task still has activ
 // if multiple tasks with the same name exist simultaneously,
 // a unique suffix is appended to uniquely identify the task opened with this function.
 func WithTask(ctx context.Context, taskName string) (context.Context, DoneFunc) {
-
 	var parentTask *traceNode
 	nodeI := ctx.Value(contextKeyTraceNode)
 	if nodeI != nil {
@@ -229,7 +227,6 @@ func WithTask(ctx context.Context, taskName string) (context.Context, DoneFunc) 
 	metrics.activeTasks.Inc()
 
 	endTaskFunc := func() {
-
 		// only hold locks while manipulating the tree
 		// (trace writer might block too long and unlike spans, tasks are updated concurrently)
 		alreadyEnded := func() (alreadyEnded bool) {
@@ -243,7 +240,7 @@ func WithTask(ctx context.Context, taskName string) (context.Context, DoneFunc) 
 					// the debugString can be quite long and panic won't print it completely
 					fmt.Fprintf(os.Stderr, "going to panic due to activeChildTasks:\n%s\n", this.debugString())
 				}
-				panic(errors.WithMessagef(ErrTaskStillHasActiveChildTasks, "end task: %v active child tasks (run daemon with env var %s=1 for more details)\n", this.activeChildTasks, debugEnabledEnvVar))
+				panic(fmt.Errorf("end task: %v active child tasks (run daemon with env var %s=1 for more details): %w", this.activeChildTasks, debugEnabledEnvVar, ErrTaskStillHasActiveChildTasks))
 			}
 
 			// support idempotent task ends
@@ -281,8 +278,10 @@ func WithTask(ctx context.Context, taskName string) (context.Context, DoneFunc) 
 	return ctx, endTaskFunc
 }
 
-var ErrAlreadyActiveChildSpan = fmt.Errorf("create child span: span already has an active child span")
-var ErrSpanStillHasActiveChildSpan = fmt.Errorf("end span: span still has active child spans")
+var (
+	ErrAlreadyActiveChildSpan      = fmt.Errorf("create child span: span already has an active child span")
+	ErrSpanStillHasActiveChildSpan = fmt.Errorf("end span: span still has active child spans")
+)
 
 // Start a new span.
 // Important: ctx must have an active task (see WithTask)
@@ -327,7 +326,6 @@ func WithSpan(ctx context.Context, annotation string) (context.Context, DoneFunc
 	callbackEndSpan := callbackBeginSpan(ctx)
 
 	endTaskFunc := func() {
-
 		defer parentSpan.mtx.Lock().Unlock()
 		if parentSpan.activeChildSpan != this && this.endedAt.IsZero() {
 			panic("impl error: activeChildSpan should not change while != nil because there can only be one")

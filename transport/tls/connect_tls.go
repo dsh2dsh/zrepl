@@ -3,9 +3,8 @@ package tls
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/tlsconf"
@@ -29,17 +28,17 @@ func TLSConnecterFromConfig(in *config.TLSConnect, parseFlags config.ParseFlags)
 
 	ca, err := tlsconf.ParseCAFile(in.Ca)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse ca file")
+		return nil, fmt.Errorf("cannot parse ca file: %w", err)
 	}
 
 	cert, err := tls.LoadX509KeyPair(in.Cert, in.Key)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse cert/key pair")
+		return nil, fmt.Errorf("cannot parse cert/key pair: %w", err)
 	}
 
 	tlsConfig, err := tlsconf.ClientAuthClient(in.ServerCN, ca, cert)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build tls config")
+		return nil, fmt.Errorf("cannot build tls config: %w", err)
 	}
 
 	return &TLSConnecter{in.Address, dialer, tlsConfig}, nil

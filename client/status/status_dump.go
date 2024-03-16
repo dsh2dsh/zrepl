@@ -7,7 +7,6 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-isatty"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/client/status/viewmodel"
 )
@@ -20,7 +19,7 @@ func dump(c Client, job string) error {
 
 	if job != "" {
 		if _, ok := s.Jobs[job]; !ok {
-			return errors.Errorf("job %q not found", job)
+			return fmt.Errorf("job %q not found", job)
 		}
 	}
 
@@ -31,10 +30,10 @@ func dump(c Client, job string) error {
 		wrap = true
 		screen, err := tcell.NewScreen()
 		if err != nil {
-			return errors.Wrap(err, "get terminal dimensions")
+			return fmt.Errorf("get terminal dimensions: %w", err)
 		}
 		if err := screen.Init(); err != nil {
-			return errors.Wrap(err, "init screen")
+			return fmt.Errorf("init screen: %w", err)
 		}
 		width, _ = screen.Size()
 		screen.Fini()

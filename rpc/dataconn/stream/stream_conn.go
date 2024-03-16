@@ -3,14 +3,13 @@ package stream
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/rpc/dataconn/heartbeatconn"
 	"github.com/zrepl/zrepl/rpc/dataconn/timeoutconn"
@@ -65,7 +64,6 @@ func (c *Conn) readFrames() {
 }
 
 func (c *Conn) ReadStreamedMessage(ctx context.Context, maxSize uint32, frameType uint32) (_ []byte, err *ReadStreamError) {
-
 	// if we are closed while reading, return that as an error
 	if closeGuard, cse := c.closeState.RWEntry(); cse != nil {
 		return nil, &ReadStreamError{
@@ -130,7 +128,6 @@ func (r *StreamReader) Close() error {
 
 // WriteStreamTo reads a stream from Conn and writes it to w.
 func (c *Conn) ReadStream(frameType uint32, closeConnOnClose bool) (_ *StreamReader, err error) {
-
 	// if we are closed while writing, return that as an error
 	if closeGuard, cse := c.closeState.RWEntry(); cse != nil {
 		return nil, cse
@@ -164,7 +161,6 @@ func (c *Conn) ReadStream(frameType uint32, closeConnOnClose bool) (_ *StreamRea
 }
 
 func (c *Conn) WriteStreamedMessage(ctx context.Context, buf io.Reader, frameType uint32) (err error) {
-
 	// if we are closed while writing, return that as an error
 	if closeGuard, cse := c.closeState.RWEntry(); cse != nil {
 		return cse
@@ -190,7 +186,6 @@ func (c *Conn) WriteStreamedMessage(ctx context.Context, buf io.Reader, frameTyp
 }
 
 func (c *Conn) SendStream(ctx context.Context, stream io.ReadCloser, frameType uint32) (err error) {
-
 	// if we are closed while reading, return that as an error
 	if closeGuard, cse := c.closeState.RWEntry(); cse != nil {
 		return cse
@@ -271,7 +266,7 @@ func (e *closeStateEntry) RWExit() net.Error {
 
 func (c *Conn) Close() error {
 	if err := c.closeState.CloseEntry(); err != nil {
-		return errors.Wrap(err, "stream conn close")
+		return fmt.Errorf("stream conn close: %w", err)
 	}
 
 	// Shutdown c.hc, which will cause c.readFrames to close c.waitReadFramesDone

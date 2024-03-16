@@ -2,9 +2,9 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/zrepl/zrepl/cli"
@@ -37,21 +37,21 @@ func doZabsCreateStep(ctx context.Context, sc *cli.Subcommand, args []string) er
 
 	fs, _, _, err := zfs.DecomposeVersionString(f.target)
 	if err != nil {
-		return errors.Wrapf(err, "%q invalid target", f.target)
+		return fmt.Errorf("%q invalid target: %w", f.target, err)
 	}
 
 	if f.jobid.FlagValue() == nil {
-		return errors.Errorf("jobid must be set")
+		return errors.New("jobid must be set")
 	}
 
 	v, err := zfs.ZFSGetFilesystemVersion(ctx, f.target)
 	if err != nil {
-		return errors.Wrapf(err, "get info about target %q", f.target)
+		return fmt.Errorf("get info about target %q: %w", f.target, err)
 	}
 
 	step, err := endpoint.HoldStep(ctx, fs, v, *f.jobid.FlagValue())
 	if err != nil {
-		return errors.Wrap(err, "create step hold")
+		return fmt.Errorf("create step hold: %w", err)
 	}
 	fmt.Println(step.String())
 	return nil

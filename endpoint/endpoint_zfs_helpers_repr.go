@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -22,7 +20,6 @@ func makeJobAndGuidBookmarkName(prefix string, fs string, guid uint64, jobid str
 var jobAndGuidBookmarkRE = regexp.MustCompile(`(.+)_G_([0-9a-f]{16})_J_(.+)$`)
 
 func parseJobAndGuidBookmarkName(fullname string, prefix string) (guid uint64, jobID JobID, _ error) {
-
 	if len(prefix) == 0 {
 		panic("prefix must not be empty")
 	}
@@ -33,25 +30,25 @@ func parseJobAndGuidBookmarkName(fullname string, prefix string) (guid uint64, j
 
 	_, _, name, err := zfs.DecomposeVersionString(fullname)
 	if err != nil {
-		return 0, JobID{}, errors.Wrap(err, "decompose bookmark name")
+		return 0, JobID{}, fmt.Errorf("decompose bookmark name: %w", err)
 	}
 
 	match := jobAndGuidBookmarkRE.FindStringSubmatch(name)
 	if match == nil {
-		return 0, JobID{}, errors.Errorf("bookmark name does not match regex %q", jobAndGuidBookmarkRE.String())
+		return 0, JobID{}, fmt.Errorf("bookmark name does not match regex %q", jobAndGuidBookmarkRE.String())
 	}
 	if match[1] != prefix {
-		return 0, JobID{}, errors.Errorf("prefix component does not match: expected %q, got %q", prefix, match[1])
+		return 0, JobID{}, fmt.Errorf("prefix component does not match: expected %q, got %q", prefix, match[1])
 	}
 
 	guid, err = strconv.ParseUint(match[2], 16, 64)
 	if err != nil {
-		return 0, JobID{}, errors.Wrapf(err, "parse guid component: %q", match[2])
+		return 0, JobID{}, fmt.Errorf("parse guid component: %q: %w", match[2], err)
 	}
 
 	jobID, err = MakeJobID(match[3])
 	if err != nil {
-		return 0, JobID{}, errors.Wrapf(err, "parse jobid component: %q", match[3])
+		return 0, JobID{}, fmt.Errorf("parse jobid component: %q: %w", match[3], err)
 	}
 
 	return guid, jobID, nil

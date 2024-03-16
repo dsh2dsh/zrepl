@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -21,20 +19,20 @@ func MakeJobID(s string) (JobID, error) {
 	}
 
 	if err := zfs.ComponentNamecheck(s); err != nil {
-		return JobID{}, errors.Wrap(err, "must be usable as a dataset path component")
+		return JobID{}, fmt.Errorf("must be usable as a dataset path component: %w", err)
 	}
 
 	if _, err := tentativeReplicationCursorBookmarkNameImpl("pool/ds", 0xface601d, s); err != nil {
 		// note that this might still fail due to total maximum name length, but we can't enforce that
-		return JobID{}, errors.Wrap(err, "must be usable for a tentative replication cursor bookmark")
+		return JobID{}, fmt.Errorf("must be usable for a tentative replication cursor bookmark: %w", err)
 	}
 
 	if _, err := stepHoldTagImpl(s); err != nil {
-		return JobID{}, errors.Wrap(err, "must be usable for a step hold tag")
+		return JobID{}, fmt.Errorf("must be usable for a step hold tag: %w", err)
 	}
 
 	if _, err := lastReceivedHoldImpl(s); err != nil {
-		return JobID{}, errors.Wrap(err, "must be usable as a last-received-hold tag")
+		return JobID{}, fmt.Errorf("must be usable as a last-received-hold tag: %w", err)
 	}
 
 	// FIXME replication cursor bookmark name
@@ -66,8 +64,10 @@ func (j JobID) String() string {
 	return j.jid
 }
 
-var _ json.Marshaler = JobID{}
-var _ json.Unmarshaler = (*JobID)(nil)
+var (
+	_ json.Marshaler   = JobID{}
+	_ json.Unmarshaler = (*JobID)(nil)
+)
 
 func (j JobID) MarshalJSON() ([]byte, error) { return json.Marshal(j.jid) }
 

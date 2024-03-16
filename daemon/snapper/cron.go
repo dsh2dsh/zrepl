@@ -2,11 +2,10 @@ package snapper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/hooks"
@@ -15,10 +14,9 @@ import (
 )
 
 func cronFromConfig(fsf zfs.DatasetFilter, in config.SnapshottingCron) (*Cron, error) {
-
 	hooksList, err := hooks.ListFromConfig(&in.Hooks)
 	if err != nil {
-		return nil, errors.Wrap(err, "hook config error")
+		return nil, fmt.Errorf("hook config error: %w", err)
 	}
 	planArgs := planArgs{
 		prefix:          in.Prefix,
@@ -43,7 +41,6 @@ type Cron struct {
 }
 
 func (s *Cron) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
-
 	for {
 		now := time.Now()
 		s.mtx.Lock()
@@ -84,13 +81,12 @@ func (s *Cron) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
 			}
 		}()
 	}
-
 }
 
 func (s *Cron) do(ctx context.Context) error {
 	fss, err := zfs.ZFSListMapping(ctx, s.fsf)
 	if err != nil {
-		return errors.Wrap(err, "cannot list filesystems")
+		return fmt.Errorf("cannot list filesystems: %w", err)
 	}
 	p := makePlan(s.planArgs, fss)
 
@@ -122,7 +118,6 @@ type CronReport struct {
 }
 
 func (s *Cron) Report() Report {
-
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 

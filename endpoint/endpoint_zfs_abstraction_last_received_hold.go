@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -42,11 +40,11 @@ func LastReceivedHoldExtractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion, hol
 func ParseLastReceivedHoldTag(tag string) (JobID, error) {
 	match := lastReceivedHoldTagRE.FindStringSubmatch(tag)
 	if match == nil {
-		return JobID{}, errors.Errorf("parse last-received-hold tag: does not match regex %s", lastReceivedHoldTagRE.String())
+		return JobID{}, fmt.Errorf("parse last-received-hold tag: does not match regex %s", lastReceivedHoldTagRE.String())
 	}
 	jobId, err := MakeJobID(match[1])
 	if err != nil {
-		return JobID{}, errors.Wrap(err, "parse last-received-hold tag: invalid job id field")
+		return JobID{}, fmt.Errorf("parse last-received-hold tag: invalid job id field: %w", err)
 	}
 	return jobId, nil
 }
@@ -64,14 +62,13 @@ func lastReceivedHoldImpl(jobid string) (string, error) {
 }
 
 func CreateLastReceivedHold(ctx context.Context, fs string, to zfs.FilesystemVersion, jobID JobID) (Abstraction, error) {
-
 	if !to.IsSnapshot() {
-		return nil, errors.Errorf("last-received-hold: target must be a snapshot: %s", to.FullPath(fs))
+		return nil, fmt.Errorf("last-received-hold: target must be a snapshot: %s", to.FullPath(fs))
 	}
 
 	tag, err := LastReceivedHoldTag(jobID)
 	if err != nil {
-		return nil, errors.Wrap(err, "last-received-hold: hold tag")
+		return nil, fmt.Errorf("last-received-hold: hold tag: %w", err)
 	}
 
 	// we never want to be without a hold
@@ -79,7 +76,7 @@ func CreateLastReceivedHold(ctx context.Context, fs string, to zfs.FilesystemVer
 
 	err = zfs.ZFSHold(ctx, fs, to, tag)
 	if err != nil {
-		return nil, errors.Wrap(err, "last-received-hold: hold newly received")
+		return nil, fmt.Errorf("last-received-hold: hold newly received: %w", err)
 	}
 
 	return &holdBasedAbstraction{

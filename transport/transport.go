@@ -4,10 +4,9 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"syscall"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/daemon/logging"
 	"github.com/zrepl/zrepl/logger"
@@ -60,7 +59,7 @@ type Connecter interface {
 func ValidateClientIdentity(in string) error {
 	err := zfs.ComponentNamecheck(in)
 	if err != nil {
-		return errors.Wrap(err, "client identity must be usable as a single dataset path component")
+		return fmt.Errorf("client identity must be usable as a single dataset path component: %w", err)
 	}
 	return nil
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/replication/logic/pdu"
@@ -45,16 +44,15 @@ type ConflictResolution struct {
 
 func (c *ConflictResolution) Validate() error {
 	if !c.InitialReplication.IsAInitialReplicationAutoResolution() {
-		return errors.Errorf("must be one of %s", InitialReplicationAutoResolutionValues())
+		return fmt.Errorf("must be one of %s", InitialReplicationAutoResolutionValues())
 	}
 	return nil
 }
 
 func ConflictResolutionFromConfig(in *config.ConflictResolution) (*ConflictResolution, error) {
-
 	initialReplication, err := InitialReplicationAutoResolutionFromConfig(in.InitialReplication)
 	if err != nil {
-		return nil, errors.Errorf("field `initial_replication` is invalid: %q is not one of %v", in.InitialReplication, InitialReplicationAutoResolutionValues())
+		return nil, fmt.Errorf("field `initial_replication` is invalid: %q is not one of %v", in.InitialReplication, InitialReplicationAutoResolutionValues())
 	}
 
 	return &ConflictResolution{
@@ -83,11 +81,11 @@ func (p PlannerPolicy) Validate() error {
 func ReplicationConfigFromConfig(in *config.Replication) (*pdu.ReplicationConfig, error) {
 	initial, err := pduReplicationGuaranteeKindFromConfig(in.Protection.Initial)
 	if err != nil {
-		return nil, errors.Wrap(err, "field 'initial'")
+		return nil, fmt.Errorf("field 'initial': %w", err)
 	}
 	incremental, err := pduReplicationGuaranteeKindFromConfig(in.Protection.Incremental)
 	if err != nil {
-		return nil, errors.Wrap(err, "field 'incremental'")
+		return nil, fmt.Errorf("field 'incremental': %w", err)
 	}
 	return &pdu.ReplicationConfig{
 		Protection: &pdu.ReplicationConfigProtection{
@@ -106,6 +104,6 @@ func pduReplicationGuaranteeKindFromConfig(in string) (k pdu.ReplicationGuarante
 	case "guarantee_resumability":
 		return pdu.ReplicationGuaranteeKind_GuaranteeResumability, nil
 	default:
-		return k, errors.Errorf("%q is not in guarantee_{nothing,incremental,resumability}", in)
+		return k, fmt.Errorf("%q is not in guarantee_{nothing,incremental,resumability}", in)
 	}
 }

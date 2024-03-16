@@ -3,6 +3,7 @@ package main
 import (
 	"container/list"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 
@@ -22,14 +22,15 @@ import (
 	"github.com/zrepl/zrepl/platformtest/tests"
 )
 
-var bold = color.New(color.Bold)
-var boldRed = color.New(color.Bold, color.FgHiRed)
-var boldGreen = color.New(color.Bold, color.FgHiGreen)
+var (
+	bold      = color.New(color.Bold)
+	boldRed   = color.New(color.Bold, color.FgHiRed)
+	boldGreen = color.New(color.Bold, color.FgHiGreen)
+)
 
 const DefaultPoolImageSize = 200 * (1 << 20)
 
 func main() {
-
 	var args HarnessArgs
 
 	flag.StringVar(&args.CreateArgs.PoolName, "poolname", "", "")
@@ -89,7 +90,6 @@ func (i *invocation) RegisterChild(c *invocation) error {
 }
 
 func HarnessRun(args HarnessArgs) error {
-
 	runRE := regexp.MustCompile(args.Run)
 
 	outlets := logger.NewOutlets()
@@ -130,7 +130,7 @@ func HarnessRun(args HarnessArgs) error {
 
 		pool, err := platformtest.CreateOrReplaceZpool(ctx, ex, args.CreateArgs)
 		if err != nil {
-			panic(errors.Wrap(err, "create test pool"))
+			panic(fmt.Errorf("create test pool: %w", err))
 		}
 
 		ctx := &platformtest.Context{
@@ -223,9 +223,8 @@ type testCaseResult struct {
 }
 
 func runTestCase(ctx *platformtest.Context, ex platformtest.Execer, c tests.Case) *testCaseResult {
-
 	// run case
-	var panicked = false
+	panicked := false
 	var panicValue interface{} = nil
 	var panicStack error
 	func() {
@@ -233,7 +232,7 @@ func runTestCase(ctx *platformtest.Context, ex platformtest.Execer, c tests.Case
 			if item := recover(); item != nil {
 				panicValue = item
 				panicked = true
-				panicStack = errors.Errorf("panic while running test: %v", panicValue)
+				panicStack = fmt.Errorf("panic while running test: %v", panicValue)
 			}
 		}()
 		c(ctx)
@@ -251,5 +250,4 @@ func runTestCase(ctx *platformtest.Context, ex platformtest.Execer, c tests.Case
 	} else {
 		return &testCaseResult{succeeded: true}
 	}
-
 }

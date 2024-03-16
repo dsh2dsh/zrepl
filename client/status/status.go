@@ -2,11 +2,11 @@ package status
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/mattn/go-isatty"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/zrepl/zrepl/cli"
@@ -62,10 +62,9 @@ var Subcommand = &cli.Subcommand{
 }
 
 func runStatusV2Command(ctx context.Context, config *config.Config, args []string) error {
-
 	c, err := client.New("unix", config.Global.Control.SockPath)
 	if err != nil {
-		return errors.Wrapf(err, "connect to daemon socket at %q", config.Global.Control.SockPath)
+		return fmt.Errorf("connect to daemon socket at %q: %w", config.Global.Control.SockPath, err)
 	}
 
 	mode := statusv2Flags.Mode.Value().(statusv2Mode)
@@ -79,7 +78,7 @@ func runStatusV2Command(ctx context.Context, config *config.Config, args []strin
 		if err != nil {
 			panic(err)
 		}
-		return errors.Errorf("error: stdout is not a tty, please use --mode %s or --mode %s", dumpmode, rawmode)
+		return fmt.Errorf("error: stdout is not a tty, please use --mode %s or --mode %s", dumpmode, rawmode)
 	}
 
 	switch mode {

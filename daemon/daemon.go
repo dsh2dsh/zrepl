@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
@@ -40,13 +39,13 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	outlets, err := logging.OutletsFromConfig(*conf.Global.Logging)
 	if err != nil {
-		return errors.Wrap(err, "cannot build logging from config")
+		return fmt.Errorf("cannot build logging from config: %w", err)
 	}
 	outlets.Add(newPrometheusLogOutlet(), logger.Debug)
 
 	confJobs, err := job.JobsFromConfig(conf, config.ParseFlagsNone)
 	if err != nil {
-		return errors.Wrap(err, "cannot build jobs from config")
+		return fmt.Errorf("cannot build jobs from config: %w", err)
 	}
 
 	log := logger.NewLogger(outlets, 1*time.Second)
@@ -65,7 +64,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	for _, job := range confJobs {
 		if IsInternalJobName(job.Name()) {
-			panic(fmt.Sprintf("internal job name used for config job '%s'", job.Name())) //FIXME
+			panic(fmt.Sprintf("internal job name used for config job '%s'", job.Name())) // FIXME
 		}
 	}
 
@@ -87,10 +86,10 @@ func Run(ctx context.Context, conf *config.Config) error {
 		case *config.PrometheusMonitoring:
 			job, err = newPrometheusJobFromConfig(v)
 		default:
-			return errors.Errorf("unknown monitoring job #%d (type %T)", i, v)
+			return fmt.Errorf("unknown monitoring job #%d (type %T)", i, v)
 		}
 		if err != nil {
-			return errors.Wrapf(err, "cannot build monitoring job #%d", i)
+			return fmt.Errorf("cannot build monitoring job #%d: %w", i, err)
 		}
 		jobs.start(ctx, job, true)
 	}
@@ -190,7 +189,7 @@ func (s *jobs) wakeup(job string) error {
 
 	wu, ok := s.wakeups[job]
 	if !ok {
-		return errors.Errorf("Job %s does not exist", job)
+		return fmt.Errorf("Job %s does not exist", job)
 	}
 	return wu()
 }
@@ -201,7 +200,7 @@ func (s *jobs) reset(job string) error {
 
 	wu, ok := s.resets[job]
 	if !ok {
-		return errors.Errorf("Job %s does not exist", job)
+		return fmt.Errorf("Job %s does not exist", job)
 	}
 	return wu()
 }

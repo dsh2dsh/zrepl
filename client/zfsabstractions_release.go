@@ -3,11 +3,11 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/zrepl/zrepl/cli"
@@ -52,7 +52,7 @@ func doZabsReleaseAll(ctx context.Context, sc *cli.Subcommand, args []string) er
 
 	q, err := zabsReleaseFlags.Filter.Query()
 	if err != nil {
-		return errors.Wrap(err, "invalid filter specification on command line")
+		return fmt.Errorf("invalid filter specification on command line: %w", err)
 	}
 
 	abstractions, listErrors, err := endpoint.ListAbstractions(ctx, q)
@@ -68,7 +68,6 @@ func doZabsReleaseAll(ctx context.Context, sc *cli.Subcommand, args []string) er
 }
 
 func doZabsReleaseStale(ctx context.Context, sc *cli.Subcommand, args []string) error {
-
 	var err error
 
 	if len(args) > 0 {
@@ -77,7 +76,7 @@ func doZabsReleaseStale(ctx context.Context, sc *cli.Subcommand, args []string) 
 
 	q, err := zabsReleaseFlags.Filter.Query()
 	if err != nil {
-		return errors.Wrap(err, "invalid filter specification on command line")
+		return fmt.Errorf("invalid filter specification on command line: %w", err)
 	}
 
 	stalenessInfo, err := endpoint.ListStale(ctx, q)
@@ -89,7 +88,6 @@ func doZabsReleaseStale(ctx context.Context, sc *cli.Subcommand, args []string) 
 }
 
 func doZabsRelease_Common(ctx context.Context, destroy []endpoint.Abstraction) error {
-
 	if zabsReleaseFlags.DryRun {
 		if zabsReleaseFlags.Json {
 			m, err := json.MarshalIndent(destroy, "", "  ")

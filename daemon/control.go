@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -11,7 +12,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/daemon/job"
@@ -34,7 +34,7 @@ func newControlJob(sockpath string, jobs *jobs) (j *controlJob, err error) {
 
 	j.sockaddr, err = net.ResolveUnixAddr("unix", sockpath)
 	if err != nil {
-		err = errors.Wrap(err, "cannot resolve unix address")
+		err = fmt.Errorf("cannot resolve unix address: %w", err)
 		return
 	}
 
@@ -81,7 +81,6 @@ const (
 )
 
 func (j *controlJob) Run(ctx context.Context) {
-
 	log := job.GetLogger(ctx)
 	defer log.Info("control job finished")
 
@@ -105,7 +104,7 @@ func (j *controlJob) Run(ctx context.Context) {
 			var msg PprofServerControlMsg
 			err := decoder(&msg)
 			if err != nil {
-				return nil, errors.Errorf("decode failed")
+				return nil, errors.New("decode failed")
 			}
 			pprofServer.Control(msg)
 			return struct{}{}, nil
@@ -128,7 +127,8 @@ func (j *controlJob) Run(ctx context.Context) {
 					ZFSCmds:   globalZFS,
 					Envconst:  envconstReport,
 					OsEnviron: os.Environ(),
-				}}
+				},
+			}
 			return s, nil
 		}})
 
@@ -140,7 +140,7 @@ func (j *controlJob) Run(ctx context.Context) {
 			}
 			var req reqT
 			if decoder(&req) != nil {
-				return nil, errors.Errorf("decode failed")
+				return nil, errors.New("decode failed")
 			}
 
 			var err error
@@ -187,7 +187,6 @@ outer:
 		}
 
 	}
-
 }
 
 type jsonResponder struct {
@@ -243,7 +242,7 @@ func (j jsonRequestResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	res, producerErr := j.producer(decoder)
 
-	//If we had a decode error ignore output of producer and return error
+	// If we had a decode error ignore output of producer and return error
 	if decodeError != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err := io.WriteString(w, decodeError.Error())

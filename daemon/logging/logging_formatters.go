@@ -8,7 +8,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/go-logfmt/logfmt"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/logger"
 )
@@ -155,13 +154,13 @@ func (f *LogfmtFormatter) Format(e *logger.Entry) ([]byte, error) {
 	if f.metadataFlags&MetadataTime != 0 {
 		err := enc.EncodeKeyval(FieldTime, e.Time)
 		if err != nil {
-			return nil, errors.Wrap(err, "logfmt: encode time")
+			return nil, fmt.Errorf("logfmt: encode time: %w", err)
 		}
 	}
 	if f.metadataFlags&MetadataLevel != 0 {
 		err := enc.EncodeKeyval(FieldLevel, e.Level)
 		if err != nil {
-			return nil, errors.Wrap(err, "logfmt: encode level")
+			return nil, fmt.Errorf("logfmt: encode level: %w", err)
 		}
 	}
 
@@ -181,7 +180,7 @@ func (f *LogfmtFormatter) Format(e *logger.Entry) ([]byte, error) {
 
 	err := enc.EncodeKeyval(FieldMessage, e.Message)
 	if err != nil {
-		return nil, errors.Wrap(err, "logfmt: encode message")
+		return nil, fmt.Errorf("logfmt: encode message: %w", err)
 	}
 	for k, v := range e.Fields {
 		if !prefixed[k] {
@@ -202,11 +201,11 @@ func logfmtTryEncodeKeyval(enc *logfmt.Encoder, field, value interface{}) error 
 	case logfmt.ErrUnsupportedValueType:
 		err := enc.EncodeKeyval(field, fmt.Sprintf("<%T>", value))
 		if err != nil {
-			return errors.Wrap(err, "cannot encode unsupported value type Go type")
+			return fmt.Errorf("cannot encode unsupported value type Go type: %w", err)
 		}
 		return nil
 	}
-	return errors.Wrapf(err, "cannot encode field '%s'", field)
+	return fmt.Errorf("cannot encode field '%s': %w", field, err)
 }
 
 func (f *LogfmtFormatter) Write(w io.Writer, e *logger.Entry) error {

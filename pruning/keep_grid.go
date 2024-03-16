@@ -1,11 +1,10 @@
 package pruning
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/pruning/retentiongrid"
@@ -20,20 +19,18 @@ type KeepGrid struct {
 }
 
 func NewKeepGrid(in *config.PruneGrid) (p *KeepGrid, err error) {
-
 	if in.Regex == "" {
 		return nil, fmt.Errorf("Regex must not be empty")
 	}
 	re, err := regexp.Compile(in.Regex)
 	if err != nil {
-		return nil, errors.Wrap(err, "Regex is invalid")
+		return nil, fmt.Errorf("Regex is invalid: %w", err)
 	}
 
 	return newKeepGrid(re, in.Grid)
 }
 
 func MustNewKeepGrid(regex, gridspec string) *KeepGrid {
-
 	ris, err := config.ParseRetentionIntervalSpec(gridspec)
 	if err != nil {
 		panic(err)
@@ -89,7 +86,6 @@ func newKeepGrid(re *regexp.Regexp, configIntervals []config.RetentionInterval) 
 
 // Prune filters snapshots with the retention grid.
 func (p *KeepGrid) KeepRule(snaps []Snapshot) (destroyList []Snapshot) {
-
 	matching, notMatching := partitionSnapList(snaps, func(snapshot Snapshot) bool {
 		return p.re.MatchString(snapshot.Name())
 	})

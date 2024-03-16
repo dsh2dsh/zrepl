@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/util/circlog"
@@ -75,7 +75,6 @@ func (p *DatasetPath) TrimNPrefixComps(n int) {
 		return
 	}
 	p.comps = p.comps[n:]
-
 }
 
 func (p DatasetPath) Equal(q *DatasetPath) bool {
@@ -115,7 +114,6 @@ func (p *DatasetPath) Pool() (string, error) {
 		return "", fmt.Errorf("dataset path does not have a pool component")
 	}
 	return p.comps[0], nil
-
 }
 
 func NewDatasetPath(s string) (p *DatasetPath, err error) {
@@ -163,7 +161,6 @@ func (e *ZFSError) Error() string {
 var ZFS_BINARY string = "zfs"
 
 func ZFSList(ctx context.Context, properties []string, zfsArgs ...string) (res [][]string, err error) {
-
 	args := make([]string, 0, 4+len(zfsArgs))
 	args = append(args,
 		"list", "-H", "-p",
@@ -411,7 +408,6 @@ func (s *SendStream) Close() error {
 // returns nil iff the child process is gone (has been successfully waited upon)
 // in that case, s.exitErr is set
 func (s *SendStream) killAndWait() error {
-
 	debug("sendStream: killAndWait enter")
 	defer debug("sendStream: killAndWait leave")
 
@@ -551,7 +547,6 @@ func (v ZFSSendArgVersion) mustValidateInMemory(fs string) {
 
 // fs must be not empty
 func (a ZFSSendArgVersion) ValidateExistsAndGetVersion(ctx context.Context, fs string) (v FilesystemVersion, _ error) {
-
 	if err := a.ValidateInMemory(fs); err != nil {
 		return v, nil
 	}
@@ -674,14 +669,14 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsVali
 	}
 	toVersion, err := a.To.ValidateExistsAndGetVersion(ctx, a.FS)
 	if err != nil {
-		return v, newGenericValidationError(a, errors.Wrap(err, "`To` invalid"))
+		return v, newGenericValidationError(a, fmt.Errorf("`To` invalid: %w", err))
 	}
 
 	var fromVersion *FilesystemVersion
 	if a.From != nil {
 		fromV, err := a.From.ValidateExistsAndGetVersion(ctx, a.FS)
 		if err != nil {
-			return v, newGenericValidationError(a, errors.Wrap(err, "`From` invalid"))
+			return v, newGenericValidationError(a, fmt.Errorf("`From` invalid: %w", err))
 		}
 		fromVersion = &fromV
 		// fallthrough
@@ -698,25 +693,25 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsVali
 	}
 
 	if err := a.ZFSSendFlags.Validate(); err != nil {
-		return v, newGenericValidationError(a, errors.Wrap(err, "send flags invalid"))
+		return v, newGenericValidationError(a, fmt.Errorf("send flags invalid: %w", err))
 	}
 
 	valCtx := &zfsSendArgsValidationContext{}
 	fsEncrypted, err := ZFSGetEncryptionEnabled(ctx, a.FS)
 	if err != nil {
 		return v, newValidationError(a, ZFSSendArgsFSEncryptionCheckFail,
-			errors.Wrapf(err, "cannot check whether filesystem %q is encrypted", a.FS))
+			fmt.Errorf("cannot check whether filesystem %q is encrypted: %w", a.FS, err))
 	}
 	valCtx.encEnabled = &nodefault.Bool{B: fsEncrypted}
 
 	if a.Encrypted.B && !fsEncrypted {
 		return v, newValidationError(a, ZFSSendArgsEncryptedSendRequestedButFSUnencrypted,
-			errors.Errorf("encrypted send mandated by policy, but filesystem %q is not encrypted", a.FS))
+			fmt.Errorf("encrypted send mandated by policy, but filesystem %q is not encrypted", a.FS))
 	}
 
 	if a.Raw && fsEncrypted && !a.Encrypted.B {
 		return v, newValidationError(a, ZFSSendArgsGenericValidationError,
-			errors.Errorf("policy mandates raw+unencrypted sends, but filesystem %q is encrypted", a.FS))
+			fmt.Errorf("policy mandates raw+unencrypted sends, but filesystem %q is encrypted", a.FS))
 	}
 
 	if err := a.validateEncryptionFlagsCorrespondToResumeToken(ctx, valCtx); err != nil {
@@ -728,7 +723,7 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsVali
 
 func (f ZFSSendFlags) Validate() error {
 	if err := f.Encrypted.ValidateNoDefault(); err != nil {
-		return errors.Wrap(err, "flag `Encrypted` invalid")
+		return fmt.Errorf("flag `Encrypted` invalid: %w", err)
 	}
 	return nil
 }
@@ -739,7 +734,6 @@ func (f ZFSSendFlags) Validate() error {
 // SECURITY SENSITIVE it is the caller's responsibility to ensure that a.Encrypted semantics
 // hold for the file system that will be sent with the send flags returned by this function
 func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
-
 	args := make([]string, 0)
 
 	// ResumeToken takes precedence, we assume that it has been validated
@@ -781,7 +775,6 @@ func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
 }
 
 func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
-
 	flags := a.buildSendFlagsUnchecked()
 
 	if a.ZFSSendFlags.ResumeToken != "" {
@@ -844,7 +837,6 @@ func (c ZFSSendArgsResumeTokenMismatchErrorCode) fmt(format string, args ...inte
 // a) the resume token does not capture all send flags (e.g. send -p is implemented in libzfs and thus not represented in the resume token)
 // b) it would force us to either reject resume tokens with unknown flags.
 func (a ZFSSendArgsUnvalidated) validateEncryptionFlagsCorrespondToResumeToken(ctx context.Context, valCtx *zfsSendArgsValidationContext) error {
-
 	if a.ResumeToken == "" {
 		return nil // nothing to do
 	}
@@ -942,7 +934,7 @@ func ZFSSend(
 	if sendArgs.Encrypted.B || sendArgs.Raw || sendArgs.BackupProperties {
 		encryptionSupported, err := EncryptionCLISupported(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "cannot determine CLI native encryption support")
+			return nil, fmt.Errorf("cannot determine CLI native encryption support: %w", err)
 		}
 
 		if !encryptionSupported {
@@ -986,7 +978,7 @@ func ZFSSend(
 		stdoutWriter.Close()
 		stdoutReader.Close()
 		_ = cmd.WaitPipe()
-		return nil, errors.Wrap(err, "cannot start zfs send command")
+		return nil, fmt.Errorf("cannot start zfs send command: %w", err)
 	}
 	// close our writing-end of the pipe so that we don't wait for ourselves when reading from the reading  end
 	stdoutWriter.Close()
@@ -1058,7 +1050,6 @@ func (s *DrySendInfo) unmarshalZFSOutput(output []byte) (err error) {
 //
 // => see test cases
 func (s *DrySendInfo) unmarshalInfoLine(l string) (regexMatched bool, err error) {
-
 	mFull := sendDryRunInfoLineRegexFull.FindStringSubmatch(l)
 	mInc := sendDryRunInfoLineRegexIncremental.FindStringSubmatch(l)
 	var matchingExpr *regexp.Regexp
@@ -1108,7 +1099,6 @@ func (s *DrySendInfo) unmarshalInfoLine(l string) (regexMatched bool, err error)
 // to may be "", in which case a full ZFS send is done
 // May return BookmarkSizeEstimationNotSupported as err if from is a bookmark.
 func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated) (_ *DrySendInfo, err error) {
-
 	if sendArgs.From != nil && strings.Contains(sendArgs.From.RelName, "#") {
 		/* TODO:
 		 * XXX feature check & support this as well
@@ -1130,7 +1120,8 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated) (_ *DrySendI
 			Filesystem:   sendArgs.FS,
 			From:         fromAbs,
 			To:           toAbs,
-			SizeEstimate: 0}, nil
+			SizeEstimate: 0,
+		}, nil
 	}
 
 	args := make([]string, 0)
@@ -1222,7 +1213,7 @@ func ZFSRecv(
 	opts RecvOptions, pipeCmds ...[]string,
 ) (err error) {
 	if err := v.ValidateInMemory(fs); err != nil {
-		return errors.Wrap(err, "invalid version")
+		return fmt.Errorf("invalid version: %w", err)
 	}
 	if !v.IsSnapshot() {
 		return errors.New("must receive into a snapshot")
@@ -1676,7 +1667,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 			if strings.HasPrefix(fields[3], p) {
 				source, err := parsePropertySource(fields[3])
 				if err != nil {
-					return nil, errors.Wrap(err, "parse property source")
+					return nil, fmt.Errorf("parse property source: %w", err)
 				}
 				fsProps, ok := propsByFS[fields[0]]
 				if !ok {
@@ -1685,7 +1676,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 					}
 				}
 				if _, ok := fsProps.m[fields[1]]; ok {
-					return nil, errors.Errorf("duplicate property %q for dataset %q", fields[1], fields[0])
+					return nil, fmt.Errorf("duplicate property %q for dataset %q", fields[1], fields[0])
 				}
 				fsProps.m[fields[1]] = PropertyValue{
 					Value:  fields[2],
@@ -1699,7 +1690,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 	// validate we got expected output
 	for fs, fsProps := range propsByFS {
 		if len(fsProps.m) != len(props) {
-			return nil, errors.Errorf("zfs get did not return all requested values for dataset %q\noutput was:\n%s", fs, o)
+			return nil, fmt.Errorf("zfs get did not return all requested values for dataset %q\noutput was:\n%s", fs, o)
 		}
 	}
 	return propsByFS, nil
@@ -1717,11 +1708,11 @@ func zfsGet(ctx context.Context, path string, props []string, allowedSources Pro
 		return &ZFSProperties{make(map[string]PropertyValue)}, nil
 	}
 	if len(propMap) != 1 {
-		return nil, errors.Errorf("zfs get unexpectedly returned properties for multiple datasets")
+		return nil, fmt.Errorf("zfs get unexpectedly returned properties for multiple datasets")
 	}
 	res, ok := propMap[path]
 	if !ok {
-		return nil, errors.Errorf("zfs get returned properties for a different dataset that requested")
+		return nil, fmt.Errorf("zfs get returned properties for a different dataset that requested")
 	}
 	return res, nil
 }
@@ -1753,7 +1744,6 @@ var destroyOneOrMoreSnapshotsNoneExistedErrorRegexp = regexp.MustCompile(`^could
 var destroyBookmarkDoesNotExist = regexp.MustCompile(`^bookmark '([^']+)' does not exist`)
 
 func tryParseDestroySnapshotsError(arg string, stderr []byte) *DestroySnapshotsError {
-
 	argComps := strings.SplitN(arg, "@", 2)
 	if len(argComps) != 2 {
 		return nil
@@ -1791,7 +1781,6 @@ func tryParseDestroySnapshotsError(arg string, stderr []byte) *DestroySnapshotsE
 }
 
 func ZFSDestroy(ctx context.Context, arg string) (err error) {
-
 	var dstype, filesystem string
 	idx := strings.IndexAny(arg, "@#")
 	if idx == -1 {
@@ -1830,7 +1819,6 @@ func ZFSDestroy(ctx context.Context, arg string) (err error) {
 	}
 
 	return
-
 }
 
 func ZFSDestroyIdempotent(ctx context.Context, path string) error {
@@ -1842,13 +1830,12 @@ func ZFSDestroyIdempotent(ctx context.Context, path string) error {
 }
 
 func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string, recursive bool) (err error) {
-
 	promTimer := prometheus.NewTimer(prom.ZFSSnapshotDuration.WithLabelValues(fs.ToString()))
 	defer promTimer.ObserveDuration()
 
 	snapname := fmt.Sprintf("%s@%s", fs.ToString(), name)
 	if err := EntityNamecheck(snapname, EntityTypeSnapshot); err != nil {
-		return errors.Wrap(err, "zfs snapshot")
+		return fmt.Errorf("zfs snapshot: %w", err)
 	}
 
 	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "snapshot", snapname)
@@ -1861,7 +1848,6 @@ func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string, recursive bo
 	}
 
 	return
-
 }
 
 var zfsBookmarkExistsRegex = regexp.MustCompile("^cannot create bookmark '[^']+': bookmark exists")
@@ -1888,7 +1874,6 @@ var ErrBookmarkCloningNotSupported = fmt.Errorf("bookmark cloning feature is not
 //
 // v must be validated by the caller
 func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark string) (bm FilesystemVersion, err error) {
-
 	bm = FilesystemVersion{
 		Type:     Bookmark,
 		Name:     bookmark,
@@ -1912,7 +1897,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 		if _, ok := err.(*DatasetDoesNotExist); ok {
 			return bm, ErrBookmarkCloningNotSupported
 		} else if err != nil {
-			return bm, errors.Wrap(err, "bookmark: idempotency check for bookmark cloning")
+			return bm, fmt.Errorf("bookmark: idempotency check for bookmark cloning: %w", err)
 		}
 		if FilesystemVersionEqualIdentity(bm, existingBm) {
 			return existingBm, nil
@@ -1935,7 +1920,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 			// check if this was idempotent
 			bookGuid, err := ZFSGetGUID(ctx, fs, "#"+bookmark)
 			if err != nil {
-				return bm, errors.Wrap(err, "bookmark: idempotency check for bookmark creation") // guid error expressive enough
+				return bm, fmt.Errorf("bookmark: idempotency check for bookmark creation: %w", err) // guid error expressive enough
 			}
 
 			if v.Guid == bookGuid {
@@ -1954,14 +1939,12 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 				WaitErr: err,
 			}
 		}
-
 	}
 
 	return bm, nil
 }
 
 func ZFSRollback(ctx context.Context, fs *DatasetPath, snapshot FilesystemVersion, rollbackArgs ...string) (err error) {
-
 	snapabs := snapshot.ToAbsPath(fs)
 	if snapshot.Type != Snapshot {
 		return fmt.Errorf("can only rollback to snapshots, got %s", snapabs)

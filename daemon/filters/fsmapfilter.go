@@ -1,11 +1,10 @@
 package filters
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/endpoint"
 	"github.com/zrepl/zrepl/zfs"
@@ -48,7 +47,6 @@ func NewDatasetMapFilter(capacity int, filterMode bool) *DatasetMapFilter {
 }
 
 func (m *DatasetMapFilter) Add(pathPattern, mapping string) (err error) {
-
 	if m.filterMode {
 		if _, err = m.parseDatasetFilterResult(mapping); err != nil {
 			return
@@ -123,7 +121,6 @@ func (m DatasetMapFilter) mostSpecificPrefixMapping(path *zfs.DatasetPath) (idx 
 
 // Returns target == nil if there is no mapping
 func (m DatasetMapFilter) Map(source *zfs.DatasetPath) (target *zfs.DatasetPath, err error) {
-
 	if m.filterMode {
 		err = fmt.Errorf("using a filter for mapping simply does not work")
 		return
@@ -163,7 +160,6 @@ func (m DatasetMapFilter) Map(source *zfs.DatasetPath) (target *zfs.DatasetPath,
 }
 
 func (m DatasetMapFilter) Filter(p *zfs.DatasetPath) (pass bool, err error) {
-
 	if !m.filterMode {
 		err = fmt.Errorf("using a mapping as a filter does not work")
 		return
@@ -198,9 +194,8 @@ func (m DatasetMapFilter) UserSpecifiedDatasets() (datasets zfs.UserSpecifiedDat
 // Construct a new filter-only DatasetMapFilter from a mapping
 // The new filter allows exactly those paths that were not forbidden by the mapping.
 func (m DatasetMapFilter) InvertedFilter() (inv *DatasetMapFilter, err error) {
-
 	if m.filterMode {
-		err = errors.Errorf("can only invert mappings")
+		err = errors.New("can only invert mappings")
 		return
 	}
 
@@ -212,7 +207,7 @@ func (m DatasetMapFilter) InvertedFilter() (inv *DatasetMapFilter, err error) {
 	for i, e := range m.entries {
 		inv.entries[i].path, err = zfs.NewDatasetPath(e.mapping)
 		if err != nil {
-			err = errors.Wrapf(err, "mapping cannot be inverted: '%s' is not a dataset path", e.mapping)
+			err = fmt.Errorf("mapping cannot be inverted: '%s' is not a dataset path: %w", e.mapping, err)
 			return
 		}
 		inv.entries[i].mapping = MapFilterResultOk
@@ -224,13 +219,12 @@ func (m DatasetMapFilter) InvertedFilter() (inv *DatasetMapFilter, err error) {
 
 // FIXME investigate whether we can support more...
 func (m DatasetMapFilter) Invert() (endpoint.FSMap, error) {
-
 	if m.filterMode {
-		return nil, errors.Errorf("can only invert mappings")
+		return nil, errors.New("can only invert mappings")
 	}
 
 	if len(m.entries) != 1 {
-		return nil, errors.Errorf("inversion of complicated mappings is not implemented") // FIXME
+		return nil, errors.New("inversion of complicated mappings is not implemented") // FIXME
 	}
 
 	e := m.entries[0]
@@ -257,7 +251,6 @@ func (m DatasetMapFilter) Invert() (endpoint.FSMap, error) {
 // All accepting mapping results are mapped to accepting filter results
 // All rejecting mapping results are mapped to rejecting filter results
 func (m DatasetMapFilter) AsFilter() endpoint.FSFilter {
-
 	f := &DatasetMapFilter{
 		make([]datasetMapFilterEntry, len(m.entries)),
 		true,
@@ -294,7 +287,6 @@ func (m DatasetMapFilter) parseDatasetFilterResult(result string) (pass bool, er
 }
 
 func DatasetMapFilterFromConfig(in map[string]bool) (f *DatasetMapFilter, err error) {
-
 	f = NewDatasetMapFilter(len(in), true)
 	for pathPattern, accept := range in {
 		mapping := MapFilterResultOmit

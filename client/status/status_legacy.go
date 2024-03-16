@@ -9,14 +9,12 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-isatty"
-	"github.com/pkg/errors"
 	tview "gitlab.com/tslocum/cview"
 
 	"github.com/zrepl/zrepl/client/status/viewmodel"
 )
 
 func legacy(c Client, flag statusFlags) error {
-
 	// Set this so we don't overwrite the default terminal colors
 	// See https://github.com/rivo/tview/blob/master/styles.go
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
@@ -38,10 +36,10 @@ func legacy(c Client, flag statusFlags) error {
 		wrap = true
 		screen, err := tcell.NewScreen()
 		if err != nil {
-			return errors.Wrap(err, "get terminal dimensions")
+			return fmt.Errorf("get terminal dimensions: %w", err)
 		}
 		if err := screen.Init(); err != nil {
-			return errors.Wrap(err, "init screen")
+			return fmt.Errorf("init screen: %w", err)
 		}
 		width, _ = screen.Size()
 		screen.Fini()

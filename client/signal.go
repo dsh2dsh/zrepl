@@ -2,8 +2,7 @@ package client
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/zrepl/zrepl/cli"
 	"github.com/zrepl/zrepl/config"
@@ -20,7 +19,7 @@ var SignalCmd = &cli.Subcommand{
 
 func runSignalCmd(config *config.Config, args []string) error {
 	if len(args) != 2 {
-		return errors.Errorf("Expected 2 arguments: [wakeup|reset] JOB")
+		return errors.New("Expected 2 arguments: [wakeup|reset] JOB")
 	}
 
 	httpc, err := controlHttpClient(config.Global.Control.SockPath)

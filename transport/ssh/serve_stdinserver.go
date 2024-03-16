@@ -7,7 +7,6 @@ import (
 	"path"
 	"sync/atomic"
 
-	"github.com/pkg/errors"
 	"github.com/problame/go-netssh"
 
 	"github.com/zrepl/zrepl/config"
@@ -16,10 +15,9 @@ import (
 )
 
 func MultiStdinserverListenerFactoryFromConfig(g *config.Global, in *config.StdinserverServer) (transport.AuthenticatedListenerFactory, error) {
-
 	for _, ci := range in.ClientIdentities {
 		if err := transport.ValidateClientIdentity(ci); err != nil {
-			return nil, errors.Wrapf(err, "invalid client identity %q", ci)
+			return nil, fmt.Errorf("invalid client identity %q: %w", ci, err)
 		}
 	}
 
@@ -69,7 +67,6 @@ func multiStdinserverListenerFromClientIdentities(sockdir string, cis []string) 
 }
 
 func (m *MultiStdinserverListener) Accept(ctx context.Context) (*transport.AuthConn, error) {
-
 	if m.accepts == nil {
 		m.accepts = make(chan multiStdinserverAcceptRes, len(m.listeners))
 		for i := range m.listeners {
@@ -84,7 +81,6 @@ func (m *MultiStdinserverListener) Accept(ctx context.Context) (*transport.AuthC
 
 	res := <-m.accepts
 	return res.conn, res.err
-
 }
 
 type multiListenerAddr struct {

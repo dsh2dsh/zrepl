@@ -1,7 +1,8 @@
 package job
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/filters"
@@ -16,15 +17,14 @@ type SendingJobConfig interface {
 }
 
 func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.SenderConfig, error) {
-
 	fsf, err := filters.DatasetMapFilterFromConfig(in.GetFilesystems())
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build filesystem filter")
+		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}
 	sendOpts := in.GetSendOptions()
 	bwlim, err := buildBandwidthLimitConfig(sendOpts.BandwidthLimit)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build bandwith limit config")
+		return nil, fmt.Errorf("cannot build bandwith limit config: %w", err)
 	}
 
 	sc := &endpoint.SenderConfig{
@@ -45,7 +45,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 	}
 
 	if err := sc.Validate(); err != nil {
-		return nil, errors.Wrap(err, "cannot build sender config")
+		return nil, fmt.Errorf("cannot build sender config: %w", err)
 	}
 
 	return sc, nil
@@ -70,7 +70,7 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 
 	bwlim, err := buildBandwidthLimitConfig(recvOpts.BandwidthLimit)
 	if err != nil {
-		return rc, errors.Wrap(err, "cannot build bandwith limit config")
+		return rc, fmt.Errorf("cannot build bandwith limit config: %w", err)
 	}
 
 	placeholderEncryption, err := endpoint.PlaceholderCreationEncryptionPropertyString(recvOpts.Placeholder.Encryption)
@@ -79,7 +79,7 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 		for _, v := range endpoint.PlaceholderCreationEncryptionPropertyValues() {
 			options = append(options, endpoint.PlaceholderCreationEncryptionProperty(v).String())
 		}
-		return rc, errors.Errorf("placeholder encryption value %q is invalid, must be one of %s",
+		return rc, fmt.Errorf("placeholder encryption value %q is invalid, must be one of %s",
 			recvOpts.Placeholder.Encryption, options)
 	}
 
@@ -98,7 +98,7 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 	}
 
 	if err := rc.Validate(); err != nil {
-		return rc, errors.Wrap(err, "cannot build receiver config")
+		return rc, fmt.Errorf("cannot build receiver config: %w", err)
 	}
 
 	return rc, nil

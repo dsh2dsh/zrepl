@@ -1,25 +1,24 @@
 package nethelpers
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 )
 
 func PreparePrivateSockpath(sockpath string) error {
 	sockdir := filepath.Dir(sockpath)
 	sdstat, err := os.Stat(sockdir)
 	if err != nil {
-		return errors.Wrapf(err, "cannot stat(2) '%s'", sockdir)
+		return fmt.Errorf("cannot stat(2) '%s': %w", sockdir, err)
 	}
 	if !sdstat.IsDir() {
-		return errors.Errorf("not a directory: %s", sockdir)
+		return fmt.Errorf("not a directory: %s", sockdir)
 	}
 	p := sdstat.Mode().Perm()
-	if p&0007 != 0 {
-		return errors.Errorf("socket directory must not be world-accessible: %s (permissions are %#o)", sockdir, p)
+	if p&0o007 != 0 {
+		return fmt.Errorf("socket directory must not be world-accessible: %s (permissions are %#o)", sockdir, p)
 	}
 
 	// Maybe things have not been cleaned up before
@@ -28,20 +27,19 @@ func PreparePrivateSockpath(sockpath string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "cannot stat(2) '%s'", sockpath)
+		return fmt.Errorf("cannot stat(2) '%s': %w", sockpath, err)
 	}
 	if s.Mode()&os.ModeSocket == 0 {
-		return errors.Errorf("unexpected file type at path '%s'", sockpath)
+		return fmt.Errorf("unexpected file type at path '%s'", sockpath)
 	}
 	err = os.Remove(sockpath)
 	if err != nil {
-		return errors.Wrapf(err, "cannot remove presumably stale socket '%s'", sockpath)
+		return fmt.Errorf("cannot remove presumably stale socket '%s': %w", sockpath, err)
 	}
 	return nil
 }
 
 func ListenUnixPrivate(sockaddr *net.UnixAddr) (*net.UnixListener, error) {
-
 	if err := PreparePrivateSockpath(sockaddr.Name); err != nil {
 		return nil, err
 	}

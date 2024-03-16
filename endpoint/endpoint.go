@@ -4,13 +4,13 @@ package endpoint
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
 	"strings"
 
 	"github.com/kr/pretty"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 
@@ -44,13 +44,13 @@ type SenderConfig struct {
 func (c *SenderConfig) Validate() error {
 	c.JobID.MustValidate()
 	if err := c.Encrypt.ValidateNoDefault(); err != nil {
-		return errors.Wrap(err, "`Encrypt` field invalid")
+		return fmt.Errorf("`Encrypt` field invalid: %w", err)
 	}
 	if _, err := StepHoldTag(c.JobID); err != nil {
 		return fmt.Errorf("JobID cannot be used for hold tag: %s", err)
 	}
 	if err := bandwidthlimit.ValidateConfig(c.BandwidthLimit); err != nil {
-		return errors.Wrap(err, "`BandwidthLimit` field invalid")
+		return fmt.Errorf("`BandwidthLimit` field invalid: %w", err)
 	}
 	return nil
 }
@@ -134,7 +134,6 @@ func (s *Sender) ListFilesystemVersions(ctx context.Context, r *pdu.ListFilesyst
 	}
 	res := &pdu.ListFilesystemVersionsRes{Versions: rfsvs}
 	return res, nil
-
 }
 
 func uncheckedSendArgsFromPDU(fsv *pdu.FilesystemVersion) *zfs.ZFSSendArgVersion {
@@ -157,7 +156,6 @@ func sendArgsFromPDUAndValidateExistsAndGetVersion(ctx context.Context, fs strin
 }
 
 func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs.ZFSSendArgsValidated, _ error) {
-
 	_, err := s.filterCheckFS(r.Filesystem)
 	if err != nil {
 		return sendArgs, err
@@ -182,7 +180,7 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 
 	sendArgs, err = sendArgsUnvalidated.Validate(ctx)
 	if err != nil {
-		return sendArgs, errors.Wrap(err, "validate send arguments")
+		return sendArgs, fmt.Errorf("validate send arguments: %w", err)
 	}
 	return sendArgs, nil
 }
@@ -309,7 +307,7 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 	sendStream, err = zfs.ZFSSend(ctx, sendArgs, s.config.ExecPipe...)
 	if err != nil {
 		// it's ok to not destroy the abstractions we just created here, a new send attempt will take care of it
-		return nil, nil, errors.Wrap(err, "zfs send failed")
+		return nil, nil, fmt.Errorf("zfs send failed: %w", err)
 	}
 
 	// apply rate limit
@@ -333,7 +331,7 @@ func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, err
 
 	si, err := zfs.ZFSSendDry(ctx, sendArgs)
 	if err != nil {
-		return nil, errors.Wrap(err, "zfs send dry failed")
+		return nil, fmt.Errorf("zfs send dry failed: %w", err)
 	}
 
 	// From now on, assume that sendArgs has been validated by ZFSSendDry
@@ -360,13 +358,13 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*p
 	if orig.GetFrom() != nil {
 		f, err := sendArgsFromPDUAndValidateExistsAndGetVersion(ctx, fs, orig.GetFrom()) // no shadow
 		if err != nil {
-			return nil, errors.Wrap(err, "validate `from` exists")
+			return nil, fmt.Errorf("validate `from` exists: %w", err)
 		}
 		from = &f
 	}
 	to, err := sendArgsFromPDUAndValidateExistsAndGetVersion(ctx, fs, orig.GetTo())
 	if err != nil {
-		return nil, errors.Wrap(err, "validate `to` exists")
+		return nil, fmt.Errorf("validate `to` exists: %w", err)
 	}
 
 	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(orig.GetReplicationConfig().Protection)
@@ -397,7 +395,6 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*p
 	abstractionsCacheSingleton.TryBatchDestroy(ctx, p.jobId, fs, destroyTypes, keep, nil)
 
 	return &pdu.SendCompletedRes{}, nil
-
 }
 
 func (p *Sender) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
@@ -514,14 +511,14 @@ func (c *ReceiverConfig) Validate() error {
 	for _, prop := range c.InheritProperties {
 		err := prop.Validate()
 		if err != nil {
-			return errors.Wrapf(err, "inherit property %q", prop)
+			return fmt.Errorf("inherit property %q: %w", prop, err)
 		}
 	}
 
 	for prop := range c.OverrideProperties {
 		err := prop.Validate()
 		if err != nil {
-			return errors.Wrapf(err, "override property %q", prop)
+			return fmt.Errorf("override property %q: %w", prop, err)
 		}
 	}
 
@@ -530,11 +527,11 @@ func (c *ReceiverConfig) Validate() error {
 	}
 
 	if err := bandwidthlimit.ValidateConfig(c.BandwidthLimit); err != nil {
-		return errors.Wrap(err, "`BandwidthLimit` field invalid")
+		return fmt.Errorf("`BandwidthLimit` field invalid: %w", err)
 	}
 
 	if !c.PlaceholderEncryption.IsAPlaceholderCreationEncryptionProperty() {
-		return errors.Errorf("`PlaceholderEncryption` field is invalid")
+		return errors.New("`PlaceholderEncryption` field is invalid")
 	}
 
 	return nil
@@ -629,7 +626,7 @@ func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
 		return nil, err
 	}
 	if p.Length() == 0 {
-		return nil, errors.Errorf("cannot map empty filesystem")
+		return nil, errors.New("cannot map empty filesystem")
 	}
 	c := f.localRoot.Copy()
 	c.Extend(p)
@@ -641,10 +638,10 @@ func (s *Receiver) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemR
 
 	// first make sure that root_fs is imported
 	if rphs, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, s.conf.RootWithoutClientComponent); err != nil {
-		return nil, errors.Wrap(err, "cannot determine whether root_fs exists")
+		return nil, fmt.Errorf("cannot determine whether root_fs exists: %w", err)
 	} else if !rphs.FSExists {
 		getLogger(ctx).WithField("root_fs", s.conf.RootWithoutClientComponent).Error("root_fs does not exist")
-		return nil, errors.Errorf("root_fs does not exist")
+		return nil, errors.New("root_fs does not exist")
 	}
 
 	root := s.clientRootFromCtx(ctx)
@@ -659,12 +656,12 @@ func (s *Receiver) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemR
 		ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, a)
 		if err != nil {
 			l.WithError(err).Error("error getting placeholder state")
-			return nil, errors.Wrapf(err, "cannot get placeholder state for fs %q", a)
+			return nil, fmt.Errorf("cannot get placeholder state for fs %q: %w", a, err)
 		}
 		l.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).Debug("placeholder state")
 		if !ph.FSExists {
 			l.Error("inconsistent placeholder state: filesystem must exists")
-			err := errors.Errorf("inconsistent placeholder state: filesystem %q must exist in this context", a.ToString())
+			err := fmt.Errorf("inconsistent placeholder state: filesystem %q must exist in this context", a.ToString())
 			return nil, err
 		}
 		token, err := zfs.ZFSGetReceiveResumeTokenOrEmptyStringIfNotSupported(ctx, a)
@@ -783,7 +780,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	root := s.clientRootFromCtx(ctx)
 	lp, err := subroot{root}.MapToLocal(req.Filesystem)
 	if err != nil {
-		return nil, errors.Wrap(err, "`Filesystem` invalid")
+		return nil, fmt.Errorf("`Filesystem` invalid: %w", err)
 	}
 
 	to := uncheckedSendArgsFromPDU(req.GetTo())
@@ -825,7 +822,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 				WithField("errType", fmt.Sprintf("%T", err)).
 				Debug("get placeholder state for filesystem")
 			if err != nil {
-				visitErr = errors.Wrapf(err, "cannot get placeholder state of %s", v.Path.ToString())
+				visitErr = fmt.Errorf("cannot get placeholder state of %s: %w", v.Path.ToString(), err)
 				return false
 			}
 
@@ -845,7 +842,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 				placeholderEncryption, err := s.receive_GetPlaceholderCreationEncryptionValue(root, v.Path)
 				if err != nil {
 					l.WithError(err).Error("cannot create placeholder filesystem") // logger already contains path
-					visitErr = errors.Wrapf(err, "cannot create placeholder filesystem %s", v.Path.ToString())
+					visitErr = fmt.Errorf("cannot create placeholder filesystem %s: %w", v.Path.ToString(), err)
 					return false
 				}
 
@@ -855,7 +852,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 				err = zfs.ZFSCreatePlaceholderFilesystem(ctx, v.Path, v.Parent.Path, placeholderEncryption)
 				if err != nil {
 					l.WithError(err).Error("cannot create placeholder filesystem") // logger already contains path
-					visitErr = errors.Wrapf(err, "cannot create placeholder filesystem %s", v.Path.ToString())
+					visitErr = fmt.Errorf("cannot create placeholder filesystem %s: %w", v.Path.ToString(), err)
 					return false
 				}
 				l.Info("created placeholder filesystem")
@@ -878,7 +875,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	var recvOpts zfs.RecvOptions
 	ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, lp)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot get placeholder state")
+		return nil, fmt.Errorf("cannot get placeholder state: %w", err)
 	}
 	log.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).Debug("placeholder state")
 
@@ -900,20 +897,20 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	if req.ClearResumeToken && ph.FSExists {
 		log.Info("clearing resume token")
 		if err := zfs.ZFSRecvClearResumeToken(ctx, lp.ToString()); err != nil {
-			return nil, errors.Wrap(err, "cannot clear resume token")
+			return nil, fmt.Errorf("cannot clear resume token: %w", err)
 		}
 	}
 
 	recvOpts.SavePartialRecvState, err = zfs.ResumeRecvSupported(ctx, lp)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot determine whether we can use resumable send & recv")
+		return nil, fmt.Errorf("cannot determine whether we can use resumable send & recv: %w", err)
 	}
 
 	// apply rate limit
 	receive = s.bwLimit.WrapReadCloser(receive)
 
 	var peek bytes.Buffer
-	var MaxPeek = envconst.Int64("ZREPL_ENDPOINT_RECV_PEEK_SIZE", 1<<20)
+	MaxPeek := envconst.Int64("ZREPL_ENDPOINT_RECV_PEEK_SIZE", 1<<20)
 	log.WithField("max_peek_bytes", MaxPeek).Info("peeking incoming stream")
 	if _, err := io.Copy(&peek, io.LimitReader(receive, MaxPeek)); err != nil {
 		log.WithError(err).Error("cannot read peek-buffer from send stream")
@@ -1007,7 +1004,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 		msg := "receive request's `To` version does not match what we received in the stream"
 		log.WithError(err).WithField("snap", snapFullPath).Error(msg)
 		log.Error("aborting recv request, but keeping received snapshot for inspection")
-		return nil, errors.Wrap(err, msg)
+		return nil, fmt.Errorf("%s: %w", msg, err)
 	}
 
 	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(req.GetReplicationConfig().Protection)

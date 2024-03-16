@@ -3,12 +3,12 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/zrepl/zrepl/cli"
@@ -41,7 +41,7 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 
 	q, err := zabsListFlags.Filter.Query()
 	if err != nil {
-		return errors.Wrap(err, "invalid filter specification on command line")
+		return fmt.Errorf("invalid filter specification on command line: %w", err)
 	}
 
 	abstractions, errors, drainDone, err := endpoint.ListAbstractionsStreamed(ctx, q)
@@ -96,5 +96,4 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 	} else {
 		return nil
 	}
-
 }

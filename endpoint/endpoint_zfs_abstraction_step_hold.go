@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -32,7 +30,7 @@ func ParseStepHoldTag(tag string) (JobID, error) {
 	}
 	jobID, err := MakeJobID(match[1])
 	if err != nil {
-		return JobID{}, errors.Wrap(err, "parse hold tag: invalid job id field")
+		return JobID{}, fmt.Errorf("parse hold tag: invalid job id field: %w", err)
 	}
 	return jobID, nil
 }
@@ -45,11 +43,11 @@ func HoldStep(ctx context.Context, fs string, v zfs.FilesystemVersion, jobID Job
 
 	tag, err := StepHoldTag(jobID)
 	if err != nil {
-		return nil, errors.Wrap(err, "step hold tag")
+		return nil, fmt.Errorf("step hold tag: %w", err)
 	}
 
 	if err := zfs.ZFSHold(ctx, fs, v, tag); err != nil {
-		return nil, errors.Wrap(err, "step hold: zfs")
+		return nil, fmt.Errorf("step hold: zfs: %w", err)
 	}
 
 	return &holdBasedAbstraction{
@@ -59,7 +57,6 @@ func HoldStep(ctx context.Context, fs string, v zfs.FilesystemVersion, jobID Job
 		JobID:             jobID,
 		FilesystemVersion: v,
 	}, nil
-
 }
 
 var _ HoldExtractor = StepHoldExtractor

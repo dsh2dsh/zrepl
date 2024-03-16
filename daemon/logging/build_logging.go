@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/syslog"
 	"os"
 
 	"github.com/mattn/go-isatty"
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/logging/trace"
@@ -32,7 +32,7 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 
 		outlet, minLevel, err := ParseOutlet(le)
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot parse outlet #%d", lei)
+			return nil, fmt.Errorf("cannot parse outlet #%d: %w", lei, err)
 		}
 		var _ logger.Outlet = WriterOutlet{}
 		var _ logger.Outlet = &SyslogOutlet{}
@@ -48,10 +48,10 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 	}
 
 	if syslogOutlets > 1 {
-		return nil, errors.Errorf("can only define one 'syslog' outlet")
+		return nil, errors.New("can only define one 'syslog' outlet")
 	}
 	if stdoutOutlets > 1 {
-		return nil, errors.Errorf("can only define one 'stdout' outlet")
+		return nil, errors.New("can only define one 'stdout' outlet")
 	}
 
 	return outlets, nil
@@ -191,16 +191,16 @@ func parseLogFormat(common config.LoggingOutletCommon,
 func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Level, err error) {
 	parseCommon := func(common config.LoggingOutletCommon) (logger.Level, EntryFormatter, error) {
 		if common.Level == "" || common.Format == "" {
-			return 0, nil, errors.Errorf("must specify 'level' and 'format' field")
+			return 0, nil, errors.New("must specify 'level' and 'format' field")
 		}
 
 		minLevel, err := logger.ParseLevel(common.Level)
 		if err != nil {
-			return 0, nil, errors.Wrap(err, "cannot parse 'level' field")
+			return 0, nil, fmt.Errorf("cannot parse 'level' field: %w", err)
 		}
 		formatter, err := parseLogFormat(common)
 		if err != nil {
-			return 0, nil, errors.Wrap(err, "cannot parse 'formatter' field")
+			return 0, nil, fmt.Errorf("cannot parse 'formatter' field: %w", err)
 		}
 		return minLevel, formatter, nil
 	}
@@ -261,18 +261,18 @@ func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter) (out 
 		tlsConfig, err = func(m *config.TCPLoggingOutletTLS, host string) (*tls.Config, error) {
 			clientCert, err := tls.LoadX509KeyPair(m.Cert, m.Key)
 			if err != nil {
-				return nil, errors.Wrap(err, "cannot load client cert")
+				return nil, fmt.Errorf("cannot load client cert: %w", err)
 			}
 
 			var rootCAs *x509.CertPool
 			if m.CA == "" {
 				if rootCAs, err = x509.SystemCertPool(); err != nil {
-					return nil, errors.Wrap(err, "cannot open system cert pool")
+					return nil, fmt.Errorf("cannot open system cert pool: %w", err)
 				}
 			} else {
 				rootCAs, err = tlsconf.ParseCAFile(m.CA)
 				if err != nil {
-					return nil, errors.Wrap(err, "cannot parse CA cert")
+					return nil, fmt.Errorf("cannot parse CA cert: %w", err)
 				}
 			}
 			if rootCAs == nil {

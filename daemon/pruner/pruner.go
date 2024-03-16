@@ -2,13 +2,13 @@ package pruner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/config"
@@ -94,7 +94,7 @@ type LocalPrunerFactory struct {
 func NewLocalPrunerFactory(in config.PruningLocal, promPruneSecs *prometheus.HistogramVec) (*LocalPrunerFactory, error) {
 	rules, err := pruning.RulesFromConfig(in.Keep)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build pruning rules")
+		return nil, fmt.Errorf("cannot build pruning rules: %w", err)
 	}
 	for _, r := range in.Keep {
 		if _, ok := r.Ret.(*config.PruneKeepNotReplicated); ok {
@@ -114,12 +114,12 @@ func NewLocalPrunerFactory(in config.PruningLocal, promPruneSecs *prometheus.His
 func NewPrunerFactory(in config.PruningSenderReceiver, promPruneSecs *prometheus.HistogramVec) (*PrunerFactory, error) {
 	keepRulesReceiver, err := pruning.RulesFromConfig(in.KeepReceiver)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build receiver pruning rules")
+		return nil, fmt.Errorf("cannot build receiver pruning rules: %w", err)
 	}
 
 	keepRulesSender, err := pruning.RulesFromConfig(in.KeepSender)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot build sender pruning rules")
+		return nil, fmt.Errorf("cannot build sender pruning rules: %w", err)
 	}
 
 	considerSnapAtCursorReplicated := false
@@ -360,7 +360,6 @@ func (s snapshot) Replicated() bool { return s.replicated }
 func (s snapshot) Date() time.Time { return s.date }
 
 func doOneAttempt(a *args, u updater) {
-
 	ctx, target, sender := a.ctx, a.target, a.sender
 
 	sfssres, err := sender.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
@@ -524,12 +523,10 @@ tfss_loop:
 			p.state = Done
 		}
 	})
-
 }
 
 // attempts to exec pfs, puts it back into the queue with the result
 func doOneAttemptExec(a *args, u updater, pfs *fs) {
-
 	destroyList := make([]*pdu.FilesystemVersion, len(pfs.destroyList))
 	for i := range destroyList {
 		destroyList[i] = pfs.destroyList[i].(snapshot).fsv

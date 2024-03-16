@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -156,18 +155,18 @@ func ParseFilesystemVersion(args ParseFilesystemVersionArgs) (v FilesystemVersio
 	}
 
 	if v.Guid, err = strconv.ParseUint(args.guid, 10, 64); err != nil {
-		err = errors.Wrapf(err, "cannot parse GUID %q", args.guid)
+		err = fmt.Errorf("cannot parse GUID %q: %w", args.guid, err)
 		return v, err
 	}
 
 	if v.CreateTXG, err = strconv.ParseUint(args.createtxg, 10, 64); err != nil {
-		err = errors.Wrapf(err, "cannot parse CreateTXG %q", args.createtxg)
+		err = fmt.Errorf("cannot parse CreateTXG %q: %w", args.createtxg, err)
 		return v, err
 	}
 
 	creationUnix, err := strconv.ParseInt(args.creation, 10, 64)
 	if err != nil {
-		err = errors.Wrapf(err, "cannot parse creation date %q", args.creation)
+		err = fmt.Errorf("cannot parse creation date %q: %w", args.creation, err)
 		return v, err
 	} else {
 		v.Creation = time.Unix(creationUnix, 0)
@@ -176,12 +175,12 @@ func ParseFilesystemVersion(args ParseFilesystemVersionArgs) (v FilesystemVersio
 	switch v.Type {
 	case Bookmark:
 		if args.userrefs != "-" {
-			return v, errors.Errorf("expecting %q for bookmark property userrefs, got %q", "-", args.userrefs)
+			return v, fmt.Errorf("expecting %q for bookmark property userrefs, got %q", "-", args.userrefs)
 		}
 		v.UserRefs = OptionUint64{Valid: false}
 	case Snapshot:
 		if v.UserRefs.Value, err = strconv.ParseUint(args.userrefs, 10, 64); err != nil {
-			err = errors.Wrapf(err, "cannot parse userrefs %q", args.userrefs)
+			err = fmt.Errorf("cannot parse userrefs %q: %w", args.userrefs, err)
 			return v, err
 		}
 		v.UserRefs.Valid = true

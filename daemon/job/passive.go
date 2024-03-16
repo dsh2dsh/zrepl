@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
@@ -67,11 +66,11 @@ func modeSourceFromConfig(g *config.Global, in *config.SourceJob, jobID endpoint
 
 	m.senderConfig, err = buildSenderConfig(in, jobID)
 	if err != nil {
-		return nil, errors.Wrap(err, "send options")
+		return nil, fmt.Errorf("send options: %w", err)
 	}
 
 	if m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting); err != nil {
-		return nil, errors.Wrap(err, "cannot build snapper")
+		return nil, fmt.Errorf("cannot build snapper: %w", err)
 	}
 
 	return m, nil
@@ -93,12 +92,11 @@ func (m *modeSource) SnapperReport() *snapper.Report {
 }
 
 func passiveSideFromConfig(g *config.Global, in *config.PassiveJob, configJob interface{}, parseFlags config.ParseFlags) (s *PassiveSide, err error) {
-
 	s = &PassiveSide{}
 
 	s.name, err = endpoint.MakeJobID(in.Name)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid job name")
+		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
 
 	switch v := configJob.(type) {
@@ -112,7 +110,7 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob, configJob in
 	}
 
 	if s.listen, err = fromconfig.ListenerFactoryFromConfig(g, in.Serve, parseFlags); err != nil {
-		return nil, errors.Wrap(err, "cannot build listener factory")
+		return nil, fmt.Errorf("cannot build listener factory: %w", err)
 	}
 
 	return s, nil

@@ -2,12 +2,11 @@ package snapper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 
@@ -29,7 +28,7 @@ func periodicFromConfig(g *config.Global, fsf zfs.DatasetFilter, in *config.Snap
 
 	hookList, err := hooks.ListFromConfig(&in.Hooks)
 	if err != nil {
-		return nil, errors.Wrap(err, "hook config error")
+		return nil, fmt.Errorf("hook config error: %w", err)
 	}
 
 	args := periodicArgs{
@@ -100,8 +99,10 @@ func (s State) sf() state {
 	return m[s]
 }
 
-type updater func(u func(*Periodic)) State
-type state func(a periodicArgs, u updater) state
+type (
+	updater func(u func(*Periodic)) State
+	state   func(a periodicArgs, u updater) state
+)
 
 func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
@@ -132,7 +133,6 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
 			Debug("state transition")
 
 	}
-
 }
 
 func onErr(err error, u updater) state {
@@ -199,7 +199,6 @@ func periodicStatePlan(a periodicArgs, u updater) state {
 }
 
 func periodicStateSnapshot(a periodicArgs, u updater) state {
-
 	var plan *plan
 	u(func(snapper *Periodic) {
 		plan = snapper.plan
@@ -257,7 +256,6 @@ var syncUpWarnNoSnapshotUntilSyncupMinDuration = envconst.Duration("ZREPL_SNAPPE
 
 // see docs/snapshotting.rst
 func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string, interval time.Duration) (syncPoint time.Time, err error) {
-
 	const (
 		prioHasVersions int = iota
 		prioNoVersions
@@ -330,19 +328,17 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string, i
 	}
 
 	return snaptimes[0].time, nil
-
 }
 
 var findSyncPointFSNoFilesystemVersionsErr = fmt.Errorf("no filesystem versions")
 
 func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time, interval time.Duration, prefix string, d *zfs.DatasetPath) (time.Time, error) {
-
 	fsvs, err := zfs.ZFSListFilesystemVersions(ctx, d, zfs.ListFilesystemVersionsOptions{
 		Types:           zfs.Snapshots,
 		ShortnamePrefix: prefix,
 	})
 	if err != nil {
-		return time.Time{}, errors.Wrap(err, "list filesystem versions")
+		return time.Time{}, fmt.Errorf("list filesystem versions: %w", err)
 	}
 	if len(fsvs) <= 0 {
 		return time.Time{}, findSyncPointFSNoFilesystemVersionsErr

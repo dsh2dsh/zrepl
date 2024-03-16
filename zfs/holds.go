@@ -9,8 +9,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/util/envconst"
 	"github.com/zrepl/zrepl/zfs/zfscmd"
 )
@@ -36,7 +34,7 @@ func ValidHoldTag(tag string) error {
 // Idemptotent: does not return an error if the tag already exists
 func ZFSHold(ctx context.Context, fs string, v FilesystemVersion, tag string) error {
 	if !v.IsSnapshot() {
-		return errors.Errorf("can only hold snapshots, got %s", v.RelName())
+		return fmt.Errorf("can only hold snapshots, got %s", v.RelName())
 	}
 
 	if err := validateNotEmpty("tag", tag); err != nil {
@@ -48,7 +46,7 @@ func ZFSHold(ctx context.Context, fs string, v FilesystemVersion, tag string) er
 		if bytes.Contains(output, []byte("tag already exists on this dataset")) {
 			goto success
 		}
-		return &ZFSError{output, errors.Wrapf(err, "cannot hold %q", fullPath)}
+		return &ZFSError{output, fmt.Errorf("cannot hold %q: %w", fullPath, err)}
 	}
 success:
 	return nil
@@ -56,7 +54,7 @@ success:
 
 func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 	if err := validateZFSFilesystem(fs); err != nil {
-		return nil, errors.Wrap(err, "`fs` is not a valid filesystem path")
+		return nil, fmt.Errorf("`fs` is not a valid filesystem path: %w", err)
 	}
 	if snap == "" {
 		return nil, fmt.Errorf("`snap` must not be empty")
@@ -64,7 +62,7 @@ func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 	dp := fmt.Sprintf("%s@%s", fs, snap)
 	output, err := zfscmd.CommandContext(ctx, "zfs", "holds", "-H", dp).CombinedOutput()
 	if err != nil {
-		return nil, &ZFSError{output, errors.Wrap(err, "zfs holds failed")}
+		return nil, &ZFSError{output, fmt.Errorf("zfs holds failed: %w", err)}
 	}
 	scan := bufio.NewScanner(bytes.NewReader(output))
 	var tags []string
@@ -91,7 +89,7 @@ func ZFSRelease(ctx context.Context, tag string, snaps ...string) error {
 	maxInvocationLen := 12 * os.Getpagesize()
 	var noSuchTagLines, otherLines []string
 	for i := 0; i < len(snaps); {
-		var j = i
+		j := i
 		for ; j < len(snaps); j++ {
 			if cumLens[j]-cumLens[i] > maxInvocationLen {
 				break

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 )
 
 type Level int
@@ -92,7 +91,7 @@ func ParseLevel(s string) (l Level, err error) {
 			return l, nil
 		}
 	}
-	return -1, errors.Errorf("unknown level '%s'", s)
+	return -1, fmt.Errorf("unknown level '%s'", s)
 }
 
 // Levels ordered least severe to most severe

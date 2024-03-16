@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/kr/pretty"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	"github.com/zrepl/yaml-config"
 
@@ -67,9 +66,8 @@ var ConfigcheckCmd = &cli.Subcommand{
 
 		// further: try to build jobs
 		confJobs, err := job.JobsFromConfig(subcommand.Config(), parseFlags)
-
 		if err != nil {
-			err := errors.Wrap(err, "cannot build jobs from config")
+			err := fmt.Errorf("cannot build jobs from config: %w", err)
 			if configcheckArgs.what == "jobs" {
 				return err
 			} else {
@@ -82,7 +80,7 @@ var ConfigcheckCmd = &cli.Subcommand{
 		// further: try to build logging outlets
 		outlets, err := logging.OutletsFromConfig(*subcommand.Config().Global.Logging)
 		if err != nil {
-			err := errors.Wrap(err, "cannot build logging from config")
+			err := fmt.Errorf("cannot build logging from config: %w", err)
 			if configcheckArgs.what == "logging" {
 				return err
 			} else {

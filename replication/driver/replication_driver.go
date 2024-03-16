@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/kr/pretty"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -182,8 +182,10 @@ type step struct {
 	step Step
 }
 
-type ReportFunc func() *report.Report
-type WaitFunc func(block bool) (done bool)
+type (
+	ReportFunc func() *report.Report
+	WaitFunc   func(block bool) (done bool)
+)
 
 type Config struct {
 	StepQueueConcurrency     int           `validate:"gte=1"`
@@ -199,7 +201,6 @@ func (c Config) Validate() error {
 
 // caller must ensure config.Validate() == nil
 func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFunc) {
-
 	if err := config.Validate(); err != nil {
 		panic(err)
 	}
@@ -292,7 +293,6 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 			}
 
 		}
-
 	}()
 
 	wait := func(block bool) bool {
@@ -408,7 +408,7 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt) map[*fs]*
 		dp, err := zfs.NewDatasetPath(fs)
 		if err != nil {
 			now := time.Now()
-			a.planErr = newTimedError(errors.Wrapf(err, "%q", fs), now)
+			a.planErr = newTimedError(fmt.Errorf("%q: %w", fs, err), now)
 			a.fss = nil
 			a.finishedAt = now
 			return nil
@@ -486,7 +486,6 @@ func (f *fs) initialRepOrdWakeupChildren() {
 }
 
 func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
-
 	defer f.l.Lock().Unlock()
 	defer f.initialRepOrdWakeupChildren()
 
@@ -607,7 +606,6 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
 					if !parentPresentOnReceiver && p.planned.stepErr != nil {
 						initialReplicatingParentsWithErrors = append(initialReplicatingParentsWithErrors, p.fs.ReportInfo().Name)
 					}
-
 				})
 			}
 		})
@@ -661,7 +659,6 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
 
 		f.initialRepOrdWakeupChildren()
 	}
-
 }
 
 // caller must hold lock l
@@ -682,7 +679,6 @@ func (r *run) report() *report.Report {
 
 // caller must hold lock l
 func (a *attempt) report() *report.AttemptReport {
-
 	r := &report.AttemptReport{
 		// State is set below
 		Filesystems: make([]*report.FilesystemReport, len(a.fss)),

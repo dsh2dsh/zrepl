@@ -2,12 +2,11 @@ package zfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/util/envconst"
 	"github.com/zrepl/zrepl/zfs/zfscmd"
@@ -25,7 +24,7 @@ func EncryptionCLISupported(ctx context.Context) (bool, error) {
 		cmd := zfscmd.CommandContext(ctx, "zfs", "load-key")
 		output, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
-			encryptionCLISupport.err = errors.Wrap(err, "native encryption cli support feature check failed")
+			encryptionCLISupport.err = fmt.Errorf("native encryption cli support feature check failed: %w", err)
 		}
 		def := strings.Contains(string(output), "load-key") && strings.Contains(string(output), "keylocation")
 		encryptionCLISupport.supported = envconst.Bool("ZREPL_EXPERIMENTAL_ZFS_ENCRYPTION_CLI_SUPPORTED", def)
@@ -53,7 +52,7 @@ func ZFSGetEncryptionEnabled(ctx context.Context, fs string) (enabled bool, err 
 
 	props, err := zfsGet(ctx, fs, []string{"encryption"}, SourceAny)
 	if err != nil {
-		return false, errors.Wrap(err, "cannot get `encryption` property")
+		return false, fmt.Errorf("cannot get `encryption` property: %w", err)
 	}
 	val := props.Get("encryption")
 	switch val {

@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	"github.com/zrepl/yaml-config"
 
@@ -263,7 +262,7 @@ func (s *CronSpec) UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) 
 
 	sched, err := parser.Parse(specString)
 	if err != nil {
-		return errors.Wrap(err, "cron syntax invalid")
+		return fmt.Errorf("cron syntax invalid: %w", err)
 	}
 	s.Schedule = sched
 	return nil
@@ -698,7 +697,7 @@ func ParseConfig(path string) (i *Config, err error) {
 				continue
 			}
 			if !stat.Mode().IsRegular() {
-				err = errors.Errorf("file at default location is not a regular file: %s", l)
+				err = fmt.Errorf("file at default location is not a regular file: %s", l)
 				return
 			}
 			path = l

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -27,15 +25,14 @@ var ErrV1ReplicationCursor = fmt.Errorf("bookmark name is a v1-replication curso
 //
 // Returns ErrV1ReplicationCursor as error if the bookmark is a v1 replication cursor
 func ParseReplicationCursorBookmarkName(fullname string) (uint64, JobID, error) {
-
 	// check for legacy cursors
 	{
 		if err := zfs.EntityNamecheck(fullname, zfs.EntityTypeBookmark); err != nil {
-			return 0, JobID{}, errors.Wrap(err, "parse replication cursor bookmark name")
+			return 0, JobID{}, fmt.Errorf("parse replication cursor bookmark name: %w", err)
 		}
 		_, _, name, err := zfs.DecomposeVersionString(fullname)
 		if err != nil {
-			return 0, JobID{}, errors.Wrap(err, "parse replication cursor bookmark name: decompose version string")
+			return 0, JobID{}, fmt.Errorf("parse replication cursor bookmark name: decompose version string: %w", err)
 		}
 		const V1ReplicationCursorBookmarkName = "zrepl_replication_cursor"
 		if name == V1ReplicationCursorBookmarkName {
@@ -46,7 +43,7 @@ func ParseReplicationCursorBookmarkName(fullname string) (uint64, JobID, error) 
 
 	guid, jobID, err := parseJobAndGuidBookmarkName(fullname, replicationCursorBookmarkNamePrefix)
 	if err != nil {
-		err = errors.Wrap(err, "parse replication cursor bookmark name") // no shadow
+		err = fmt.Errorf("parse replication cursor bookmark name: %w", err) // no shadow
 	}
 	return guid, jobID, err
 }
@@ -68,7 +65,7 @@ func tentativeReplicationCursorBookmarkNameImpl(fs string, guid uint64, jobid st
 func ParseTentativeReplicationCursorBookmarkName(fullname string) (guid uint64, jobID JobID, err error) {
 	guid, jobID, err = parseJobAndGuidBookmarkName(fullname, tentativeReplicationCursorBookmarkNamePrefix)
 	if err != nil {
-		err = errors.Wrap(err, "parse step bookmark name") // no shadow!
+		err = fmt.Errorf("parse step bookmark name: %w", err) // no shadow!
 	}
 	return guid, jobID, err
 }
@@ -93,7 +90,6 @@ func GetMostRecentReplicationCursorOfJob(ctx context.Context, fs string, jobID J
 }
 
 func GetReplicationCursors(ctx context.Context, dp *zfs.DatasetPath, jobID JobID) ([]zfs.FilesystemVersion, error) {
-
 	fs := dp.ToString()
 	q := ListZFSHoldsAndBookmarksQuery{
 		FS: ListZFSHoldsAndBookmarksQueryFilesystemFilter{FS: &fs},
@@ -107,7 +103,7 @@ func GetReplicationCursors(ctx context.Context, dp *zfs.DatasetPath, jobID JobID
 	}
 	abs, absErr, err := ListAbstractions(ctx, q)
 	if err != nil {
-		return nil, errors.Wrap(err, "get replication cursor: list bookmarks and holds")
+		return nil, fmt.Errorf("get replication cursor: list bookmarks and holds: %w", err)
 	}
 	if len(absErr) > 0 {
 		return nil, ListAbstractionsErrors(absErr)
@@ -150,7 +146,6 @@ func CreateTentativeReplicationCursor(ctx context.Context, fs string, target zfs
 }
 
 func createBookmarkAbstraction(ctx context.Context, abstractionType AbstractionType, fs string, target zfs.FilesystemVersion, jobID JobID) (a Abstraction, err error) {
-
 	bookmarkNamer := abstractionType.BookmarkNamer()
 	if bookmarkNamer == nil {
 		panic(abstractionType)
@@ -158,7 +153,7 @@ func createBookmarkAbstraction(ctx context.Context, abstractionType AbstractionT
 
 	bookmarkname, err := bookmarkNamer(fs, target.GetGuid(), jobID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "determine %s name", abstractionType)
+		return nil, fmt.Errorf("determine %s name: %w", abstractionType, err)
 	}
 
 	// idempotently create bookmark (guid is encoded in it)
@@ -168,7 +163,7 @@ func createBookmarkAbstraction(ctx context.Context, abstractionType AbstractionT
 		if err == zfs.ErrBookmarkCloningNotSupported {
 			return nil, err // TODO go1.13 use wrapping
 		}
-		return nil, errors.Wrapf(err, "cannot create bookmark")
+		return nil, fmt.Errorf("cannot create bookmark: %w", err)
 	}
 
 	return &bookmarkBasedAbstraction{
@@ -256,12 +251,14 @@ func (c ReplicationCursorV1) GetFilesystemVersion() zfs.FilesystemVersion { retu
 func (c ReplicationCursorV1) MarshalJSON() ([]byte, error) {
 	return json.Marshal(AbstractionJSON{c})
 }
+
 func (c ReplicationCursorV1) String() string {
 	return fmt.Sprintf("%s %s", c.Type, c.GetFullPath())
 }
+
 func (c ReplicationCursorV1) Destroy(ctx context.Context) error {
 	if err := zfs.ZFSDestroyIdempotent(ctx, c.GetFullPath()); err != nil {
-		return errors.Wrapf(err, "destroy %s %s: zfs", c.Type, c.GetFullPath())
+		return fmt.Errorf("destroy %s %s: zfs: %w", c.Type, c.GetFullPath(), err)
 	}
 	return nil
 }

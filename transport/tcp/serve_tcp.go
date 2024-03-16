@@ -2,9 +2,8 @@ package tcp
 
 import (
 	"context"
+	"fmt"
 	"net"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/transport"
@@ -14,7 +13,7 @@ import (
 func TCPListenerFactoryFromConfig(c *config.Global, in *config.TCPServe) (transport.AuthenticatedListenerFactory, error) {
 	clientMap, err := ipMapFromConfig(in.Clients)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot parse client IP map")
+		return nil, fmt.Errorf("cannot parse client IP map: %w", err)
 	}
 	lf := func() (transport.AuthenticatedListener, error) {
 		l, err := tcpsock.Listen(in.Listen, in.ListenFreeBind)

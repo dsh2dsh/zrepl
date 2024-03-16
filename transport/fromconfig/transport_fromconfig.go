@@ -5,8 +5,6 @@ package fromconfig
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/transport"
 	"github.com/zrepl/zrepl/transport/local"
@@ -16,7 +14,6 @@ import (
 )
 
 func ListenerFactoryFromConfig(g *config.Global, in config.ServeEnum, parseFlags config.ParseFlags) (transport.AuthenticatedListenerFactory, error) {
-
 	var (
 		l   transport.AuthenticatedListenerFactory
 		err error
@@ -31,7 +28,7 @@ func ListenerFactoryFromConfig(g *config.Global, in config.ServeEnum, parseFlags
 	case *config.LocalServe:
 		l, err = local.LocalListenerFactoryFromConfig(g, v)
 	default:
-		return nil, errors.Errorf("internal error: unknown serve type %T", v)
+		return nil, fmt.Errorf("internal error: unknown serve type %T", v)
 	}
 
 	return l, err

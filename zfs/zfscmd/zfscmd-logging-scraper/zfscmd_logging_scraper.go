@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-logfmt/logfmt"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/zrepl/zrepl/daemon/logging"
@@ -28,7 +28,7 @@ var humanFormatterLineRE = regexp.MustCompile(`^(\[[^\]]+\]){2}\[zfs.cmd\]\[[^\]
 func parseSecs(s string) (time.Duration, error) {
 	d, err := time.ParseDuration(s + "s")
 	if err != nil {
-		return 0, errors.Wrapf(err, "parse duration %q", s)
+		return 0, fmt.Errorf("parse duration %q: %w", s, err)
 	}
 	return d, nil
 }
@@ -58,7 +58,7 @@ func parseHumanFormatterNodate(line string) (l RuntimeLine, err error) {
 			case "invocation":
 				continue // pass
 			default:
-				return l, errors.Errorf("unknown key %q", k)
+				return l, fmt.Errorf("unknown key %q", k)
 			}
 			if err != nil {
 				return l, err
@@ -66,7 +66,7 @@ func parseHumanFormatterNodate(line string) (l RuntimeLine, err error) {
 		}
 	}
 	if d.Err() != nil {
-		return l, errors.Wrap(d.Err(), "decode key value pairs")
+		return l, fmt.Errorf("decode key value pairs: %w", d.Err())
 	}
 	return l, nil
 }
@@ -74,7 +74,7 @@ func parseHumanFormatterNodate(line string) (l RuntimeLine, err error) {
 func parseLogLine(line string) (l RuntimeLine, err error) {
 	m := dateRegex.FindStringSubmatch(line)
 	if len(m) != 3 {
-		return l, errors.Errorf("invalid date regex match %v", m)
+		return l, fmt.Errorf("invalid date regex match %v", m)
 	}
 	dateTrimmed := strings.TrimSpace(m[1])
 	date, err := time.Parse(dateFormat, dateTrimmed)
@@ -88,13 +88,14 @@ func parseLogLine(line string) (l RuntimeLine, err error) {
 	return l, err
 }
 
-var verbose bool
-var dateRegexArg string
-var dateRegex = regexp.MustCompile(`^([^\[]+)(.*)`)
-var dateFormat = logging.HumanFormatterDateFormat
+var (
+	verbose      bool
+	dateRegexArg string
+	dateRegex    = regexp.MustCompile(`^([^\[]+)(.*)`)
+	dateFormat   = logging.HumanFormatterDateFormat
+)
 
 func main() {
-
 	pflag.StringVarP(&dateRegexArg, "dateRE", "d", "", "date regex")
 	pflag.StringVar(&dateFormat, "dateFormat", logging.HumanFormatterDateFormat, "go date format")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "verbose")
@@ -125,5 +126,4 @@ func main() {
 	if input.Err() != nil {
 		panic(input.Err())
 	}
-
 }

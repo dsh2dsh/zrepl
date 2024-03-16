@@ -3,13 +3,12 @@ package endpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/util/envconst"
@@ -92,7 +91,7 @@ func (t AbstractionType) Validate() error {
 	case AbstractionReplicationCursorBookmarkV2:
 		return nil
 	default:
-		return errors.Errorf("unknown abstraction type %q", t)
+		return fmt.Errorf("unknown abstraction type %q", t)
 	}
 }
 
@@ -138,7 +137,7 @@ func AbstractionTypeSetFromStrings(sts []string) (AbstractionTypeSet, error) {
 	for i, t := range sts {
 		at := AbstractionType(t)
 		if err := at.Validate(); err != nil {
-			return nil, errors.Wrapf(err, "invalid abstraction type #%d %q", i+1, t)
+			return nil, fmt.Errorf("invalid abstraction type #%d %q: %w", i+1, t, err)
 		}
 		ats[at] = true
 	}
@@ -330,13 +329,13 @@ type ListZFSHoldsAndBookmarksQueryFilesystemFilter struct {
 
 func (q *ListZFSHoldsAndBookmarksQuery) Validate() error {
 	if err := q.FS.Validate(); err != nil {
-		return errors.Wrap(err, "FS")
+		return fmt.Errorf("FS: %w", err)
 	}
 	if q.JobID != nil {
 		q.JobID.MustValidate() // FIXME
 	}
 	if err := q.CreateTXG.Validate(); err != nil {
-		return errors.Wrap(err, "CreateTXGRange")
+		return fmt.Errorf("CreateTXGRange: %w", err)
 	}
 	if err := q.What.Validate(); err != nil {
 		return err
@@ -351,13 +350,12 @@ var createTXGRangeBoundAllowCreateTXG0 = envconst.Bool("ZREPL_ENDPOINT_LIST_ABST
 
 func (i *CreateTXGRangeBound) Validate() error {
 	if err := i.Inclusive.ValidateNoDefault(); err != nil {
-		return errors.Wrap(err, "Inclusive")
+		return fmt.Errorf("Inclusive: %w", err)
 	}
 	if i.CreateTXG == 0 && !createTXGRangeBoundAllowCreateTXG0 {
 		return errors.New("CreateTXG must be non-zero")
 	}
 	return nil
-
 }
 
 func (f *ListZFSHoldsAndBookmarksQueryFilesystemFilter) Validate() error {
@@ -371,7 +369,7 @@ func (f *ListZFSHoldsAndBookmarksQueryFilesystemFilter) Validate() error {
 	}
 	if fsSet {
 		if err := zfs.EntityNamecheck(*f.FS, zfs.EntityTypeFilesystem); err != nil {
-			return errors.Wrap(err, "FS invalid")
+			return fmt.Errorf("FS invalid: %w", err)
 		}
 	}
 	return nil
@@ -401,16 +399,16 @@ func (f *ListZFSHoldsAndBookmarksQueryFilesystemFilter) Filesystems(ctx context.
 func (r *CreateTXGRange) Validate() error {
 	if r.Since != nil {
 		if err := r.Since.Validate(); err != nil {
-			return errors.Wrap(err, "Since")
+			return fmt.Errorf("Since: %w", err)
 		}
 	}
 	if r.Until != nil {
 		if err := r.Until.Validate(); err != nil {
-			return errors.Wrap(err, "Until")
+			return fmt.Errorf("Until: %w", err)
 		}
 	}
 	if _, err := r.effectiveBounds(); err != nil {
-		return errors.Wrapf(err, "specified range %s is semantically invalid", r)
+		return fmt.Errorf("specified range %s is semantically invalid: %w", r, err)
 	}
 	return nil
 }
@@ -425,7 +423,6 @@ type effectiveBounds struct {
 
 // callers must have validated r.Since and r.Until before calling this method
 func (r *CreateTXGRange) effectiveBounds() (bounds effectiveBounds, err error) {
-
 	bounds.sinceUnbounded = r.Since == nil
 	bounds.untilUnbounded = r.Until == nil
 
@@ -437,7 +434,7 @@ func (r *CreateTXGRange) effectiveBounds() (bounds effectiveBounds, err error) {
 		bounds.sinceInclusive = r.Since.CreateTXG
 		if !r.Since.Inclusive.B {
 			if r.Since.CreateTXG == math.MaxUint64 {
-				return bounds, errors.Errorf("Since-exclusive (%v) must be less than math.MaxUint64 (%v)",
+				return bounds, fmt.Errorf("Since-exclusive (%v) must be less than math.MaxUint64 (%v)",
 					r.Since.CreateTXG, uint64(math.MaxUint64))
 			}
 			bounds.sinceInclusive++
@@ -448,7 +445,7 @@ func (r *CreateTXGRange) effectiveBounds() (bounds effectiveBounds, err error) {
 		bounds.untilInclusive = r.Until.CreateTXG
 		if !r.Until.Inclusive.B {
 			if r.Until.CreateTXG == 0 {
-				return bounds, errors.Errorf("Until-exclusive (%v) must be greater than 0", r.Until.CreateTXG)
+				return bounds, fmt.Errorf("Until-exclusive (%v) must be greater than 0", r.Until.CreateTXG)
 			}
 			bounds.untilInclusive--
 		}
@@ -456,7 +453,7 @@ func (r *CreateTXGRange) effectiveBounds() (bounds effectiveBounds, err error) {
 
 	if !bounds.sinceUnbounded && !bounds.untilUnbounded {
 		if bounds.sinceInclusive >= bounds.untilInclusive {
-			return bounds, errors.Errorf("effective range bounds are [%v,%v] which is empty or invalid", bounds.sinceInclusive, bounds.untilInclusive)
+			return bounds, fmt.Errorf("effective range bounds are [%v,%v] which is empty or invalid", bounds.sinceInclusive, bounds.untilInclusive)
 		}
 		// fallthrough
 	}
@@ -545,8 +542,10 @@ func (e ListAbstractionsError) Error() string {
 	}
 }
 
-type putListAbstractionErr func(err error, fs string, what string)
-type putListAbstraction func(a Abstraction)
+type (
+	putListAbstractionErr func(err error, fs string, what string)
+	putListAbstraction    func(a Abstraction)
+)
 
 type ListAbstractionsErrors []ListAbstractionsError
 
@@ -594,17 +593,16 @@ func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery) 
 // if err == nil, both channels must be fully drained by the caller to avoid leaking goroutines.
 // After draining is done, the caller must call the returned drainDone func.
 func ListAbstractionsStreamed(ctx context.Context, query ListZFSHoldsAndBookmarksQuery) (_ <-chan Abstraction, _ <-chan ListAbstractionsError, drainDone func(), _ error) {
-
 	// impl note: structure the query processing in such a way that
 	// a minimum amount of zfs shell-outs needs to be done
 
 	if err := query.Validate(); err != nil {
-		return nil, nil, nil, errors.Wrap(err, "validate query")
+		return nil, nil, nil, fmt.Errorf("validate query: %w", err)
 	}
 
 	fss, err := query.FS.Filesystems(ctx)
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "list filesystems")
+		return nil, nil, nil, fmt.Errorf("list filesystems: %w", err)
 	}
 
 	outErrs := make(chan ListAbstractionsError)
@@ -777,7 +775,7 @@ func ListStale(ctx context.Context, q ListZFSHoldsAndBookmarksQuery) (*Staleness
 		AbstractionReplicationCursorBookmarkV2: true,
 	}
 	if q.What.ContainsAnyOf(ifAnyThenAll) && !q.What.ContainsAll(ifAnyThenAll) {
-		return nil, &ListStaleQueryError{errors.Errorf("ListStale requires query to ask for all of %s", ifAnyThenAll.String())}
+		return nil, &ListStaleQueryError{fmt.Errorf("ListStale requires query to ask for all of %s", ifAnyThenAll.String())}
 	}
 
 	// ----------------- done validating query for listStaleFiltering -----------------------
@@ -809,7 +807,6 @@ type fsAjobAtype struct {
 //
 // the returned StalenessInfo.ConstructedWithQuery is not set
 func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *StalenessInfo {
-
 	var noJobId []Abstraction
 	by := make(map[fsAjobAtype][]Abstraction)
 	for _, a := range abs {
@@ -929,5 +926,4 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 	}
 
 	return ret
-
 }

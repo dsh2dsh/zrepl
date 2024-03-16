@@ -10,8 +10,6 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"github.com/pkg/errors"
-
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/filters"
 	"github.com/zrepl/zrepl/zfs"
@@ -48,16 +46,16 @@ const (
 func MyLockTablesFromConfig(in *config.HookMySQLLockTables) (*MySQLLockTables, error) {
 	conf, err := mysql.ParseDSN(in.DSN)
 	if err != nil {
-		return nil, errors.Wrap(err, "`dsn` invalid")
+		return nil, fmt.Errorf("`dsn` invalid: %w", err)
 	}
 	cn, err := mysql.NewConnector(conf)
 	if err != nil {
-		return nil, errors.Wrap(err, "`connect` invalid")
+		return nil, fmt.Errorf("`connect` invalid: %w", err)
 	}
 
 	filesystems, err := filters.DatasetMapFilterFromConfig(in.Filesystems)
 	if err != nil {
-		return nil, errors.Wrap(err, "`filesystems` invalid")
+		return nil, fmt.Errorf("`filesystems` invalid: %w", err)
 	}
 
 	return &MySQLLockTables{
@@ -134,7 +132,6 @@ func (h *MySQLLockTables) doRunPre(ctx context.Context, fs *zfs.DatasetPath, dry
 }
 
 func (h *MySQLLockTables) doRunPost(ctx context.Context, fs *zfs.DatasetPath, dry bool, state map[interface{}]interface{}) error {
-
 	db := state[myLockTablesConnection].(*sql.DB)
 	defer db.Close()
 

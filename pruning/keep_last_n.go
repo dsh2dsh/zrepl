@@ -1,11 +1,10 @@
 package pruning
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 type KeepLastN struct {
@@ -23,11 +22,11 @@ func MustKeepLastN(n int, regex string) *KeepLastN {
 
 func NewKeepLastN(n int, regex string) (*KeepLastN, error) {
 	if n <= 0 {
-		return nil, errors.Errorf("must specify positive number as 'keep last count', got %d", n)
+		return nil, fmt.Errorf("must specify positive number as 'keep last count', got %d", n)
 	}
 	re, err := regexp.Compile(regex)
 	if err != nil {
-		return nil, errors.Errorf("invalid regex %q: %s", regex, err)
+		return nil, fmt.Errorf("invalid regex %q: %w", regex, err)
 	}
 	return &KeepLastN{n, re}, nil
 }
