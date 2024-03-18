@@ -6,6 +6,9 @@ jobs:
     serve:
       type: local
       listener_name: localsink
+    recv:
+      placeholder:
+        encryption: "inherit"
 
   - type: push
     name: "backup_system"
@@ -16,6 +19,8 @@ jobs:
     filesystems: {
       "system<": true,
     }
+    conflict_resolution:
+      initial_replication: "all"
     snapshotting:
       type: periodic
       interval: 10m

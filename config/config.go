@@ -69,7 +69,7 @@ type ActiveJob struct {
 }
 
 type ConflictResolution struct {
-	InitialReplication string `yaml:"initial_replication,optional,default=most_recent"`
+	InitialReplication string `yaml:"initial_replication,optional,default=all"`
 }
 
 type MonitorSnapshots struct {
@@ -156,7 +156,7 @@ type PropertyRecvOptions struct {
 }
 
 type PlaceholderRecvOptions struct {
-	Encryption string `yaml:"encryption,default=unspecified"`
+	Encryption string `yaml:"encryption,default=inherit"`
 }
 
 type PushJob struct {
