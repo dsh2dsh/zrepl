@@ -1,7 +1,7 @@
 # zrepl
 zrepl is a one-stop ZFS backup & replication solution.
 
-This project is a fork of [go-monitoringplugin](https://github.com/zrepl/zrepl).
+This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
 ## Changes from [upstream](https://github.com/zrepl/zrepl):
 
