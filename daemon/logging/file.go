@@ -91,10 +91,10 @@ func (self *logFile) exists() (bool, error) {
 		return false, fmt.Errorf("stat of %q: %w", self.filename, err)
 	}
 
-	nlink := uint64(0)
+	var nlink uint64
 	if finfo.Sys() != nil {
 		if stat, ok := finfo.Sys().(*syscall.Stat_t); ok {
-			nlink = stat.Nlink
+			nlink = uint64(stat.Nlink)
 		}
 	}
 	return nlink > 0, nil
