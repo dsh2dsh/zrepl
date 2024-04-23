@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
 	"github.com/zrepl/zrepl/config"
+	"github.com/zrepl/zrepl/daemon/logging/trace"
+	"github.com/zrepl/zrepl/version"
 )
 
 var rootArgs struct {
@@ -153,6 +153,7 @@ func addSubcommandToCobraCmd(c *cobra.Command, s *Subcommand) {
 }
 
 func Run() {
+	rootCmd.Version = version.NewZreplVersionInformation().Version
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
