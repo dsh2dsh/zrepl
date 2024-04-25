@@ -167,13 +167,7 @@ Most hook types take additional parameters, please refer to the respective subse
     * - ``command``
       - :ref:`Details <job-hook-type-command>`
       - Arbitrary pre- and post snapshot scripts.
-    * - ``postgres-checkpoint``
-      - :ref:`Details <job-hook-type-postgres-checkpoint>`
-      - Execute Postgres ``CHECKPOINT`` SQL command before snapshot.
-    * - ``mysql-lock-tables``
-      - :ref:`Details <job-hook-type-mysql-lock-tables>`
-      - Flush and read-Lock MySQL tables while taking the snapshot.
-      
+
 .. _job-hook-type-command:
 
 ``command`` Hooks
@@ -217,65 +211,3 @@ The following environment variables are set:
 * ``ZREPL_DRYRUN``: set to ``"true"`` if a dry run is in progress so scripts can print, but not run, their commands
 
 An empty template hook can be found in :sampleconf:`/hooks/template.sh`.
-
-.. _job-hook-type-postgres-checkpoint:
-
-``postgres-checkpoint`` Hook
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Connects to a Postgres server and executes the ``CHECKPOINT`` statement pre-snapshot.
-Checkpointing applies the WAL contents to all data files and syncs the data files to disk.
-This is not required for a consistent database backup: it merely forward-pays the "cost" of WAL replay to the time of snapshotting instead of at restore.
-However, the Postgres manual recommends against checkpointing during normal operation.
-Further, the operation requires Postgres superuser privileges.
-zrepl users must decide on their own whether this hook is useful for them (it likely isn't).
-
-.. ATTENTION::
-    Note that WALs and Postgres data directory (with all database data files) must be on the same filesystem to guarantee a correct point-in-time backup with the ZFS snapshot.
-
-DSN syntax documented here: `<https://godoc.org/github.com/lib/pq>`_
-
-.. code-block:: sql
-
-   CREATE USER zrepl_checkpoint PASSWORD yourpasswordhere;
-   ALTER ROLE zrepl_checkpoint SUPERUSER;
-
-.. code-block:: yaml
-
-  - type: postgres-checkpoint
-    dsn: "host=localhost port=5432 user=postgres password=yourpasswordhere sslmode=disable"
-    filesystems: {
-        "p1/postgres/data11": true
-    }
-
-.. _job-hook-type-mysql-lock-tables:
-
-``mysql-lock-tables`` Hook
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Connects to MySQL and executes
-
-* pre-snapshot ``FLUSH TABLES WITH READ LOCK`` to lock all tables in all databases in the MySQL server we connect to (`docs <https://dev.mysql.com/doc/refman/8.0/en/flush.html#flush-tables-with-read-lock>`_)
-* post-snapshot ``UNLOCK TABLES``  reverse above operation.
-
-Above procedure is documented in the `MySQL manual <https://dev.mysql.com/doc/mysql-backup-excerpt/5.7/en/backup-methods.html>`_
-as a means to produce a consistent backup of a MySQL DBMS installation (i.e., all databases).
-
-`DSN syntax <https://github.com/go-sql-driver/mysql#dsn-data-source-name>`_: ``[username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]``
-
-.. ATTENTION::
-    All MySQL databases must be on the same ZFS filesystem to guarantee a consistent point-in-time backup with the ZFS snapshot.
-
-.. code-block:: sql
-
-   CREATE USER zrepl_lock_tables IDENTIFIED BY 'yourpasswordhere';
-   GRANT RELOAD ON *.* TO zrepl_lock_tables;
-   FLUSH PRIVILEGES;
-
-.. code-block:: yaml
-
-  - type: mysql-lock-tables
-    dsn: "zrepl_lock_tables:yourpasswordhere@tcp(localhost)/"
-    filesystems: {
-      "tank/mysql": true
-    }

@@ -71,7 +71,7 @@ Main Features
 * **Automatic snapshot management**
 
   * [x] Periodic :ref:`filesystem snapshots <job-snapshotting-spec>`
-  * [x] Support for :ref:`pre- and post-snapshot hooks <job-snapshotting-hooks>` with builtins for MySQL & Postgres
+  * [x] Support for :ref:`pre- and post-snapshot hooks <job-snapshotting-hooks>`
   * [x] Flexible :ref:`pruning rule system <prune>`
 
     * [x] Age-based fading (grandfathering scheme)

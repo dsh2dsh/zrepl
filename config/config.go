@@ -513,20 +513,6 @@ type HookCommand struct {
 	HookSettingsCommon `yaml:",inline"`
 }
 
-type HookPostgresCheckpoint struct {
-	HookSettingsCommon `yaml:",inline"`
-	DSN                string            `yaml:"dsn"`
-	Timeout            time.Duration     `yaml:"timeout,optional,positive,default=30s"`
-	Filesystems        FilesystemsFilter `yaml:"filesystems"` // required, user should not CHECKPOINT for every FS
-}
-
-type HookMySQLLockTables struct {
-	HookSettingsCommon `yaml:",inline"`
-	DSN                string            `yaml:"dsn"`
-	Timeout            time.Duration     `yaml:"timeout,optional,positive,default=30s"`
-	Filesystems        FilesystemsFilter `yaml:"filesystems"`
-}
-
 type HookSettingsCommon struct {
 	Type       string `yaml:"type"`
 	ErrIsFatal bool   `yaml:"err_is_fatal,optional,default=false"`
@@ -676,9 +662,7 @@ func (t *SyslogFacility) UnmarshalYAML(u func(interface{}, bool) error) (err err
 
 func (t *HookEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
 	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"command":             &HookCommand{},
-		"postgres-checkpoint": &HookPostgresCheckpoint{},
-		"mysql-lock-tables":   &HookMySQLLockTables{},
+		"command": &HookCommand{},
 	})
 	return
 }

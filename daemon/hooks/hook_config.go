@@ -13,10 +13,6 @@ func HookFromConfig(in config.HookEnum) (Hook, error) {
 	switch v := in.Ret.(type) {
 	case *config.HookCommand:
 		return NewCommandHook(v)
-	case *config.HookPostgresCheckpoint:
-		return PgChkptHookFromConfig(v)
-	case *config.HookMySQLLockTables:
-		return MyLockTablesFromConfig(v)
 	default:
 		return nil, fmt.Errorf("unknown hook type %T", v)
 	}

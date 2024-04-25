@@ -128,6 +128,8 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
     zrepl monitor snapshots oldest --job zroot-to-zdisk
     ```
 
+  * Removed support of `postgres-checkpoint` and `mysql-lock-tables` hooks.
+
   * Small cosmetic changes
 
 ## User Documentation

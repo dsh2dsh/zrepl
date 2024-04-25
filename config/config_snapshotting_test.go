@@ -64,16 +64,6 @@ jobs:
     - type: command
       path: /tmp/path/to/command
       filesystems: { "zroot<": true, "<": false }
-    - type: postgres-checkpoint
-      dsn: "host=localhost port=5432 user=postgres sslmode=disable"
-      filesystems: {
-          "tank/postgres/data11": true
-      }
-    - type: mysql-lock-tables
-      dsn: "root@tcp(localhost)/"
-      filesystems: {
-        "tank/mysql": true
-      }
 `
 
 	fillSnapshotting := func(s string) string { return fmt.Sprintf(tmpl, s) }
@@ -115,10 +105,7 @@ jobs:
 		hs := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingPeriodic).Hooks
 		assert.Equal(t, hs[0].Ret.(*HookCommand).Filesystems["<"], true)
 		assert.Equal(t, hs[1].Ret.(*HookCommand).Filesystems["zroot<"], true)
-		assert.Equal(t, hs[2].Ret.(*HookPostgresCheckpoint).Filesystems["tank/postgres/data11"], true)
-		assert.Equal(t, hs[3].Ret.(*HookMySQLLockTables).Filesystems["tank/mysql"], true)
 	})
-
 }
 
 func TestSnapshottingTimestampDefaults(t *testing.T) {
