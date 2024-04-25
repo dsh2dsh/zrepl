@@ -85,6 +85,8 @@ type monitorSnapshots struct {
 	prefix   string
 	critical time.Duration
 	warning  time.Duration
+
+	age time.Duration
 }
 
 func (self *monitorSnapshots) run(
@@ -250,20 +252,25 @@ func (self *monitorSnapshots) checkDataset(
 	latest := self.groupSnapshots(snaps, rules)
 	for i, rule := range rules {
 		const tooOldFmt = "%s %q too old: %q > %q"
+		d := time.Since(latest[i].Creation).Truncate(time.Second)
 		switch {
 		case rule.Prefix == "" && latest[i].Creation.IsZero():
 		case latest[i].Creation.IsZero():
-			return newMonitorCriticalf(
+			err = newMonitorCriticalf(
 				"%q has no snapshots with prefix %q", name, rule.Prefix)
 		case time.Since(latest[i].Creation) >= rule.Critical:
-			return newMonitorCriticalf(tooOldFmt, self.snapshotType(),
-				latest[i].FullPath(name), time.Since(latest[i].Creation), rule.Critical)
+			err = newMonitorCriticalf(tooOldFmt, self.snapshotType(),
+				latest[i].FullPath(name), d, rule.Critical)
 		case rule.Warning > 0 && time.Since(latest[i].Creation) >= rule.Warning:
-			return newMonitorWarningf(tooOldFmt, self.snapshotType(),
-				latest[i].FullPath(name), time.Since(latest[i].Creation), rule.Warning)
+			err = newMonitorWarningf(tooOldFmt, self.snapshotType(),
+				latest[i].FullPath(name), d, rule.Warning)
+		case d > self.age:
+			self.age = d
+		}
+		if err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
@@ -302,8 +309,8 @@ func (self *monitorSnapshots) cmpSnapshots(
 }
 
 func (self *monitorSnapshots) outputAndExit(err error) {
-	resp := monitoringplugin.NewResponse(
-		fmt.Sprintf("job %q: %s snapshots", self.job, self.snapshotType()))
+	resp := monitoringplugin.NewResponse(fmt.Sprintf("job %q: %s snapshot: %v",
+		self.job, self.snapshotType(), self.age))
 
 	if err != nil {
 		status := fmt.Sprintf("job %q: %s", self.job, err)
