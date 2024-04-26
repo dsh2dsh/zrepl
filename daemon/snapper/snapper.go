@@ -31,7 +31,7 @@ type Report struct {
 func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingEnum) (Snapper, error) {
 	switch v := in.Ret.(type) {
 	case *config.SnapshottingPeriodic:
-		return periodicFromConfig(g, fsf, v)
+		return periodicFromConfig(fsf, v)
 	case *config.SnapshottingCron:
 		return cronFromConfig(fsf, *v)
 	case *config.SnapshottingManual:

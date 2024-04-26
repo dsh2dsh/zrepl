@@ -18,7 +18,7 @@ import (
 	"github.com/zrepl/zrepl/zfs"
 )
 
-func periodicFromConfig(g *config.Global, fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic) (*Periodic, error) {
+func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic) (*Periodic, error) {
 	if in.Prefix == "" {
 		return nil, errors.New("prefix must not be empty")
 	}
