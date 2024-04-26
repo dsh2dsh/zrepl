@@ -18,6 +18,8 @@ import (
 	"github.com/zrepl/zrepl/zfs"
 )
 
+const snapshotsOkMsg = "job %q: %s snapshot: %v"
+
 var MonitorCmd = &cli.Subcommand{
 	Use:   "monitor",
 	Short: "Icinga/Nagios health checks",
@@ -36,14 +38,14 @@ func newMonitorAliveCmd() *cli.Subcommand {
 }
 
 func newMonitorSnapshotsCmd() *cli.Subcommand {
-	runner := monitorSnapshots{}
+	runner := newMonitorSnapshots()
 	return &cli.Subcommand{
 		Use:   "snapshots",
 		Short: "check snapshots age",
 		SetupSubcommands: func() []*cli.Subcommand {
 			return []*cli.Subcommand{
-				newLatestSnapshotsCmd(&runner),
-				newOldestSnapshotsCmd(&runner),
+				newLatestSnapshotsCmd(runner),
+				newOldestSnapshotsCmd(runner),
 			}
 		},
 		SetupCobra: func(c *cobra.Command) {
@@ -63,7 +65,11 @@ func newLatestSnapshotsCmd(runner *monitorSnapshots) *cli.Subcommand {
 	return &cli.Subcommand{
 		Use:   "latest",
 		Short: "check latest snapshots are not too old, according to rules",
-		Run:   runner.run,
+		Run: func(ctx context.Context, subcmd *cli.Subcommand, args []string,
+		) error {
+			runner.outputAndExit(runner.run(ctx, subcmd, args))
+			return nil
+		},
 	}
 }
 
@@ -73,10 +79,15 @@ func newOldestSnapshotsCmd(runner *monitorSnapshots) *cli.Subcommand {
 		Short: "check oldest snapshots are not too old, according to rules",
 		Run: func(ctx context.Context, subcmd *cli.Subcommand, args []string,
 		) error {
-			runner.oldest = true
-			return runner.run(ctx, subcmd, args)
+			runner.outputAndExit(runner.withOldest(true).run(ctx, subcmd, args))
+			return nil
 		},
 	}
+}
+
+func newMonitorSnapshots() *monitorSnapshots {
+	m := &monitorSnapshots{}
+	return m.applyOptions()
 }
 
 type monitorSnapshots struct {
@@ -86,11 +97,24 @@ type monitorSnapshots struct {
 	critical time.Duration
 	warning  time.Duration
 
-	age time.Duration
+	resp *monitoringplugin.Response
+	age  time.Duration
+}
+
+func (self *monitorSnapshots) applyOptions() *monitorSnapshots {
+	if self.resp == nil {
+		self.resp = monitoringplugin.NewResponse(snapshotsOkMsg)
+	}
+	return self
+}
+
+func (self *monitorSnapshots) withOldest(v bool) *monitorSnapshots {
+	self.oldest = v
+	return self
 }
 
 func (self *monitorSnapshots) run(
-	ctx context.Context, subcmd *cli.Subcommand, args []string,
+	ctx context.Context, subcmd *cli.Subcommand, _ []string,
 ) error {
 	jobConfig, err := subcmd.Config().Job(self.job)
 	if err != nil {
@@ -103,9 +127,7 @@ func (self *monitorSnapshots) run(
 	} else if rules, err = self.overrideRules(rules); err != nil {
 		return err
 	}
-	self.outputAndExit(self.checkSnapshots(ctx, datasets, rules))
-
-	return nil
+	return self.checkSnapshots(ctx, datasets, rules)
 }
 
 func (self *monitorSnapshots) overrideRules(
@@ -251,24 +273,26 @@ func (self *monitorSnapshots) checkDataset(
 
 	latest := self.groupSnapshots(snaps, rules)
 	for i, rule := range rules {
-		const tooOldFmt = "%s %q too old: %q > %q"
 		d := time.Since(latest[i].Creation).Truncate(time.Second)
+		const tooOldFmt = "%s %q too old: %q > %q"
 		switch {
 		case rule.Prefix == "" && latest[i].Creation.IsZero():
 		case latest[i].Creation.IsZero():
-			err = newMonitorCriticalf(
-				"%q has no snapshots with prefix %q", name, rule.Prefix)
-		case time.Since(latest[i].Creation) >= rule.Critical:
-			err = newMonitorCriticalf(tooOldFmt, self.snapshotType(),
-				latest[i].FullPath(name), d, rule.Critical)
-		case rule.Warning > 0 && time.Since(latest[i].Creation) >= rule.Warning:
-			err = newMonitorWarningf(tooOldFmt, self.snapshotType(),
-				latest[i].FullPath(name), d, rule.Warning)
-		case d > self.age:
+			self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
+				"%q has no snapshots with prefix %q", name, rule.Prefix))
+			return nil
+		case d >= rule.Critical:
+			self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
+				tooOldFmt,
+				self.snapshotType(), latest[i].FullPath(name), d, rule.Critical))
+			return nil
+		case rule.Warning > 0 && d >= rule.Warning:
+			self.resp.UpdateStatus(monitoringplugin.WARNING, fmt.Sprintf(
+				tooOldFmt,
+				self.snapshotType(), latest[i].FullPath(name), d, rule.Warning))
+			return nil
+		case self.age == 0 || d < self.age:
 			self.age = d
-		}
-		if err != nil {
-			return err
 		}
 	}
 	return nil
@@ -309,26 +333,14 @@ func (self *monitorSnapshots) cmpSnapshots(
 }
 
 func (self *monitorSnapshots) outputAndExit(err error) {
-	resp := monitoringplugin.NewResponse(fmt.Sprintf("job %q: %s snapshot: %v",
-		self.job, self.snapshotType(), self.age))
-
 	if err != nil {
-		status := fmt.Sprintf("job %q: %s", self.job, err)
-		var checkResult monitorCheckResult
-		if errors.As(err, &checkResult) {
-			switch {
-			case checkResult.critical:
-				resp.UpdateStatus(monitoringplugin.CRITICAL, status)
-			case checkResult.warning:
-				resp.UpdateStatus(monitoringplugin.WARNING, status)
-			default:
-				resp.UpdateStatus(monitoringplugin.UNKNOWN, status)
-			}
-		} else {
-			resp.UpdateStatus(monitoringplugin.UNKNOWN, status)
-		}
+		self.resp.UpdateStatusOnError(fmt.Errorf("job %q: %w", self.job, err),
+			monitoringplugin.UNKNOWN, "", true)
+	} else {
+		self.resp.WithDefaultOkMessage(fmt.Sprintf(snapshotsOkMsg,
+			self.job, self.snapshotType(), self.age))
 	}
-	resp.OutputAndExit()
+	self.resp.OutputAndExit()
 }
 
 func (self *monitorSnapshots) snapshotType() string {
