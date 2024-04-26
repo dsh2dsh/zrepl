@@ -34,7 +34,6 @@ archives:
         format: "zip"
 
 changelog:
-  sort: "asc"
   filters:
     exclude:
       - "^docs:"
