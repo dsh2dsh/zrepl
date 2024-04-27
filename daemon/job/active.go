@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/util/envconst"
@@ -88,7 +89,9 @@ type activeMode interface {
 	SenderReceiver() (logic.Sender, logic.Receiver)
 	Type() Type
 	PlannerPolicy() logic.PlannerPolicy
-	RunPeriodic(ctx context.Context, wakeUpCommon chan<- struct{})
+	RunPeriodic(ctx context.Context, wakeUpCommon chan<- struct{},
+		cron *cron.Cron)
+	Cron() string
 	SnapperReport() *snapper.Report
 	ResetConnectBackoff()
 }
@@ -100,7 +103,7 @@ type modePush struct {
 	senderConfig  *endpoint.SenderConfig
 	plannerPolicy *logic.PlannerPolicy
 	snapper       snapper.Snapper
-	interval      *config.PositiveDurationOrManual
+	cronSpec      string
 }
 
 func (m *modePush) ConnectEndpoints(ctx context.Context, connecter transport.Connecter) {
@@ -131,32 +134,12 @@ func (m *modePush) Type() Type { return TypePush }
 
 func (m *modePush) PlannerPolicy() logic.PlannerPolicy { return *m.plannerPolicy }
 
-func (m *modePush) RunPeriodic(
-	ctx context.Context, wakeUpCommon chan<- struct{},
+func (m *modePush) Cron() string { return m.cronSpec }
+
+func (m *modePush) RunPeriodic(ctx context.Context,
+	wakeUpCommon chan<- struct{}, cron *cron.Cron,
 ) {
-	if m.interval == nil {
-		m.snapper.Run(ctx, wakeUpCommon)
-		return
-	}
-
-	t := time.NewTicker(m.interval.Interval)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-t.C:
-			select {
-			case wakeUpCommon <- struct{}{}:
-			default:
-				GetLogger(ctx).
-					WithField("push_interval", m.interval).
-					Warn("push job took longer than push interval")
-				wakeUpCommon <- struct{}{} // block anyways, to queue up the wakeup
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
+	go m.snapper.Run(ctx, wakeUpCommon)
 }
 
 func (m *modePush) SnapperReport() *snapper.Report {
@@ -176,8 +159,17 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 	m := &modePush{}
 	var err error
 
+	cronSpec := in.CronSpec()
 	if _, ok := in.Snapshotting.Ret.(*config.SnapshottingManual); ok {
-		m.interval = in.Interval
+		if cronSpec != "" {
+			if _, err := cron.ParseStandard(cronSpec); err != nil {
+				return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)
+			}
+			m.cronSpec = cronSpec
+		}
+	} else if cronSpec != "" {
+		return nil, fmt.Errorf(
+			"both cron spec and periodic snapshotting defined: %q", cronSpec)
 	}
 
 	m.senderConfig, err = buildSenderConfig(in, jobID)
@@ -217,7 +209,7 @@ type modePull struct {
 	receiverConfig endpoint.ReceiverConfig
 	sender         *rpc.Client
 	plannerPolicy  *logic.PlannerPolicy
-	interval       config.PositiveDurationOrManual
+	cronSpec       string
 }
 
 func (m *modePull) ConnectEndpoints(ctx context.Context, connecter transport.Connecter) {
@@ -248,29 +240,12 @@ func (*modePull) Type() Type { return TypePull }
 
 func (m *modePull) PlannerPolicy() logic.PlannerPolicy { return *m.plannerPolicy }
 
-func (m *modePull) RunPeriodic(ctx context.Context, wakeUpCommon chan<- struct{}) {
-	if m.interval.Manual {
-		GetLogger(ctx).Info("manual pull configured, periodic pull disabled")
-		// "waiting for wakeups" is printed in common ActiveSide.do
-		return
-	}
-	t := time.NewTicker(m.interval.Interval)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			select {
-			case wakeUpCommon <- struct{}{}:
-			default:
-				GetLogger(ctx).
-					WithField("pull_interval", m.interval).
-					Warn("pull job took longer than pull interval")
-				wakeUpCommon <- struct{}{} // block anyways, to queue up the wakeup
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
+func (m *modePull) Cron() string { return m.cronSpec }
+
+func (m *modePull) RunPeriodic(ctx context.Context,
+	wakeUpCommon chan<- struct{}, cron *cron.Cron,
+) {
+	GetLogger(ctx).Info("manual pull configured, periodic pull disabled")
 }
 
 func (m *modePull) SnapperReport() *snapper.Report {
@@ -287,7 +262,14 @@ func (m *modePull) ResetConnectBackoff() {
 
 func modePullFromConfig(g *config.Global, in *config.PullJob, jobID endpoint.JobID) (m *modePull, err error) {
 	m = &modePull{}
-	m.interval = in.Interval
+
+	cronSpec := in.CronSpec()
+	if cronSpec != "" {
+		if _, err := cron.ParseStandard(cronSpec); err != nil {
+			return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)
+		}
+		m.cronSpec = cronSpec
+	}
 
 	replicationConfig, err := logic.ReplicationConfigFromConfig(in.Replication)
 	if err != nil {
@@ -460,7 +442,7 @@ func FakeActiveSideDirectMethodInvocationClientIdentity(jobId endpoint.JobID) st
 	return fmt.Sprintf("<local><active><job><client><identity><job=%q>", jobId.String())
 }
 
-func (j *ActiveSide) Run(ctx context.Context) {
+func (j *ActiveSide) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "active-side-job", j.Name())
 	defer endTask()
 
@@ -475,26 +457,53 @@ func (j *ActiveSide) Run(ctx context.Context) {
 	defer cancel()
 	periodicCtx, endTask := trace.WithTask(ctx, "periodic")
 	defer endTask()
-	go j.mode.RunPeriodic(periodicCtx, periodicDone)
+	j.runPeriodic(periodicCtx, periodicDone, cron)
 
 	invocationCount := 0
-outer:
 	for {
 		log.Info("wait for wakeups")
 		select {
 		case <-ctx.Done():
-			log.WithError(ctx.Err()).Info("context")
-			break outer
-
 		case <-wakeup.Wait(ctx):
 			j.mode.ResetConnectBackoff()
 		case <-periodicDone:
+		}
+		if ctx.Err() != nil {
+			log.WithError(ctx.Err()).Info("context")
+			return
 		}
 		invocationCount++
 		invocationCtx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", invocationCount))
 		j.do(invocationCtx)
 		endSpan()
 	}
+}
+
+func (j *ActiveSide) runPeriodic(ctx context.Context,
+	wakeUpCommon chan<- struct{}, cron *cron.Cron,
+) {
+	cronSpec := j.mode.Cron()
+	if cronSpec == "" {
+		j.mode.RunPeriodic(ctx, wakeUpCommon, cron)
+		return
+	}
+
+	log := GetLogger(ctx).WithField("cron", cronSpec)
+	_, err := cron.AddFunc(cronSpec, func() {
+		select {
+		case wakeUpCommon <- struct{}{}:
+		case <-ctx.Done():
+		default:
+			log.WithField("cron", cronSpec).Warn(
+				"job took longer than its interval")
+		}
+	})
+	if err != nil {
+		log.WithError(err).Error("add cron job")
+		return
+	}
+
+	log.Info("add cron job")
 }
 
 func (j *ActiveSide) do(ctx context.Context) {

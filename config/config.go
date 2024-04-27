@@ -59,13 +59,24 @@ func (j JobEnum) Name() string {
 }
 
 type ActiveJob struct {
-	Type               string                `yaml:"type"`
-	Name               string                `yaml:"name"`
-	Connect            ConnectEnum           `yaml:"connect"`
-	Pruning            PruningSenderReceiver `yaml:"pruning"`
-	Replication        *Replication          `yaml:"replication,optional,fromdefaults"`
-	ConflictResolution *ConflictResolution   `yaml:"conflict_resolution,optional,fromdefaults"`
-	MonitorSnapshots   MonitorSnapshots      `yaml:"monitor,optional"`
+	Type               string                   `yaml:"type"`
+	Name               string                   `yaml:"name"`
+	Connect            ConnectEnum              `yaml:"connect"`
+	Pruning            PruningSenderReceiver    `yaml:"pruning"`
+	Replication        *Replication             `yaml:"replication,optional,fromdefaults"`
+	ConflictResolution *ConflictResolution      `yaml:"conflict_resolution,optional,fromdefaults"`
+	MonitorSnapshots   MonitorSnapshots         `yaml:"monitor,optional"`
+	Interval           PositiveDurationOrManual `yaml:"interval,optional"`
+	Cron               string                   `yaml:"cron,optional"`
+}
+
+func (self *ActiveJob) CronSpec() string {
+	if self.Cron != "" {
+		return self.Cron
+	} else if self.Interval.Interval > 0 && !self.Interval.Manual {
+		return "@every " + self.Interval.Interval.Truncate(time.Second).String()
+	}
+	return ""
 }
 
 type ConflictResolution struct {
@@ -161,10 +172,9 @@ type PlaceholderRecvOptions struct {
 
 type PushJob struct {
 	ActiveJob    `yaml:",inline"`
-	Interval     *PositiveDurationOrManual `yaml:"interval,optional"`
-	Snapshotting SnapshottingEnum          `yaml:"snapshotting"`
-	Filesystems  FilesystemsFilter         `yaml:"filesystems"`
-	Send         *SendOptions              `yaml:"send,fromdefaults,optional"`
+	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
+	Filesystems  FilesystemsFilter `yaml:"filesystems"`
+	Send         *SendOptions      `yaml:"send,fromdefaults,optional"`
 }
 
 func (j *PushJob) GetFilesystems() FilesystemsFilter { return j.Filesystems }
@@ -172,9 +182,8 @@ func (j *PushJob) GetSendOptions() *SendOptions      { return j.Send }
 
 type PullJob struct {
 	ActiveJob `yaml:",inline"`
-	RootFS    string                   `yaml:"root_fs"`
-	Interval  PositiveDurationOrManual `yaml:"interval"`
-	Recv      *RecvOptions             `yaml:"recv,fromdefaults,optional"`
+	RootFS    string       `yaml:"root_fs"`
+	Recv      *RecvOptions `yaml:"recv,fromdefaults,optional"`
 }
 
 func (j *PullJob) GetRootFS() string             { return j.RootFS }

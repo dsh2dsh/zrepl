@@ -7,6 +7,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/job"
@@ -54,8 +55,7 @@ func (j *prometheusJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
 func (j *prometheusJob) RegisterMetrics(registerer prometheus.Registerer) {}
 
-func (j *prometheusJob) Run(ctx context.Context) {
-
+func (j *prometheusJob) Run(ctx context.Context, cron *cron.Cron) {
 	if err := zfs.PrometheusRegister(prometheus.DefaultRegisterer); err != nil {
 		panic(err)
 	}
@@ -83,11 +83,9 @@ func (j *prometheusJob) Run(ctx context.Context) {
 	if err != nil && ctx.Err() == nil {
 		log.WithError(err).Error("error while serving")
 	}
-
 }
 
-type prometheusJobOutlet struct {
-}
+type prometheusJobOutlet struct{}
 
 var _ logger.Outlet = prometheusJobOutlet{}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging"
 	"github.com/zrepl/zrepl/endpoint"
@@ -21,7 +22,7 @@ func GetLogger(ctx context.Context) Logger {
 
 type Job interface {
 	Name() string
-	Run(ctx context.Context)
+	Run(ctx context.Context, cron *cron.Cron)
 	Status() *Status
 	RegisterMetrics(registerer prometheus.Registerer)
 	// Jobs that return a subtree of the dataset hierarchy

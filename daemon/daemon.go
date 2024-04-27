@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/endpoint"
@@ -68,7 +69,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		}
 	}
 
-	jobs := newJobs()
+	jobs := newJobs(logging.GetLogger(ctx, logging.SubsysCron))
 
 	// start control socket
 	controlJob, err := newControlJob(conf.Global.Control.SockPath, jobs)
@@ -103,24 +104,23 @@ func Run(ctx context.Context, conf *config.Config) error {
 	log.Info("starting daemon")
 
 	// start regular jobs
-	for _, j := range confJobs {
-		jobs.start(ctx, j, false)
-	}
+	done := jobs.wait(jobs.startJobsWithCron(ctx, confJobs, false))
 
 	select {
-	case <-jobs.wait():
+	case <-done.Done():
 		log.Info("all jobs finished")
 	case <-ctx.Done():
 		log.WithError(ctx.Err()).Info("context finished")
 	}
 	log.Info("waiting for jobs to finish")
-	<-jobs.wait()
+	<-done.Done()
 	log.Info("daemon exiting")
 	return nil
 }
 
 type jobs struct {
-	wg sync.WaitGroup
+	wg   sync.WaitGroup
+	cron *cron.Cron
 
 	// m protects all fields below it
 	m       sync.RWMutex
@@ -129,21 +129,24 @@ type jobs struct {
 	jobs    map[string]job.Job
 }
 
-func newJobs() *jobs {
+func newJobs(log logger.Logger) *jobs {
 	return &jobs{
+		cron:    newCron(log, true),
 		wakeups: make(map[string]wakeup.Func),
 		resets:  make(map[string]reset.Func),
 		jobs:    make(map[string]job.Job),
 	}
 }
 
-func (s *jobs) wait() <-chan struct{} {
-	ch := make(chan struct{})
+func (s *jobs) wait(ctx context.Context) context.Context {
+	ctx2, cancel := context.WithCancel(context.Background())
 	go func() {
 		s.wg.Wait()
-		close(ch)
+		<-s.cron.Stop().Done()
+		<-ctx.Done()
+		cancel()
 	}()
-	return ch
+	return ctx2
 }
 
 type Status struct {
@@ -205,6 +208,21 @@ func (s *jobs) reset(job string) error {
 	return wu()
 }
 
+func (s *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job,
+	internal bool,
+) context.Context {
+	cronCtx, cancel := context.WithCancel(context.Background())
+	go func() {
+		s.cron.Run()
+		cancel()
+	}()
+
+	for _, j := range confJobs {
+		s.start(ctx, j, internal)
+	}
+	return cronCtx
+}
+
 const (
 	jobNamePrometheus = "_prometheus"
 	jobNameControl    = "_control"
@@ -245,6 +263,6 @@ func (s *jobs) start(ctx context.Context, j job.Job, internal bool) {
 		defer s.wg.Done()
 		job.GetLogger(ctx).Info("starting job")
 		defer job.GetLogger(ctx).Info("job exited")
-		j.Run(ctx)
+		j.Run(ctx, s.cron)
 	}()
 }

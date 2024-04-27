@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 
@@ -149,7 +150,7 @@ func (j *PassiveSide) SenderConfig() *endpoint.SenderConfig {
 
 func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}
 
-func (j *PassiveSide) Run(ctx context.Context) {
+func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "passive-side-job", j.Name())
 	defer endTask()
 	log := GetLogger(ctx)

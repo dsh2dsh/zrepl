@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/job"
 	"github.com/zrepl/zrepl/daemon/nethelpers"
@@ -80,7 +81,7 @@ const (
 	ControlJobEndpointSignal  string = "/signal"
 )
 
-func (j *controlJob) Run(ctx context.Context) {
+func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 	log := job.GetLogger(ctx)
 	defer log.Info("control job finished")
 

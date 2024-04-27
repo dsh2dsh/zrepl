@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/util/bandwidthlimit"
@@ -96,7 +97,7 @@ func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 
 func (j *SnapJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
-func (j *SnapJob) Run(ctx context.Context) {
+func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "snap-job", j.Name())
 	defer endTask()
 	log := GetLogger(ctx)

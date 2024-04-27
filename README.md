@@ -69,6 +69,21 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
         type: "manual"
     ```
 
+    Both `pull` and `push` job types support configuration of periodic run using
+    cron specification. For instance:
+
+    ``` yaml
+    - name: "zroot-to-server"
+      type: "push"
+      cron: "25 15-22 * * *"
+      snapshotting:
+        type: "manual"
+    ```
+
+    See [CRON Expression Format] for details.
+
+    [CRON Expression Format]: https://pkg.go.dev/github.com/robfig/cron/v3#hdr-CRON_Expression_Format
+
   * Added ability to configure command piplines between `zfs send` and `zfs recv`.
     See [#761](https://github.com/zrepl/zrepl/pull/761). Configuration example:
 

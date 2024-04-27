@@ -60,6 +60,7 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 type Subsystem string
 
 const (
+	SubsysCron         Subsystem = "cron"
 	SubsysMeta         Subsystem = "meta"
 	SubsysJob          Subsystem = "job"
 	SubsysReplication  Subsystem = "repl"
@@ -78,6 +79,7 @@ const (
 )
 
 var AllSubsystems = []Subsystem{
+	SubsysCron,
 	SubsysMeta,
 	SubsysJob,
 	SubsysReplication,
