@@ -58,7 +58,6 @@ type Params struct {
 var validate = validator.New()
 
 func (m *M) Update(p Params) {
-
 	if err := validate.Struct(p); err != nil {
 		panic(err)
 	}
@@ -107,7 +106,6 @@ func (m *M) Update(p Params) {
 	}
 
 	m.dateString = time.Now().Format(time.RFC3339)
-
 }
 
 func (m *M) BottomBarStatus() string { return m.bottomBarStatus }
@@ -145,7 +143,6 @@ func (j *Job) Name() string {
 }
 
 func drawJob(t *stringbuilder.B, name string, v *job.Status, history *bytesProgressHistory, fsfilter FilterFunc) {
-
 	t.Printf("Job: %s\n", name)
 	t.Printf("Type: %s\n\n", v.Type)
 
@@ -217,7 +214,6 @@ func drawJob(t *stringbuilder.B, name string, v *job.Status, history *bytesProgr
 }
 
 func printFilesystemStatus(t *stringbuilder.B, rep *report.FilesystemReport, maxFS int) {
-
 	expected, replicated, containsInvalidSizeEstimates := rep.BytesSum()
 	sizeEstimationImpreciseNotice := ""
 	if containsInvalidSizeEstimates {
@@ -279,7 +275,6 @@ func printFilesystemStatus(t *stringbuilder.B, rep *report.FilesystemReport, max
 		} else {
 			next = "" // individual FSes may still be in planning state
 		}
-
 	}
 	t.Printf("%s", next)
 
@@ -546,7 +541,6 @@ func renderPrunerReport(t *stringbuilder.B, r *pruner.Report, fsfilter FilterFun
 		}
 		t.Newline()
 	}
-
 }
 
 func renderSnapperReport(t *stringbuilder.B, r *snapper.Report, fsfilter FilterFunc) {
@@ -564,17 +558,18 @@ func renderSnapperReport(t *stringbuilder.B, r *snapper.Report, fsfilter FilterF
 	}
 }
 
-func renderSnapperReportPeriodic(t *stringbuilder.B, r *snapper.PeriodicReport, fsfilter FilterFunc) {
-	t.Printf("Status: %s", r.State)
-	t.Newline()
-
+func renderSnapperReportPeriodic(t *stringbuilder.B, r *snapper.PeriodicReport,
+	fsfilter FilterFunc,
+) {
+	t.Printf("Interval: %s\n", r.CronSpec)
+	t.Printf("Status: %s\n", r.State)
 	if r.Error != "" {
 		t.Printf("Error: %s\n", r.Error)
 	}
 	if !r.SleepUntil.IsZero() {
-		t.Printf("Sleep until: %s\n", r.SleepUntil)
+		t.Printf("Sleep until: %s (%s remaining)\n", r.SleepUntil,
+			time.Until(r.SleepUntil).Truncate(time.Second))
 	}
-
 	renderSnapperPlanReportFilesystem(t, r.Progress, fsfilter)
 }
 
