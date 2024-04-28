@@ -145,6 +145,17 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
   * Removed support of `postgres-checkpoint` and `mysql-lock-tables` hooks.
 
+  * Periodic snapshotting now recognizes cron specification. For instance:
+
+    ``` yaml
+    snapshotting:
+      type: "periodic"
+      cron: "25 15-22 * * *"
+    ```
+
+    type: "cron" still works too, just for compatibility. Both of them is the
+    same type.
+
   * Small cosmetic changes
 
 ## User Documentation
