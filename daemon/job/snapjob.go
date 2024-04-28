@@ -109,7 +109,7 @@ func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) {
 	defer cancel()
 	periodicCtx, endTask := trace.WithTask(ctx, "snapshotting")
 	defer endTask()
-	go j.snapper.Run(periodicCtx, periodicDone)
+	go j.snapper.Run(periodicCtx, periodicDone, cron)
 
 	invocationCount := 0
 outer:

@@ -139,7 +139,7 @@ func (m *modePush) Cron() string { return m.cronSpec }
 func (m *modePush) RunPeriodic(ctx context.Context,
 	wakeUpCommon chan<- struct{}, cron *cron.Cron,
 ) {
-	go m.snapper.Run(ctx, wakeUpCommon)
+	go m.snapper.Run(ctx, wakeUpCommon, cron)
 }
 
 func (m *modePush) SnapperReport() *snapper.Report {

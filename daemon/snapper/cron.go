@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/hooks"
 	"github.com/zrepl/zrepl/util/suspendresumesafetimer"
@@ -40,7 +41,9 @@ type Cron struct {
 	wakeupWhileRunningCount int
 }
 
-func (s *Cron) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
+func (s *Cron) Run(ctx context.Context, snapshotsTaken chan<- struct{},
+	cron *cron.Cron,
+) {
 	for {
 		now := time.Now()
 		s.mtx.Lock()

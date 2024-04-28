@@ -27,7 +27,7 @@ type PassiveSide struct {
 
 type passiveMode interface {
 	Handler() rpc.Handler
-	RunPeriodic(ctx context.Context)
+	RunPeriodic(ctx context.Context, cron *cron.Cron)
 	SnapperReport() *snapper.Report // may be nil
 	Type() Type
 }
@@ -42,8 +42,8 @@ func (m *modeSink) Handler() rpc.Handler {
 	return endpoint.NewReceiver(m.receiverConfig)
 }
 
-func (m *modeSink) RunPeriodic(_ context.Context)  {}
-func (m *modeSink) SnapperReport() *snapper.Report { return nil }
+func (m *modeSink) RunPeriodic(_ context.Context, cron *cron.Cron) {}
+func (m *modeSink) SnapperReport() *snapper.Report                 { return nil }
 
 func modeSinkFromConfig(g *config.Global, in *config.SinkJob, jobID endpoint.JobID) (m *modeSink, err error) {
 	m = &modeSink{}
@@ -83,8 +83,8 @@ func (m *modeSource) Handler() rpc.Handler {
 	return endpoint.NewSender(*m.senderConfig)
 }
 
-func (m *modeSource) RunPeriodic(ctx context.Context) {
-	m.snapper.Run(ctx, nil)
+func (m *modeSource) RunPeriodic(ctx context.Context, cron *cron.Cron) {
+	go m.snapper.Run(ctx, nil, cron)
 }
 
 func (m *modeSource) SnapperReport() *snapper.Report {
@@ -160,7 +160,7 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 		defer endTask()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		go j.mode.RunPeriodic(ctx)
+		j.mode.RunPeriodic(ctx, cron)
 	}
 
 	handler := j.mode.Handler()

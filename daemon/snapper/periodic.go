@@ -8,22 +8,33 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
+	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/hooks"
 	"github.com/zrepl/zrepl/daemon/logging"
+	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/util/envconst"
 	"github.com/zrepl/zrepl/util/suspendresumesafetimer"
 	"github.com/zrepl/zrepl/zfs"
 )
 
-func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic) (*Periodic, error) {
+func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
+) (*Periodic, error) {
 	if in.Prefix == "" {
 		return nil, errors.New("prefix must not be empty")
 	}
-	if in.Interval.Duration() <= 0 {
-		return nil, errors.New("interval must be positive")
+
+	cronSpec := in.CronSpec()
+	if cronSpec == "" {
+		return nil, errors.New("both interval and cron not configured")
+	}
+
+	d := in.Interval.Duration()
+	if d < 0 {
+		return nil, errors.New("negative interval")
+	} else if _, err := cron.ParseStandard(cronSpec); err != nil {
+		return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)
 	}
 
 	hookList, err := hooks.ListFromConfig(&in.Hooks)
@@ -32,13 +43,14 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic) 
 	}
 
 	args := periodicArgs{
-		interval: in.Interval.Duration(),
+		interval: d.Truncate(time.Second),
 		fsf:      fsf,
 		planArgs: planArgs{
 			prefix:          in.Prefix,
 			timestampFormat: in.TimestampFormat,
 			hooks:           hookList,
 		},
+		cronSpec: cronSpec,
 		// ctx and log is set in Run()
 	}
 
@@ -52,6 +64,10 @@ type periodicArgs struct {
 	planArgs       planArgs
 	snapshotsTaken chan<- struct{}
 	dryRun         bool
+
+	cron     *cron.Cron
+	cronSpec string
+	wakeup   chan struct{}
 }
 
 type Periodic struct {
@@ -68,9 +84,11 @@ type Periodic struct {
 
 	// valid for state SyncUp and Waiting
 	sleepUntil time.Time
+	cronId     cron.EntryID
 
 	// valid for state Err
-	err error
+	err        error
+	wakeupBusy int
 }
 
 //go:generate stringer -type=State
@@ -104,7 +122,9 @@ type (
 	state   func(a periodicArgs, u updater) state
 )
 
-func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
+func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
+	cron *cron.Cron,
+) {
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	getLogger(ctx).Debug("start")
 	defer getLogger(ctx).Debug("stop")
@@ -112,6 +132,8 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
 	s.args.snapshotsTaken = snapshotsTaken
 	s.args.ctx = ctx
 	s.args.dryRun = false // for future expansion
+	s.args.cron = cron
+	s.args.wakeup = make(chan struct{})
 
 	u := func(u func(*Periodic)) State {
 		s.mtx.Lock()
@@ -122,7 +144,11 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
 		return s.state
 	}
 
-	var st state = periodicStateSyncUp
+	st := periodicStateSyncUp
+	if s.args.interval == 0 {
+		st = periodicStateWait
+		s.runPeriodic(ctx)
+	}
 
 	for st != nil {
 		pre := u(nil)
@@ -133,6 +159,28 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{}) {
 			Debug("state transition")
 
 	}
+}
+
+func (s *Periodic) runPeriodic(ctx context.Context) {
+	cronSpec := s.args.cronSpec
+	log := getLogger(ctx).WithField("cron", cronSpec)
+	id, err := s.args.cron.AddFunc(cronSpec, func() {
+		select {
+		case s.args.wakeup <- struct{}{}:
+			s.wakeupBusy = 0
+		case <-ctx.Done():
+		default:
+			s.wakeupBusy++
+			log.WithField("cron", cronSpec).Warn(
+				"job took longer than its interval")
+		}
+	})
+	if err != nil {
+		log.WithError(err).Error("add cron job")
+		return
+	}
+	s.cronId = id
+	log.WithField("id", id).Info("add cron job")
 }
 
 func onErr(err error, u updater) state {
@@ -179,6 +227,7 @@ func periodicStateSyncUp(a periodicArgs, u updater) state {
 	}
 	return u(func(s *Periodic) {
 		s.state = Planning
+		s.runPeriodic(a.ctx)
 	}).sf()
 }
 
@@ -226,12 +275,8 @@ func periodicStateSnapshot(a periodicArgs, u updater) state {
 }
 
 func periodicStateWait(a periodicArgs, u updater) state {
-	var sleepUntil time.Time
 	u(func(snapper *Periodic) {
-		lastTick := snapper.lastInvocation
-		snapper.sleepUntil = lastTick.Add(a.interval)
-		sleepUntil = snapper.sleepUntil
-		log := getLogger(a.ctx).WithField("sleep_until", sleepUntil).WithField("duration", a.interval)
+		log := getLogger(a.ctx)
 		logFunc := log.Debug
 		if snapper.state == ErrorWait || snapper.state == SyncUpErrWait {
 			logFunc = log.Error
@@ -239,13 +284,14 @@ func periodicStateWait(a periodicArgs, u updater) state {
 		logFunc("enter wait-state after error")
 	})
 
-	ctxDone := suspendresumesafetimer.SleepUntil(a.ctx, sleepUntil)
-	if ctxDone != nil {
+	select {
+	case <-a.wakeup:
+	case <-a.ctx.Done():
+	}
+	if a.ctx.Err() != nil {
 		return onMainCtxDone(a.ctx, u)
 	}
-	return u(func(snapper *Periodic) {
-		snapper.state = Planning
-	}).sf()
+	return u(func(snapper *Periodic) { snapper.state = Planning }).sf()
 }
 
 func listFSes(ctx context.Context, mf zfs.DatasetFilter) (fss []*zfs.DatasetPath, err error) {
@@ -361,7 +407,8 @@ func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time, 
 }
 
 type PeriodicReport struct {
-	State State
+	CronSpec string
+	State    State
 	// valid in state SyncUp and Waiting
 	SleepUntil time.Time
 	// valid in state Err
@@ -379,10 +426,23 @@ func (s *Periodic) Report() Report {
 		progress = s.plan.report()
 	}
 
+	sleepUntil := s.sleepUntil
+	if s.cronId > 0 {
+		sleepUntil = s.args.cron.Entry(s.cronId).Next
+	}
+
+	err := s.err
+	if err == nil && s.wakeupBusy > 0 {
+		err = fmt.Errorf(
+			"job frequency is too high; snapshots were not taken %d times",
+			s.wakeupBusy)
+	}
+
 	r := &PeriodicReport{
+		CronSpec:   s.args.cronSpec,
 		State:      s.state,
-		SleepUntil: s.sleepUntil,
-		Error:      errOrEmptyString(s.err),
+		SleepUntil: sleepUntil,
+		Error:      errOrEmptyString(err),
 		Progress:   progress,
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/robfig/cron/v3"
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/zfs"
 )
@@ -17,7 +18,7 @@ const (
 )
 
 type Snapper interface {
-	Run(ctx context.Context, snapshotsTaken chan<- struct{})
+	Run(ctx context.Context, snapshotsTaken chan<- struct{}, cron *cron.Cron)
 	Report() Report
 }
 
@@ -32,8 +33,6 @@ func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingE
 	switch v := in.Ret.(type) {
 	case *config.SnapshottingPeriodic:
 		return periodicFromConfig(fsf, v)
-	case *config.SnapshottingCron:
-		return cronFromConfig(fsf, *v)
 	case *config.SnapshottingManual:
 		return &manual{}, nil
 	default:

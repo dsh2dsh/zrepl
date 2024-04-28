@@ -245,11 +245,21 @@ type SnapshottingEnum struct {
 }
 
 type SnapshottingPeriodic struct {
-	Type            string            `yaml:"type"`
-	Prefix          string            `yaml:"prefix"`
-	Interval        *PositiveDuration `yaml:"interval"`
-	Hooks           HookList          `yaml:"hooks,optional"`
-	TimestampFormat string            `yaml:"timestamp_format,optional,default=dense"`
+	Type            string   `yaml:"type"`
+	Prefix          string   `yaml:"prefix"`
+	Interval        Duration `yaml:"interval,optional"`
+	Cron            string   `yaml:"cron,optional"`
+	Hooks           HookList `yaml:"hooks,optional"`
+	TimestampFormat string   `yaml:"timestamp_format,optional,default=dense"`
+}
+
+func (self *SnapshottingPeriodic) CronSpec() string {
+	if self.Cron != "" {
+		return self.Cron
+	} else if self.Interval.Duration() > 0 {
+		return "@every " + self.Interval.Duration().Truncate(time.Second).String()
+	}
+	return ""
 }
 
 type CronSpec struct {
@@ -593,7 +603,7 @@ func (t *SnapshottingEnum) UnmarshalYAML(u func(interface{}, bool) error) (err e
 	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
 		"periodic": &SnapshottingPeriodic{},
 		"manual":   &SnapshottingManual{},
-		"cron":     &SnapshottingCron{},
+		"cron":     &SnapshottingPeriodic{},
 	})
 	return
 }
