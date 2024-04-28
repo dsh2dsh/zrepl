@@ -156,6 +156,18 @@ func drawJob(t *stringbuilder.B, name string, v *job.Status, history *bytesProgr
 
 		t.Printf("Replication:")
 		t.AddIndentAndNewline(1)
+
+		if cronSpec := activeStatus.CronSpec; cronSpec != "" {
+			t.Printf("Interval: %s\n", cronSpec)
+		}
+		if err := activeStatus.Error; err != nil {
+			t.Printf("Error: %s", err)
+		}
+		if sleepUntil := activeStatus.SleepUntil; !sleepUntil.IsZero() {
+			t.Printf("Sleep until: %s (%s remaining)\n",
+				sleepUntil, time.Until(sleepUntil).Truncate(time.Second))
+		}
+
 		renderReplicationReport(t, activeStatus.Replication, history, fsfilter)
 		t.AddIndentAndNewline(-1)
 

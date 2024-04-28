@@ -9,12 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-	"github.com/zrepl/zrepl/util/envconst"
-
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon/job/reset"
 	"github.com/zrepl/zrepl/daemon/job/wakeup"
+	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/daemon/pruner"
 	"github.com/zrepl/zrepl/daemon/snapper"
 	"github.com/zrepl/zrepl/endpoint"
@@ -25,6 +23,7 @@ import (
 	"github.com/zrepl/zrepl/rpc"
 	"github.com/zrepl/zrepl/transport"
 	"github.com/zrepl/zrepl/transport/fromconfig"
+	"github.com/zrepl/zrepl/util/envconst"
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -45,6 +44,10 @@ type ActiveSide struct {
 
 	tasksMtx sync.Mutex
 	tasks    activeSideTasks
+
+	cron       *cron.Cron
+	cronId     cron.EntryID
+	wakeupBusy int
 }
 
 //go:generate enumer -type=ActiveSideState
@@ -392,6 +395,10 @@ func (j *ActiveSide) RegisterMetrics(registerer prometheus.Registerer) {
 func (j *ActiveSide) Name() string { return j.name.String() }
 
 type ActiveSideStatus struct {
+	CronSpec   string
+	SleepUntil time.Time
+	Error      error
+
 	Replication                    *report.Report
 	PruningSender, PruningReceiver *pruner.Report
 	Snapshotting                   *snapper.Report
@@ -399,9 +406,20 @@ type ActiveSideStatus struct {
 
 func (j *ActiveSide) Status() *Status {
 	tasks := j.updateTasks(nil)
+	s := &ActiveSideStatus{
+		CronSpec:     j.mode.Cron(),
+		Snapshotting: j.mode.SnapperReport(),
+	}
 
-	s := &ActiveSideStatus{}
-	t := j.mode.Type()
+	if id := j.cronId; id > 0 {
+		s.SleepUntil = j.cron.Entry(id).Next
+	}
+
+	if cnt := j.wakeupBusy; cnt > 0 {
+		s.Error = fmt.Errorf(
+			"job frequency is too high; replication was not done %d times", cnt)
+	}
+
 	if tasks.replicationReport != nil {
 		s.Replication = tasks.replicationReport()
 	}
@@ -411,8 +429,9 @@ func (j *ActiveSide) Status() *Status {
 	if tasks.prunerReceiver != nil {
 		s.PruningReceiver = tasks.prunerReceiver.Report()
 	}
+
 	s.Snapshotting = j.mode.SnapperReport()
-	return &Status{Type: t, JobSpecific: s}
+	return &Status{Type: j.mode.Type(), JobSpecific: s}
 }
 
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
@@ -489,11 +508,13 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 	}
 
 	log := GetLogger(ctx).WithField("cron", cronSpec)
-	_, err := cron.AddFunc(cronSpec, func() {
+	id, err := cron.AddFunc(cronSpec, func() {
 		select {
 		case wakeUpCommon <- struct{}{}:
+			j.wakeupBusy = 0
 		case <-ctx.Done():
 		default:
+			j.wakeupBusy++
 			log.WithField("cron", cronSpec).Warn(
 				"job took longer than its interval")
 		}
@@ -503,7 +524,8 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 		return
 	}
 
-	log.Info("add cron job")
+	j.cron, j.cronId = cron, id
+	log.WithField("id", id).Info("add cron job")
 }
 
 func (j *ActiveSide) do(ctx context.Context) {
