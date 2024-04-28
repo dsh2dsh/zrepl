@@ -28,7 +28,7 @@ func NewSlogFormatter() *SlogFormatter {
 		metaFlags: MetadataLevel,
 		mu:        new(sync.Mutex),
 	}
-	orderedFields := [...]string{JobField, SubsysField, SpanField}
+	orderedFields := [...]string{SubsysField, JobField, SpanField}
 	return f.withOrderedFields(orderedFields[:])
 }
 
