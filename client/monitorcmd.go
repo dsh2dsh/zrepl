@@ -2,8 +2,9 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/zrepl/zrepl/config"
 	"github.com/zrepl/zrepl/daemon"
 	"github.com/zrepl/zrepl/daemon/filters"
+	"github.com/zrepl/zrepl/daemon/job"
 	"github.com/zrepl/zrepl/version"
 	"github.com/zrepl/zrepl/zfs"
 )
@@ -29,7 +31,7 @@ var MonitorCmd = &cli.Subcommand{
 }
 
 func newMonitorAliveCmd() *cli.Subcommand {
-	runner := monitorAlive{}
+	runner := newMonitorAlive()
 	return &cli.Subcommand{
 		Use:   "alive",
 		Short: "check the daemon is alive",
@@ -352,94 +354,107 @@ func (self *monitorSnapshots) snapshotType() string {
 
 // --------------------------------------------------
 
-func newMonitorCriticalf(msg string, v ...interface{}) monitorCheckResult {
-	return monitorCheckResult{
-		msg:      fmt.Sprintf(msg, v...),
-		critical: true,
+func newMonitorAlive() *monitorAlive {
+	m := monitorAlive{}
+	return m.applyOptions()
+}
+
+type monitorAlive struct {
+	h    http.Client
+	resp *monitoringplugin.Response
+}
+
+func (self *monitorAlive) applyOptions() *monitorAlive {
+	if self.resp == nil {
+		self.resp = monitoringplugin.NewResponse("daemon alive")
 	}
+	return self
 }
-
-func newMonitorWarningf(msg string, v ...interface{}) monitorCheckResult {
-	return monitorCheckResult{
-		msg:     fmt.Sprintf(msg, v...),
-		warning: true,
-	}
-}
-
-type monitorCheckResult struct {
-	msg      string
-	critical bool
-	warning  bool
-}
-
-func (self monitorCheckResult) Error() string {
-	return self.msg
-}
-
-// --------------------------------------------------
-
-type monitorAlive struct{}
 
 func (self *monitorAlive) run(
 	ctx context.Context, subcmd *cli.Subcommand, args []string,
 ) error {
-	resp := monitoringplugin.NewResponse("daemon alive")
-	resp.SetOutputDelimiter("")
-	defer resp.OutputAndExit()
+	defer self.resp.OutputAndExit()
 
-	daemonVer, err := self.checkVersions(subcmd.Config().Global.Control.SockPath)
-	if err != nil {
-		self.updateErrStatus(err, resp)
-	} else {
-		resp.UpdateStatus(monitoringplugin.OK,
-			fmt.Sprintf(", %s", daemonVer))
+	if !self.checkVersions(subcmd.Config().Global.Control.SockPath) {
+		return nil
 	}
-
+	self.checkJobs()
 	return nil
 }
 
-func (self *monitorAlive) checkVersions(sockPath string) (string, error) {
+func (self *monitorAlive) checkVersions(sockPath string) bool {
+	daemonVer := self.daemonVersion(sockPath)
+	if daemonVer == "" {
+		return false
+	}
+
 	clientVer := version.NewZreplVersionInformation().String()
-	daemonVer, err := self.daemonVersion(sockPath)
-	if err != nil {
-		return "", err
-	}
-
 	if clientVer != daemonVer {
-		return "", newMonitorWarningf("client version (%s) != daemon version (%s)",
-			clientVer, daemonVer)
+		self.resp.UpdateStatus(monitoringplugin.WARNING,
+			"client version != daemon version")
+		self.resp.UpdateStatus(monitoringplugin.WARNING, "client version: "+clientVer)
+		return false
 	}
-
-	return daemonVer, nil
+	return true
 }
 
-func (self *monitorAlive) daemonVersion(sockPath string) (string, error) {
+func (self *monitorAlive) daemonVersion(sockPath string) string {
 	httpc, err := controlHttpClient(sockPath)
 	if err != nil {
-		return "", fmt.Errorf("failed http client for %q: %w", sockPath, err)
+		self.resp.UpdateStatusOnError(
+			fmt.Errorf("failed http client for %q: %w", sockPath, err),
+			monitoringplugin.UNKNOWN, "", true)
+		return ""
 	}
+	self.h = httpc
 
 	var ver version.ZreplVersionInformation
-	err = jsonRequestResponse(httpc, daemon.ControlJobEndpointVersion, "", &ver)
+	err = self.jsonRequestResponse(daemon.ControlJobEndpointVersion,
+		struct{}{}, &ver)
 	if err != nil {
-		return "", newMonitorCriticalf("failed version request: %s", err)
+		self.resp.UpdateStatusOnError(
+			fmt.Errorf("failed version request: %w", err),
+			monitoringplugin.CRITICAL, "", true)
+		return ""
 	}
 
-	return ver.String(), nil
+	self.resp.UpdateStatus(monitoringplugin.OK, "daemon version: "+ver.String())
+	return ver.String()
 }
 
-func (self *monitorAlive) updateErrStatus(
-	err error, resp *monitoringplugin.Response,
-) {
-	statusCode := monitoringplugin.UNKNOWN
-	var checkResult monitorCheckResult
-	if errors.As(err, &checkResult) {
-		switch {
-		case checkResult.critical:
-			statusCode = monitoringplugin.CRITICAL
-		case checkResult.warning:
-			statusCode = monitoringplugin.WARNING
+func (self *monitorAlive) jsonRequestResponse(endpoint string, req, resp any,
+) error {
+	if err := jsonRequestResponse(self.h, endpoint, req, resp); err != nil {
+		return fmt.Errorf("json req to %q: %w", endpoint, err)
+	}
+	return nil
+}
+
+func (self *monitorAlive) checkJobs() bool {
+	jobs, err := self.jobs()
+	if err != nil {
+		self.resp.UpdateStatusOnError(fmt.Errorf("job reports: %w", err),
+			monitoringplugin.CRITICAL, "", true)
+		return false
+	}
+	self.resp.WithDefaultOkMessage(strconv.Itoa(len(jobs)) + " jobs")
+	return true
+}
+
+func (self *monitorAlive) jobs() (map[string]*job.Status, error) {
+	var s daemon.Status
+	err := self.jsonRequestResponse(daemon.ControlJobEndpointStatus,
+		struct{}{}, &s)
+	if err != nil {
+		return nil, fmt.Errorf("failed status request: %w", err)
+	}
+
+	m := make(map[string]*job.Status, len(s.Jobs))
+	for jname, jstatus := range s.Jobs {
+		if !daemon.IsInternalJobName(jname) {
+			m[jname] = jstatus
 		}
 	}
-	resp.UpdateStatus(statusCode, err.Error())
+	return m, nil
 }
