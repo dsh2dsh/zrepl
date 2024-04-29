@@ -563,8 +563,6 @@ func renderSnapperReport(t *stringbuilder.B, r *snapper.Report, fsfilter FilterF
 	t.Printf("Type: %s\n", r.Type)
 	if r.Periodic != nil {
 		renderSnapperReportPeriodic(t, r.Periodic, fsfilter)
-	} else if r.Cron != nil {
-		renderSnapperReportCron(t, r.Cron, fsfilter)
 	} else {
 		t.Printf("<no details available>")
 	}
@@ -582,19 +580,6 @@ func renderSnapperReportPeriodic(t *stringbuilder.B, r *snapper.PeriodicReport,
 		t.Printf("Sleep until: %s (%s remaining)\n", r.SleepUntil,
 			time.Until(r.SleepUntil).Truncate(time.Second))
 	}
-	renderSnapperPlanReportFilesystem(t, r.Progress, fsfilter)
-}
-
-func renderSnapperReportCron(t *stringbuilder.B, r *snapper.CronReport, fsfilter FilterFunc) {
-	t.Printf("State: %s\n", r.State)
-
-	now := time.Now()
-	if r.WakeupTime.After(now) {
-		t.Printf("Sleep until: %s (%s remaining)\n", r.WakeupTime, r.WakeupTime.Sub(now).Round(time.Second))
-	} else {
-		t.Printf("Started: %s (lasting %s)\n", r.WakeupTime, now.Sub(r.WakeupTime).Round(time.Second))
-	}
-
 	renderSnapperPlanReportFilesystem(t, r.Progress, fsfilter)
 }
 

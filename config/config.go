@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/robfig/cron/v3"
 	"github.com/zrepl/yaml-config"
 
 	"github.com/zrepl/zrepl/util/datasizeunit"
@@ -260,39 +259,6 @@ func (self *SnapshottingPeriodic) CronSpec() string {
 		return "@every " + self.Interval.Duration().Truncate(time.Second).String()
 	}
 	return ""
-}
-
-type CronSpec struct {
-	Schedule cron.Schedule
-}
-
-var _ yaml.Unmarshaler = &CronSpec{}
-
-func (s *CronSpec) UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) error) error {
-	var specString string
-	if err := unmarshal(&specString, false); err != nil {
-		return err
-	}
-
-	// Use standard cron format.
-	// Disable the various "descriptors" (@daily, etc)
-	// They are just aliases to "top of hour", "midnight", etc.
-	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.SecondOptional)
-
-	sched, err := parser.Parse(specString)
-	if err != nil {
-		return fmt.Errorf("cron syntax invalid: %w", err)
-	}
-	s.Schedule = sched
-	return nil
-}
-
-type SnapshottingCron struct {
-	Type            string   `yaml:"type"`
-	Prefix          string   `yaml:"prefix"`
-	Cron            CronSpec `yaml:"cron"`
-	Hooks           HookList `yaml:"hooks,optional"`
-	TimestampFormat string   `yaml:"timestamp_format,optional,default=dense"`
 }
 
 type SnapshottingManual struct {

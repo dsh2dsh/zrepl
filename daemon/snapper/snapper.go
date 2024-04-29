@@ -25,7 +25,6 @@ type Snapper interface {
 type Report struct {
 	Type     Type
 	Periodic *PeriodicReport
-	Cron     *CronReport
 	Manual   *struct{}
 }
 

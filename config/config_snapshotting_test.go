@@ -94,8 +94,8 @@ jobs:
 
 	t.Run("cron", func(t *testing.T) {
 		c = testValidConfig(t, fillSnapshotting(cron))
-		snp := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingCron)
-		assert.Equal(t, "cron", snp.Type)
+		snp := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingPeriodic)
+		assert.Equal(t, "periodic", snp.Type)
 		assert.Equal(t, "zrepl_", snp.Prefix)
 		assert.Equal(t, "human", snp.TimestampFormat)
 	})
@@ -155,8 +155,8 @@ jobs:
 
 	t.Run("cron", func(t *testing.T) {
 		c = testValidConfig(t, fillSnapshotting(cron))
-		snp := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingCron)
-		assert.Equal(t, "cron", snp.Type)
+		snp := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingPeriodic)
+		assert.Equal(t, "periodic", snp.Type)
 		assert.Equal(t, "zrepl_", snp.Prefix)
 		assert.Equal(t, "dense", snp.TimestampFormat) // default was set correctly
 	})
