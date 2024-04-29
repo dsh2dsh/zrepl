@@ -15,7 +15,6 @@ import (
 	"github.com/zrepl/zrepl/daemon/logging"
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/util/suspendresumesafetimer"
 	"github.com/zrepl/zrepl/zfs"
 )
 
@@ -221,12 +220,24 @@ func periodicStateSyncUp(a periodicArgs, u updater) state {
 	u(func(s *Periodic) {
 		s.sleepUntil = syncPoint
 	})
-	ctxDone := suspendresumesafetimer.SleepUntil(a.ctx, syncPoint)
-	if ctxDone != nil {
-		return onMainCtxDone(a.ctx, u)
+
+	nextState := Planning
+	if syncPoint.After(time.Now()) {
+		t := time.NewTimer(time.Until(syncPoint))
+		select {
+		case <-t.C:
+		case <-a.ctx.Done():
+			t.Stop()
+		}
+		if a.ctx.Err() != nil {
+			return onMainCtxDone(a.ctx, u)
+		}
+	} else {
+		nextState = Waiting
 	}
+
 	return u(func(s *Periodic) {
-		s.state = Planning
+		s.state = nextState
 		s.runPeriodic(a.ctx)
 	}).sf()
 }
