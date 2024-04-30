@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
@@ -137,6 +138,13 @@ func (self *PassiveStatus) Error() string {
 		}
 	}
 	return ""
+}
+
+func (self *PassiveStatus) Running() time.Duration {
+	if snap := self.Snapper; snap != nil {
+		return snap.Running()
+	}
+	return 0
 }
 
 func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

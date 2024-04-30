@@ -417,17 +417,6 @@ func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time, 
 	return latest.Creation.Add(interval), nil
 }
 
-type PeriodicReport struct {
-	CronSpec string
-	State    State
-	// valid in state SyncUp and Waiting
-	SleepUntil time.Time
-	// valid in state Err
-	Error string
-	// valid in state Snapshotting
-	Progress []*ReportFilesystem
-}
-
 func (s *Periodic) Report() Report {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -458,4 +447,29 @@ func (s *Periodic) Report() Report {
 	}
 
 	return Report{Type: TypePeriodic, Periodic: r}
+}
+
+type PeriodicReport struct {
+	CronSpec string
+	State    State
+	// valid in state SyncUp and Waiting
+	SleepUntil time.Time
+	// valid in state Err
+	Error string
+	// valid in state Snapshotting
+	Progress []*ReportFilesystem
+}
+
+func (self *PeriodicReport) Running() time.Duration {
+	var d time.Duration
+	if progress := self.Progress; progress != nil {
+		for _, fs := range progress {
+			if fs.DoneAt.IsZero() {
+				if d2 := time.Since(fs.StartAt); d2 > d {
+					d = d2
+				}
+			}
+		}
+	}
+	return d
 }

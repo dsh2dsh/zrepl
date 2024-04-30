@@ -36,6 +36,13 @@ func newMonitorAliveCmd() *cli.Subcommand {
 		Use:   "alive",
 		Short: "check the daemon is alive",
 		Run:   runner.run,
+		SetupCobra: func(c *cobra.Command) {
+			f := c.Flags()
+			f.DurationVarP(&runner.warnRunning, "warn", "w", 0,
+				"warning job running time")
+			f.DurationVarP(&runner.critRunning, "crit", "c", 0,
+				"critical job running time")
+		},
 	}
 }
 
@@ -362,6 +369,9 @@ func newMonitorAlive() *monitorAlive {
 type monitorAlive struct {
 	h    http.Client
 	resp *monitoringplugin.Response
+
+	warnRunning time.Duration
+	critRunning time.Duration
 }
 
 func (self *monitorAlive) applyOptions() *monitorAlive {
@@ -440,14 +450,23 @@ func (self *monitorAlive) checkJobs() bool {
 	}
 	self.resp.WithDefaultOkMessage(strconv.Itoa(len(jobs)) + " jobs")
 
+	lasting := struct {
+		name string
+		d    time.Duration
+	}{}
+
 	for jname, status := range jobs {
 		if s := status.Error(); s != "" {
 			self.resp.UpdateStatus(monitoringplugin.WARNING, s)
 			self.resp.UpdateStatus(monitoringplugin.WARNING, "job: "+jname)
 			return false
 		}
+		if d := status.Running(); d > lasting.d {
+			lasting.name = jname
+			lasting.d = d
+		}
 	}
-	return true
+	return self.checkLongestJob(lasting.name, lasting.d)
 }
 
 func (self *monitorAlive) jobs() (map[string]*job.Status, error) {
@@ -465,4 +484,24 @@ func (self *monitorAlive) jobs() (map[string]*job.Status, error) {
 		}
 	}
 	return m, nil
+}
+
+func (self *monitorAlive) checkLongestJob(name string, lasting time.Duration,
+) bool {
+	if lasting == 0 {
+		return true
+	}
+
+	point := monitoringplugin.NewPerformanceDataPoint(
+		"running", lasting.Seconds()).SetUnit("s")
+	point.NewThresholds(0, self.warnRunning.Seconds(),
+		0, self.critRunning.Seconds())
+	if err := self.resp.AddPerformanceDataPoint(point); err != nil {
+		self.resp.UpdateStatusOnError(err, monitoringplugin.UNKNOWN, "", true)
+	} else {
+		self.resp.UpdateStatus(monitoringplugin.OK, "longest job: "+name)
+		self.resp.UpdateStatus(monitoringplugin.OK,
+			"running: "+lasting.Truncate(time.Second).String())
+	}
+	return self.resp.GetStatusCode() == monitoringplugin.OK
 }

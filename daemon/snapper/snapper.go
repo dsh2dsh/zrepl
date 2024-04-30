@@ -3,6 +3,7 @@ package snapper
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/zrepl/zrepl/config"
@@ -33,8 +34,20 @@ func (self *Report) Error() string {
 		if p.Error != "" {
 			return p.Error
 		}
+		for _, fs := range p.Progress {
+			if fs.HooksHadError {
+				return fs.Hooks
+			}
+		}
 	}
 	return ""
+}
+
+func (self *Report) Running() time.Duration {
+	if p := self.Periodic; p != nil {
+		return p.Running()
+	}
+	return 0
 }
 
 func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingEnum) (Snapper, error) {

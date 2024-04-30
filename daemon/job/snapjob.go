@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
@@ -109,6 +110,13 @@ func (self *SnapJobStatus) Error() string {
 		}
 	}
 	return ""
+}
+
+func (self *SnapJobStatus) Running() time.Duration {
+	if snap := self.Snapshotting; snap != nil {
+		return snap.Running()
+	}
+	return 0
 }
 
 func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

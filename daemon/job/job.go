@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/robfig/cron/v3"
@@ -113,4 +114,11 @@ func (s *Status) Error() string {
 		return v.Error()
 	}
 	return ""
+}
+
+func (s *Status) Running() time.Duration {
+	if v, ok := s.JobSpecific.(interface{ Running() time.Duration }); ok {
+		return v.Running()
+	}
+	return 0
 }

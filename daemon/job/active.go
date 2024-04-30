@@ -475,6 +475,19 @@ func (self *ActiveSideStatus) Error() string {
 	return ""
 }
 
+func (self *ActiveSideStatus) Running() time.Duration {
+	var d time.Duration
+	if repl := self.Replication; repl != nil {
+		d = repl.Running()
+	}
+	if snap := self.Snapshotting; snap != nil {
+		if d2 := snap.Running(); d2 > d {
+			d = d2
+		}
+	}
+	return d
+}
+
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 	pull, ok := j.mode.(*modePull)
 	if !ok {

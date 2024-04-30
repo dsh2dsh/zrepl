@@ -214,6 +214,16 @@ func (r *Report) Error() string {
 	return ""
 }
 
+func (r *Report) Running() time.Duration {
+	if len(r.Attempts) > 0 {
+		att := r.Attempts[len(r.Attempts)-1]
+		if att.FinishAt.IsZero() {
+			return time.Since(att.StartAt)
+		}
+	}
+	return 0
+}
+
 // Returns true in case the AttemptState is a terminal
 // state(AttemptPlanningError, AttemptFanOutError, AttemptDone)
 func (a AttemptState) IsTerminal() bool {
