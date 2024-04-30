@@ -73,11 +73,6 @@ func (j *SnapJob) RegisterMetrics(registerer prometheus.Registerer) {
 	registerer.MustRegister(j.promPruneSecs)
 }
 
-type SnapJobStatus struct {
-	Pruning      *pruner.Report
-	Snapshotting *snapper.Report // may be nil
-}
-
 func (j *SnapJob) Status() *Status {
 	s := &SnapJobStatus{}
 	t := j.Type()
@@ -89,6 +84,31 @@ func (j *SnapJob) Status() *Status {
 	r := j.snapper.Report()
 	s.Snapshotting = &r
 	return &Status{Type: t, JobSpecific: s}
+}
+
+type SnapJobStatus struct {
+	Pruning      *pruner.Report
+	Snapshotting *snapper.Report // may be nil
+}
+
+func (self *SnapJobStatus) Error() string {
+	if prun := self.Pruning; prun != nil {
+		if prun.Error != "" {
+			return prun.Error
+		}
+		for _, fs := range prun.Completed {
+			if fs.SkipReason.NotSkipped() && fs.LastError != "" {
+				return fs.LastError
+			}
+		}
+	}
+
+	if snap := self.Snapshotting; snap != nil {
+		if s := snap.Error(); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

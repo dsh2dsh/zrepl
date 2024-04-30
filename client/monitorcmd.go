@@ -439,6 +439,14 @@ func (self *monitorAlive) checkJobs() bool {
 		return false
 	}
 	self.resp.WithDefaultOkMessage(strconv.Itoa(len(jobs)) + " jobs")
+
+	for jname, status := range jobs {
+		if s := status.Error(); s != "" {
+			self.resp.UpdateStatus(monitoringplugin.WARNING, s)
+			self.resp.UpdateStatus(monitoringplugin.WARNING, "job: "+jname)
+			return false
+		}
+	}
 	return true
 }
 

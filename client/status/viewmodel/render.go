@@ -160,8 +160,8 @@ func drawJob(t *stringbuilder.B, name string, v *job.Status, history *bytesProgr
 		if cronSpec := activeStatus.CronSpec; cronSpec != "" {
 			t.Printf("Interval: %s\n", cronSpec)
 		}
-		if err := activeStatus.Error; err != nil {
-			t.Printf("Error: %s", err)
+		if s := activeStatus.Error(); s != "" {
+			t.Printf("Error: %s", s)
 		}
 		if sleepUntil := activeStatus.SleepUntil; !sleepUntil.IsZero() {
 			t.Printf("Sleep until: %s (%s remaining)\n",

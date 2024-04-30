@@ -119,15 +119,24 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob, configJob in
 
 func (j *PassiveSide) Name() string { return j.name.String() }
 
-type PassiveStatus struct {
-	Snapper *snapper.Report
-}
-
 func (s *PassiveSide) Status() *Status {
 	st := &PassiveStatus{
 		Snapper: s.mode.SnapperReport(),
 	}
 	return &Status{Type: s.mode.Type(), JobSpecific: st}
+}
+
+type PassiveStatus struct {
+	Snapper *snapper.Report
+}
+
+func (self *PassiveStatus) Error() string {
+	if snap := self.Snapper; snap != nil {
+		if s := snap.Error(); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

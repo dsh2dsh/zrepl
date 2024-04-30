@@ -28,6 +28,15 @@ type Report struct {
 	Manual   *struct{}
 }
 
+func (self *Report) Error() string {
+	if p := self.Periodic; p != nil {
+		if p.Error != "" {
+			return p.Error
+		}
+	}
+	return ""
+}
+
 func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingEnum) (Snapper, error) {
 	switch v := in.Ret.(type) {
 	case *config.SnapshottingPeriodic:

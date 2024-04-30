@@ -171,7 +171,6 @@ func (f *StepReport) IsIncremental() bool {
 // -1 if the replication failed while enumerating file systems
 // N  if N filesystems could not not be replicated successfully
 func (r *Report) GetFailedFilesystemsCountInLatestAttempt() int {
-
 	if len(r.Attempts) == 0 {
 		return 0
 	}
@@ -191,6 +190,28 @@ func (r *Report) GetFailedFilesystemsCountInLatestAttempt() int {
 	default:
 		return 0
 	}
+}
+
+func (r *Report) Error() string {
+	if r.WaitReconnectError != nil {
+		return r.WaitReconnectError.Error()
+	}
+
+	if len(r.Attempts) == 0 {
+		return ""
+	}
+
+	att := r.Attempts[len(r.Attempts)-1]
+	if att.State == AttemptPlanningError {
+		return att.PlanError.Error()
+	}
+
+	for _, fs := range att.Filesystems {
+		if err := fs.Error(); err != nil {
+			return err.Error()
+		}
+	}
+	return ""
 }
 
 // Returns true in case the AttemptState is a terminal

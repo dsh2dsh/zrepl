@@ -394,16 +394,6 @@ func (j *ActiveSide) RegisterMetrics(registerer prometheus.Registerer) {
 
 func (j *ActiveSide) Name() string { return j.name.String() }
 
-type ActiveSideStatus struct {
-	CronSpec   string
-	SleepUntil time.Time
-	Error      error
-
-	Replication                    *report.Report
-	PruningSender, PruningReceiver *pruner.Report
-	Snapshotting                   *snapper.Report
-}
-
 func (j *ActiveSide) Status() *Status {
 	tasks := j.updateTasks(nil)
 	s := &ActiveSideStatus{
@@ -416,7 +406,7 @@ func (j *ActiveSide) Status() *Status {
 	}
 
 	if cnt := j.wakeupBusy; cnt > 0 {
-		s.Error = fmt.Errorf(
+		s.err = fmt.Errorf(
 			"job frequency is too high; replication was not done %d times", cnt)
 	}
 
@@ -432,6 +422,57 @@ func (j *ActiveSide) Status() *Status {
 
 	s.Snapshotting = j.mode.SnapperReport()
 	return &Status{Type: j.mode.Type(), JobSpecific: s}
+}
+
+type ActiveSideStatus struct {
+	CronSpec   string
+	SleepUntil time.Time
+	err        error
+
+	Replication                    *report.Report
+	PruningSender, PruningReceiver *pruner.Report
+	Snapshotting                   *snapper.Report
+}
+
+func (self *ActiveSideStatus) Error() string {
+	if self.err != nil {
+		return self.err.Error()
+	}
+
+	if prun := self.PruningSender; prun != nil {
+		if prun.Error != "" {
+			return prun.Error
+		}
+		for _, fs := range prun.Completed {
+			if fs.SkipReason.NotSkipped() && fs.LastError != "" {
+				return fs.LastError
+			}
+		}
+	}
+
+	if prun := self.PruningReceiver; prun != nil {
+		if prun.Error != "" {
+			return prun.Error
+		}
+		for _, fs := range prun.Completed {
+			if fs.SkipReason.NotSkipped() && fs.LastError != "" {
+				return fs.LastError
+			}
+		}
+	}
+
+	if snap := self.Snapshotting; snap != nil {
+		if s := snap.Error(); s != "" {
+			return s
+		}
+	}
+
+	if repl := self.Replication; repl != nil {
+		if s := repl.Error(); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

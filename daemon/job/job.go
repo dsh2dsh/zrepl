@@ -107,3 +107,10 @@ func (s *Status) UnmarshalJSON(in []byte) (err error) {
 	}
 	return err
 }
+
+func (s *Status) Error() string {
+	if v, ok := s.JobSpecific.(interface{ Error() string }); ok {
+		return v.Error()
+	}
+	return ""
+}
