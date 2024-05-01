@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging"
 	"github.com/zrepl/zrepl/endpoint"

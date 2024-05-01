@@ -3,7 +3,7 @@ package snapper
 import (
 	"context"
 
-	"github.com/robfig/cron/v3"
+	"github.com/dsh2dsh/cron/v3"
 )
 
 type manual struct{}

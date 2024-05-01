@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/bits-and-blooms/bitset v1.13.0
+	github.com/dsh2dsh/cron/v3 v3.0.2
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.16.0
 	github.com/gdamore/tcell/v2 v2.7.4
@@ -19,7 +20,6 @@ require (
 	github.com/pkg/profile v1.7.0
 	github.com/problame/go-netssh v0.0.0-20201229122201-330ad6c9cc6f
 	github.com/prometheus/client_golang v1.19.0
-	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0

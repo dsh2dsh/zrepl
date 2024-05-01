@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/logging/trace"
 	"github.com/zrepl/zrepl/endpoint"
@@ -104,16 +104,17 @@ func Run(ctx context.Context, conf *config.Config) error {
 	log.Info("starting daemon")
 
 	// start regular jobs
-	done := jobs.wait(jobs.startJobsWithCron(ctx, confJobs, false))
+	jobs.startJobsWithCron(ctx, confJobs, false)
 
+	wait := jobs.wait()
 	select {
-	case <-done.Done():
+	case <-wait.Done():
 		log.Info("all jobs finished")
 	case <-ctx.Done():
 		log.WithError(ctx.Err()).Info("context finished")
 	}
 	log.Info("waiting for jobs to finish")
-	<-done.Done()
+	<-wait.Done()
 	log.Info("daemon exiting")
 	return nil
 }
@@ -138,15 +139,14 @@ func newJobs(log logger.Logger) *jobs {
 	}
 }
 
-func (s *jobs) wait(ctx context.Context) context.Context {
-	ctx2, cancel := context.WithCancel(context.Background())
+func (s *jobs) wait() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		s.wg.Wait()
 		<-s.cron.Stop().Done()
-		<-ctx.Done()
 		cancel()
 	}()
-	return ctx2
+	return ctx
 }
 
 type Status struct {
@@ -210,17 +210,11 @@ func (s *jobs) reset(job string) error {
 
 func (s *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job,
 	internal bool,
-) context.Context {
-	cronCtx, cancel := context.WithCancel(context.Background())
-	go func() {
-		s.cron.Run()
-		cancel()
-	}()
-
+) {
+	s.cron.Start()
 	for _, j := range confJobs {
 		s.start(ctx, j, internal)
 	}
-	return cronCtx
 }
 
 const (

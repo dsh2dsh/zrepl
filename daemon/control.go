@@ -12,8 +12,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/robfig/cron/v3"
 
 	"github.com/zrepl/zrepl/daemon/job"
 	"github.com/zrepl/zrepl/daemon/nethelpers"
