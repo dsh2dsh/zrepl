@@ -170,8 +170,7 @@ func (s *Periodic) runPeriodic(ctx context.Context) {
 		case <-ctx.Done():
 		default:
 			s.wakeupBusy++
-			log.WithField("cron", cronSpec).Warn(
-				"job took longer than its interval")
+			log.Warn("job took longer than its interval")
 		}
 	})
 	if err != nil {
