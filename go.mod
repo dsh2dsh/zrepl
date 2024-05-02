@@ -10,7 +10,7 @@ require (
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
 	github.com/go-logfmt/logfmt v0.6.0
-	github.com/go-playground/validator/v10 v10.19.0
+	github.com/go-playground/validator/v10 v10.20.0
 	github.com/google/uuid v1.6.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/juju/ratelimit v1.0.2
@@ -31,7 +31,7 @@ require (
 	golang.org/x/sys v0.19.0
 	golang.org/x/tools v0.20.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.0
 )
 
 require (
