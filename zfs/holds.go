@@ -32,35 +32,39 @@ func ValidHoldTag(tag string) error {
 }
 
 // Idemptotent: does not return an error if the tag already exists
-func ZFSHold(ctx context.Context, fs string, v FilesystemVersion, tag string) error {
+func ZFSHold(ctx context.Context, fs string, v FilesystemVersion, tag string,
+) error {
 	if !v.IsSnapshot() {
 		return fmt.Errorf("can only hold snapshots, got %s", v.RelName())
-	}
-
-	if err := validateNotEmpty("tag", tag); err != nil {
+	} else if err := validateNotEmpty("tag", tag); err != nil {
 		return err
 	}
+
 	fullPath := v.FullPath(fs)
-	output, err := zfscmd.CommandContext(ctx, "zfs", "hold", tag, fullPath).CombinedOutput()
+	cmd := zfscmd.CommandContext(ctx, "zfs", "hold", tag, fullPath).
+		WithLogError(false)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if bytes.Contains(output, []byte("tag already exists on this dataset")) {
-			goto success
+			cmd.LogError(err, true)
+			return nil
 		}
+		cmd.LogError(err, false)
 		return &ZFSError{output, fmt.Errorf("cannot hold %q: %w", fullPath, err)}
 	}
-success:
 	return nil
 }
 
 func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 	if err := validateZFSFilesystem(fs); err != nil {
 		return nil, fmt.Errorf("`fs` is not a valid filesystem path: %w", err)
-	}
-	if snap == "" {
+	} else if snap == "" {
 		return nil, fmt.Errorf("`snap` must not be empty")
 	}
+
 	dp := fmt.Sprintf("%s@%s", fs, snap)
-	output, err := zfscmd.CommandContext(ctx, "zfs", "holds", "-H", dp).CombinedOutput()
+	cmd := zfscmd.CommandContext(ctx, "zfs", "holds", "-H", dp)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, &ZFSError{output, fmt.Errorf("zfs holds failed: %w", err)}
 	}
@@ -95,11 +99,14 @@ func ZFSRelease(ctx context.Context, tag string, snaps ...string) error {
 				break
 			}
 		}
+
 		args := []string{"release", tag}
 		args = append(args, snaps[i:j]...)
-		output, err := zfscmd.CommandContext(ctx, "zfs", args...).CombinedOutput()
+		cmd := zfscmd.CommandContext(ctx, "zfs", args...).WithLogError(false)
+		output, err := cmd.CombinedOutput()
 		if pe, ok := err.(*os.PathError); err != nil && ok && pe.Err == syscall.E2BIG {
 			maxInvocationLen = maxInvocationLen / 2
+			cmd.LogError(err, true)
 			continue
 		}
 		// further error handling part of error scraper below
@@ -112,15 +119,20 @@ func ZFSRelease(ctx context.Context, tag string, snaps ...string) error {
 		// FIXME verify this in a platformtest
 		// => screen-scrape
 		scan := bufio.NewScanner(bytes.NewReader(output))
+		var hasOtherLines bool
 		for scan.Scan() {
 			line := scan.Text()
 			if strings.Contains(line, "no such tag on this dataset") {
 				noSuchTagLines = append(noSuchTagLines, line)
 			} else {
 				otherLines = append(otherLines, line)
+				hasOtherLines = true
 			}
 		}
 
+		if err != nil {
+			cmd.LogError(err, !hasOtherLines)
+		}
 	}
 	if debugEnabled {
 		debug("zfs release: no such tag lines=%v otherLines=%v", noSuchTagLines, otherLines)

@@ -1,11 +1,11 @@
 package zfs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os/exec"
-	"strings"
 	"sync"
 
 	"github.com/zrepl/zrepl/util/envconst"
@@ -21,13 +21,19 @@ var encryptionCLISupport struct {
 func EncryptionCLISupported(ctx context.Context) (bool, error) {
 	encryptionCLISupport.once.Do(func() {
 		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, "zfs", "load-key")
+		cmd := zfscmd.CommandContext(ctx, "zfs", "load-key").WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
-			encryptionCLISupport.err = fmt.Errorf("native encryption cli support feature check failed: %w", err)
+			encryptionCLISupport.err = fmt.Errorf(
+				"native encryption cli support feature check failed: %w", err)
 		}
-		def := strings.Contains(string(output), "load-key") && strings.Contains(string(output), "keylocation")
-		encryptionCLISupport.supported = envconst.Bool("ZREPL_EXPERIMENTAL_ZFS_ENCRYPTION_CLI_SUPPORTED", def)
+		def := bytes.Contains(output, []byte("load-key")) && bytes.Contains(
+			output, []byte("keylocation"))
+		if err != nil {
+			cmd.LogError(err, def)
+		}
+		encryptionCLISupport.supported = envconst.Bool(
+			"ZREPL_EXPERIMENTAL_ZFS_ENCRYPTION_CLI_SUPPORTED", def)
 		debug("encryption cli feature check complete %#v", &encryptionCLISupport)
 	})
 	return encryptionCLISupport.supported, encryptionCLISupport.err

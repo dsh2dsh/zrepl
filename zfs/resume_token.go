@@ -1,6 +1,7 @@
 package zfs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -49,13 +50,18 @@ var resumeSendSupportedCheck struct {
 func ResumeSendSupported(ctx context.Context) (bool, error) {
 	resumeSendSupportedCheck.once.Do(func() {
 		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, "zfs", "send")
+		cmd := zfscmd.CommandContext(ctx, "zfs", "send").WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
-			resumeSendSupportedCheck.err = fmt.Errorf("resumable send cli support feature check failed: %w", err)
+			resumeSendSupportedCheck.err = fmt.Errorf(
+				"resumable send cli support feature check failed: %w", err)
 		}
-		def := strings.Contains(string(output), "receive_resume_token")
-		resumeSendSupportedCheck.supported = envconst.Bool("ZREPL_EXPERIMENTAL_ZFS_SEND_RESUME_SUPPORTED", def)
+		def := bytes.Contains(output, []byte("receive_resume_token"))
+		if err != nil {
+			cmd.LogError(err, def)
+		}
+		resumeSendSupportedCheck.supported = envconst.Bool(
+			"ZREPL_EXPERIMENTAL_ZFS_SEND_RESUME_SUPPORTED", def)
 		debug("resume send feature check complete %#v", &resumeSendSupportedCheck)
 	})
 	return resumeSendSupportedCheck.supported, resumeSendSupportedCheck.err
@@ -93,13 +99,19 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 	}
 
 	if !sup.flagSupport.checked {
-		output, err := zfscmd.CommandContext(ctx, ZFS_BINARY, "receive").CombinedOutput()
+		cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "receive").
+			WithLogError(false)
+		output, err := cmd.CombinedOutput()
 		upgradeWhile(func() {
 			sup.flagSupport.checked = true
 			if ee, ok := err.(*exec.ExitError); err != nil && (!ok || ok && !ee.Exited()) {
 				sup.flagSupport.err = err
 			} else {
-				sup.flagSupport.supported = strings.Contains(string(output), "-A <filesystem|volume>")
+				sup.flagSupport.supported = bytes.Contains(output,
+					[]byte("-A <filesystem|volume>"))
+			}
+			if err != nil {
+				cmd.LogError(err, sup.flagSupport.supported)
 			}
 			debug("resume recv cli flag feature check result: %#v", sup.flagSupport)
 		})

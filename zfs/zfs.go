@@ -1421,17 +1421,20 @@ func (e ClearResumeTokenError) Error() string {
 }
 
 // always returns *ClearResumeTokenError
-func ZFSRecvClearResumeToken(ctx context.Context, fs string) (err error) {
+func ZFSRecvClearResumeToken(ctx context.Context, fs string) error {
 	if err := validateZFSFilesystem(fs); err != nil {
 		return err
 	}
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "recv", "-A", fs)
+	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "recv", "-A", fs).
+		WithLogError(false)
 	o, err := cmd.CombinedOutput()
 	if err != nil {
 		if bytes.Contains(o, []byte("does not have any resumable receive state to abort")) {
+			cmd.LogError(err, true)
 			return nil
 		}
+		cmd.LogError(err, false)
 		return &ClearResumeTokenError{o, err}
 	}
 	return nil

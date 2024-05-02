@@ -7,6 +7,7 @@ package zfscmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,11 +29,20 @@ type Cmd struct {
 
 	pipeCmds []*exec.Cmd
 	pipeLeft bool
+
+	usage        usage
+	stdoutStderr []byte
+	logError     bool
 }
 
 func CommandContext(ctx context.Context, name string, arg ...string) *Cmd {
 	cmd := exec.CommandContext(ctx, name, arg...)
-	return &Cmd{cmd: cmd, ctx: ctx}
+	return &Cmd{cmd: cmd, ctx: ctx, logError: true}
+}
+
+func (c *Cmd) WithLogError(v bool) *Cmd {
+	c.logError = v
+	return c
 }
 
 // err.(*exec.ExitError).Stderr will NOT be set
@@ -41,6 +51,7 @@ func (c *Cmd) CombinedOutput() (o []byte, err error) {
 	c.startPost(nil)
 	c.waitPre()
 	o, err = c.cmd.CombinedOutput()
+	c.stdoutStderr = o
 	c.waitPost(err)
 	return
 }
@@ -148,7 +159,6 @@ func (c *Cmd) startPre(newTask bool) {
 }
 
 func (c *Cmd) startPost(err error) {
-
 	now := time.Now()
 	c.startedAt = now
 
@@ -193,36 +203,45 @@ func (c *Cmd) waitPost(err error) {
 	c.mtx.Unlock()
 
 	// build usage
-	var u usage
-	{
-		var s *os.ProcessState
-		if err == nil {
-			s = c.cmd.ProcessState
-		} else if ee, ok := err.(*exec.ExitError); ok {
-			s = ee.ProcessState
-		}
-
-		if s == nil {
-			u = usage{
-				total_secs:  c.Runtime().Seconds(),
-				system_secs: -1,
-				user_secs:   -1,
-			}
-		} else {
-			u = usage{
-				total_secs:  c.Runtime().Seconds(),
-				system_secs: s.SystemTime().Seconds(),
-				user_secs:   s.UserTime().Seconds(),
+	var s *os.ProcessState
+	if err == nil {
+		s = c.cmd.ProcessState
+	} else {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			s = exitError.ProcessState
+			if c.stdoutStderr == nil {
+				c.stdoutStderr = exitError.Stderr
 			}
 		}
 	}
 
-	waitPostReport(c, u, now)
-	waitPostLogging(c, u, err, now)
-	waitPostPrometheus(c, u, err, now)
+	if s == nil {
+		c.usage = usage{
+			total_secs:  c.Runtime().Seconds(),
+			system_secs: -1,
+			user_secs:   -1,
+		}
+	} else {
+		c.usage = usage{
+			total_secs:  c.Runtime().Seconds(),
+			system_secs: s.SystemTime().Seconds(),
+			user_secs:   s.UserTime().Seconds(),
+		}
+	}
+
+	waitPostReport(c, c.usage, now)
+	if err == nil || c.logError {
+		c.LogError(err, false)
+	}
+	waitPostPrometheus(c, c.usage, err, now)
 
 	// must be last because c.ctx might be used by other waitPost calls
 	c.waitReturnEndSpanCb()
+}
+
+func (c *Cmd) LogError(err error, debug bool) {
+	waitPostLogging(c, err, debug)
 }
 
 // returns 0 if the command did not yet finish
