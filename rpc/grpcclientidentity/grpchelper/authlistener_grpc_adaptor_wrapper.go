@@ -59,13 +59,13 @@ func WithTimeout(t time.Duration, log Logger) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any,
 		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption,
 	) error {
-		log = log.WithField("method", method).WithField("timeout", t)
+		l := log.WithField("method", method).WithField("timeout", t)
 		if t <= 0 {
-			log.Warn("ignore negative timeout")
+			l.Warn("ignore negative timeout")
 			return invoker(ctx, method, req, reply, cc, opts...)
 		}
 
-		log.Debug("set call timeout")
+		l.Debug("set call timeout")
 		ctx, cancel := context.WithTimeout(ctx, t)
 		defer cancel()
 		return invoker(ctx, method, req, reply, cc, opts...)
