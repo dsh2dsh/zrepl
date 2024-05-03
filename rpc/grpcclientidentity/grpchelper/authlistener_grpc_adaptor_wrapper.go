@@ -3,7 +3,6 @@
 package grpchelper
 
 import (
-	"context"
 	"time"
 
 	"google.golang.org/grpc"
@@ -26,8 +25,8 @@ const (
 
 type Logger = logger.Logger
 
-// ClientConn is an easy-to-use wrapper around the Dialer and TransportCredentials interface
-// to produce a grpc.ClientConn
+// ClientConn is an easy-to-use wrapper around the Dialer and
+// TransportCredentials interface to produce a grpc.ClientConn
 func ClientConn(cn transport.Connecter, log Logger) *grpc.ClientConn {
 	ka := grpc.WithKeepaliveParams(keepalive.ClientParameters{
 		Time:                StartKeepalivesAfterInactivityDuration,
@@ -35,17 +34,22 @@ func ClientConn(cn transport.Connecter, log Logger) *grpc.ClientConn {
 		PermitWithoutStream: true,
 	})
 	dialerOption := grpc.WithContextDialer(grpcclientidentity.NewDialer(log, cn))
-	cred := grpc.WithTransportCredentials(grpcclientidentity.NewTransportCredentials(log))
-	// we use context.Background without a timeout here because we don't set grpc.WithBlock
-	// => docs:  "In the non-blocking case, the ctx does not act against the connection. It only controls the setup steps."
-	cc, err := grpc.DialContext(context.Background(), "doesn't matter done by dialer", dialerOption, cred, ka)
+	cred := grpc.WithTransportCredentials(
+		grpcclientidentity.NewTransportCredentials(log))
+	// we use context.Background without a timeout here because we don't set
+	// grpc.WithBlock
+	//
+	// => docs: "In the non-blocking case, the ctx does not act against the
+	// connection. It only controls the setup steps."
+	cc, err := grpc.NewClient("passthrough:///doesn't matter done by dialer",
+		dialerOption, cred, ka)
 	if err != nil {
 		log.WithError(err).Error("cannot create gRPC client conn (non-blocking)")
 		// It's ok to panic here: the we call grpc.DialContext without the
-		// (grpc.WithBlock) dial option, and at the time of writing, the grpc
-		// docs state that no connection attempt is made in that case.
-		// Hence, any error that occurs is due to DialOptions or similar,
-		// and thus indicative of an implementation error.
+		// (grpc.WithBlock) dial option, and at the time of writing, the grpc docs
+		// state that no connection attempt is made in that case. Hence, any error
+		// that occurs is due to DialOptions or similar, and thus indicative of an
+		// implementation error.
 		panic(err)
 	}
 	return cc
