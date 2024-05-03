@@ -1027,20 +1027,19 @@ var (
 )
 
 // see test cases for example output
-func (s *DrySendInfo) unmarshalZFSOutput(output []byte) (err error) {
+func (s *DrySendInfo) unmarshalZFSOutput(output []byte) error {
 	debug("DrySendInfo.unmarshalZFSOutput: output=%q", output)
-	lines := strings.Split(string(output), "\n")
-	for _, l := range lines {
-		regexMatched, err := s.unmarshalInfoLine(l)
-		if err != nil {
-			return fmt.Errorf("line %q: %s", l, err)
+	scan := bufio.NewScanner(bytes.NewReader(output))
+	for scan.Scan() {
+		l := scan.Text()
+		if regexMatched, err := s.unmarshalInfoLine(l); err != nil {
+			return fmt.Errorf("line %q: %w", l, err)
+		} else if regexMatched {
+			return nil
 		}
-		if !regexMatched {
-			continue
-		}
-		return nil
 	}
-	return fmt.Errorf("no match for info line (regex1 %s) (regex2 %s)", sendDryRunInfoLineRegexFull, sendDryRunInfoLineRegexIncremental)
+	return fmt.Errorf("no match for info line (regex1 %s) (regex2 %s)",
+		sendDryRunInfoLineRegexFull, sendDryRunInfoLineRegexIncremental)
 }
 
 // unmarshal info line, looks like this:
@@ -1098,22 +1097,24 @@ func (s *DrySendInfo) unmarshalInfoLine(l string) (regexMatched bool, err error)
 
 // to may be "", in which case a full ZFS send is done
 // May return BookmarkSizeEstimationNotSupported as err if from is a bookmark.
-func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated) (_ *DrySendInfo, err error) {
+func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
+) (*DrySendInfo, error) {
 	if sendArgs.From != nil && strings.Contains(sendArgs.From.RelName, "#") {
 		/* TODO:
 		 * XXX feature check & support this as well
-		 * ZFS at the time of writing does not support dry-run send because size-estimation
-		 * uses fromSnap's deadlist. However, for a bookmark, that deadlist no longer exists.
-		 * Redacted send & recv will bring this functionality, see
-		 * 	https://github.com/openzfs/openzfs/pull/484
+		 *
+		 * ZFS at the time of writing does not support dry-run send because
+		 * size-estimation uses fromSnap's deadlist. However, for a bookmark, that
+		 * deadlist no longer exists. Redacted send & recv will bring this
+		 * functionality, see https://github.com/openzfs/openzfs/pull/484
 		 */
 		fromAbs, err := absVersion(sendArgs.FS, sendArgs.From)
 		if err != nil {
-			return nil, fmt.Errorf("error building abs version for 'from': %s", err)
+			return nil, fmt.Errorf("error building abs version for 'from': %w", err)
 		}
 		toAbs, err := absVersion(sendArgs.FS, sendArgs.To)
 		if err != nil {
-			return nil, fmt.Errorf("error building abs version for 'to': %s", err)
+			return nil, fmt.Errorf("error building abs version for 'to': %w", err)
 		}
 		return &DrySendInfo{
 			Type:         DrySendTypeIncremental,
@@ -1124,8 +1125,7 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated) (_ *DrySendI
 		}, nil
 	}
 
-	args := make([]string, 0)
-	args = append(args, "send", "-n", "-v", "-P")
+	args := []string{"send", "-n", "-v", "-P"}
 	sargs, err := sendArgs.buildSendCommandLine()
 	if err != nil {
 		return nil, err
@@ -1147,10 +1147,14 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated) (_ *DrySendI
 	// - resulting upstream bug: https://github.com/openzfs/zfs/issues/12265
 	//
 	// The wrong estimates are easy to detect because they are absurdly large.
-	// NB: we're doing the workaround for this late so that the test cases are not affected.
-	sizeEstimateThreshold := envconst.Uint64("ZREPL_ZFS_SEND_SIZE_ESTIMATE_INCORRECT_THRESHOLD", math.MaxInt64)
+	//
+	// NB: we're doing the workaround for this late so that the test cases are not
+	// affected.
+	sizeEstimateThreshold := envconst.Uint64(
+		"ZREPL_ZFS_SEND_SIZE_ESTIMATE_INCORRECT_THRESHOLD", math.MaxInt64)
 	if sizeEstimateThreshold != 0 && si.SizeEstimate >= sizeEstimateThreshold {
-		debug("size estimate exceeds threshold %v, working around it: %#v %q", sizeEstimateThreshold, si, args)
+		debug("size estimate exceeds threshold %v, working around it: %#v %q",
+			sizeEstimateThreshold, si, args)
 		si.SizeEstimate = 0
 	}
 
