@@ -146,6 +146,7 @@ func (f *Filesystem) PlanFS(ctx context.Context) ([]driver.Step, error) {
 	}
 	return dsteps, nil
 }
+
 func (f *Filesystem) ReportInfo() *report.FilesystemInfo {
 	return &report.FilesystemInfo{Name: f.Path} // FIXME compat name
 }
@@ -187,7 +188,6 @@ func (s *Step) Step(ctx context.Context) error {
 }
 
 func (s *Step) ReportInfo() *report.StepInfo {
-
 	// get current byteCounter value
 	var byteCounter uint64
 	s.byteCounterMtx.Lock()
@@ -224,7 +224,6 @@ func NewPlanner(secsPerState *prometheus.HistogramVec, bytesReplicated *promethe
 }
 
 func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*pdu.FilesystemVersion, reason error) {
-
 	if _, ok := conflict.(*ConflictMostRecentSnapshotAlreadyPresent); ok {
 		// replicatoin is a no-op
 		return nil, nil
@@ -274,7 +273,6 @@ func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*
 }
 
 func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
-
 	log := getLogger(ctx)
 
 	log.Info("start planning")
@@ -326,7 +324,6 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 }
 
 func (fs *Filesystem) doPlanning(ctx context.Context) ([]*Step, error) {
-
 	log := func(ctx context.Context) logger.Logger {
 		return getLogger(ctx).WithField("filesystem", fs.Path)
 	}
@@ -453,7 +450,6 @@ func (fs *Filesystem) doPlanning(ctx context.Context) ([]*Step, error) {
 			updPath, updConflict := tryAutoresolveConflict(conflict, *fs.policy.ConflictResolution)
 			if updConflict == nil {
 				log(ctx).WithField("conflict", conflict).Info("conflict automatically resolved")
-
 			} else {
 				log(ctx).WithField("conflict", conflict).Error("cannot resolve conflict")
 			}
@@ -529,22 +525,20 @@ func (fs *Filesystem) doPlanning(ctx context.Context) ([]*Step, error) {
 }
 
 func (s *Step) updateSizeEstimate(ctx context.Context) error {
-
-	log := getLogger(ctx)
-
 	sr := s.buildSendRequest()
-
+	log := getLogger(ctx)
 	log.Debug("initiate dry run send request")
+
 	sres, err := s.sender.SendDry(ctx, sr)
 	if err != nil {
 		log.WithError(err).Error("dry run send request failed")
 		return err
-	}
-	if sres == nil {
-		err := fmt.Errorf("dry run send request returned nil send result")
-		log.Error(err.Error())
+	} else if sres == nil {
+		err := fmt.Errorf("got nil send result")
+		log.WithError(err).Error("dry run send request failed")
 		return err
 	}
+
 	s.expectedSize = sres.GetExpectedSize()
 	return nil
 }
@@ -562,7 +556,6 @@ func (s *Step) buildSendRequest() (sr *pdu.SendReq) {
 }
 
 func (s *Step) doReplication(ctx context.Context) error {
-
 	fs := s.parent.Path
 
 	log := getLogger(ctx).WithField("filesystem", fs)

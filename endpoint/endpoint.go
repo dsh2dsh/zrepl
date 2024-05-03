@@ -321,7 +321,8 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 	return res, sendStream, nil
 }
 
-func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error) {
+func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq,
+) (*pdu.SendRes, error) {
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 
 	sendArgs, err := s.sendMakeArgs(ctx, r)
@@ -334,9 +335,8 @@ func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, err
 		return nil, fmt.Errorf("zfs send dry failed: %w", err)
 	}
 
-	// From now on, assume that sendArgs has been validated by ZFSSendDry
-	// (because validation involves shelling out, it's actually a little expensive)
-
+	// From now on, assume that sendArgs has been validated by ZFSSendDry (because
+	// validation involves shelling out, it's actually a little expensive)
 	res := &pdu.SendRes{
 		ExpectedSize:    si.SizeEstimate,
 		UsedResumeToken: r.ResumeToken != "",
