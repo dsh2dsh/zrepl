@@ -212,6 +212,12 @@ func (s State) IsTerminal() bool {
 type updater func(func(*Pruner))
 
 func (p *Pruner) Prune() {
+	if len(p.args.rules) == 0 {
+		l := GetLogger(p.args.ctx)
+		l.Info("skip pruning, because no keep rules configured")
+		p.state = Done
+		return
+	}
 	p.prune(p.args)
 }
 

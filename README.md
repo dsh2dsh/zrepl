@@ -156,6 +156,35 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
     type: "cron" still works too, just for compatibility. Both of them is the
     same type.
 
+  * Fast skip "keep all" pruning.
+
+    Instead of configuration like this:
+
+    ``` yaml
+    pruning:
+      keep:
+        - type: "regex"
+          regex: ".*"
+    ```
+
+    or like this:
+
+    ``` yaml
+    pruning:
+      keep_sender:
+        - type: "regex"
+          regex: ".*"
+      keep_receiver:
+    ```
+
+    which keeps all snapshots, now it's possible to omit `pruning:` at all, or
+    one of `keep_sender:` or `keep_receiver:`. In this case zrepl will early
+    abort pruning and mark it as done.
+
+    Originally zrepl requests all snapshots and does nothing after that, because
+    pruning configured to keep all snapshots, but anyway it spends some time
+    executing zfs commands.
+
   * Small cosmetic changes
 
 ## User Documentation

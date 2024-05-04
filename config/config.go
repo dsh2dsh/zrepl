@@ -103,7 +103,7 @@ type PassiveJob struct {
 type SnapJob struct {
 	Type             string            `yaml:"type"`
 	Name             string            `yaml:"name"`
-	Pruning          PruningLocal      `yaml:"pruning"`
+	Pruning          PruningLocal      `yaml:"pruning,optional"`
 	Snapshotting     SnapshottingEnum  `yaml:"snapshotting"`
 	Filesystems      FilesystemsFilter `yaml:"filesystems"`
 	MonitorSnapshots MonitorSnapshots  `yaml:"monitor,optional"`
@@ -266,8 +266,8 @@ type SnapshottingManual struct {
 }
 
 type PruningSenderReceiver struct {
-	KeepSender   []PruningEnum `yaml:"keep_sender"`
-	KeepReceiver []PruningEnum `yaml:"keep_receiver"`
+	KeepSender   []PruningEnum `yaml:"keep_sender,optional"`
+	KeepReceiver []PruningEnum `yaml:"keep_receiver,optional"`
 }
 
 type PruningLocal struct {
