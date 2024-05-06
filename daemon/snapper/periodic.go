@@ -463,7 +463,7 @@ func (self *PeriodicReport) Running() time.Duration {
 	var d time.Duration
 	if progress := self.Progress; progress != nil {
 		for _, fs := range progress {
-			if fs.DoneAt.IsZero() {
+			if fs.State == SnapStarted {
 				if d2 := time.Since(fs.StartAt); d2 > d {
 					d = d2
 				}

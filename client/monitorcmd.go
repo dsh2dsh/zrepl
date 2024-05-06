@@ -489,7 +489,7 @@ func (self *monitorAlive) jobs() (map[string]*job.Status, error) {
 func (self *monitorAlive) checkLongestJob(name string, lasting time.Duration,
 ) bool {
 	point := monitoringplugin.NewPerformanceDataPoint(
-		"running", lasting.Seconds()).SetUnit("s")
+		"running", lasting.Truncate(time.Second).Seconds()).SetUnit("s")
 	point.NewThresholds(0, self.warnRunning.Seconds(),
 		0, self.critRunning.Seconds())
 	if err := self.resp.AddPerformanceDataPoint(point); err != nil {
