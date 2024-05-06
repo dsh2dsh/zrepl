@@ -16,8 +16,6 @@ import (
 	"github.com/zrepl/zrepl/util/circlog"
 )
 
-const testBin = "./zfscmd_platform_test.bash"
-
 func TestCmdStderrBehaviorOutput(t *testing.T) {
 	stdout, err := exec.Command(testBin, "0").Output()
 	require.NoError(t, err)
