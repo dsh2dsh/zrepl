@@ -19,7 +19,6 @@ import (
 const testBin = "./zfscmd_platform_test.bash"
 
 func TestCmdStderrBehaviorOutput(t *testing.T) {
-
 	stdout, err := exec.Command(testBin, "0").Output()
 	require.NoError(t, err)
 	require.Equal(t, []byte("to stdout\n"), stdout)
@@ -33,7 +32,6 @@ func TestCmdStderrBehaviorOutput(t *testing.T) {
 }
 
 func TestCmdStderrBehaviorCombinedOutput(t *testing.T) {
-
 	stdio, err := exec.Command(testBin, "0").CombinedOutput()
 	require.NoError(t, err)
 	require.Equal(t, "to stderr\nto stdout\n", string(stdio))
@@ -66,10 +64,9 @@ func TestCmdStderrBehaviorStdoutPipe(t *testing.T) {
 }
 
 func TestCmdProcessState(t *testing.T) {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "bash", "-c", "echo running; sleep 3600")
+	cmd := exec.CommandContext(ctx, "sh", "-c", "echo running; sleep 3600")
 	stdout, err := cmd.StdoutPipe()
 	require.NoError(t, err)
 	err = cmd.Start()
@@ -94,7 +91,7 @@ func TestCmdProcessState(t *testing.T) {
 func TestSigpipe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cmd := CommandContext(ctx, "bash", "-c", "sleep 5; echo invalid input; exit 23")
+	cmd := CommandContext(ctx, "sh", "-c", "sleep 5; echo invalid input; exit 23")
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	output := circlog.MustNewCircularLog(1 << 20)
