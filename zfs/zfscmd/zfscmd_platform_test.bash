@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 set -euo pipefail
 
 echo "to stderr" 1>&2
