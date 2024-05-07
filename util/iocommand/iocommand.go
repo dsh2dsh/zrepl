@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zrepl/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/util/envconst"
 )
 
 // An IOCommand exposes a forked process's std(in|out|err) through the io.ReadWriteCloser interface.
@@ -49,7 +49,6 @@ func RunIOCommand(ctx context.Context, command string, args ...string) (c *IOCom
 }
 
 func NewIOCommand(ctx context.Context, command string, args []string, stderrBufSize int) (c *IOCommand, err error) {
-
 	if stderrBufSize == 0 {
 		stderrBufSize = IOCommandStderrBufSize
 	}
@@ -71,7 +70,6 @@ func NewIOCommand(ctx context.Context, command string, args []string, stderrBufS
 	c.Cmd.Stderr = c.StderrBuf
 
 	return
-
 }
 
 func (c *IOCommand) Start() (err error) {

@@ -9,7 +9,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/go-logfmt/logfmt"
 
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 const (

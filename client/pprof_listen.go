@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon"
 )
 
 var pprofListenCmd struct {
@@ -40,7 +40,6 @@ var PprofListenCmd = &cli.Subcommand{
 		return nil
 	enargs:
 		return errors.New("invalid number of positional arguments")
-
 	},
 }
 

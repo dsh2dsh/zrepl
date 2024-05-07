@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zrepl/zrepl/util/nodefault"
-	zfsprop "github.com/zrepl/zrepl/zfs/property"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
 )
 
 // FIXME make this a platformtest
@@ -42,7 +42,6 @@ func TestDatasetPathTrimNPrefixComps(t *testing.T) {
 }
 
 func TestZFSPropertySource(t *testing.T) {
-
 	tcs := []struct {
 		in  PropertySource
 		exp []string
@@ -92,7 +91,6 @@ func TestZFSPropertySource(t *testing.T) {
 		expSet := toSet(tc.exp)
 		assert.Equal(t, expSet, resSet)
 	}
-
 }
 
 func TestDrySendRegexesHaveSameCaptureGroupCount(t *testing.T) {
@@ -100,7 +98,6 @@ func TestDrySendRegexesHaveSameCaptureGroupCount(t *testing.T) {
 }
 
 func TestDrySendInfo(t *testing.T) {
-
 	// # full send
 	// $ zfs send -Pnv -t 1-9baebea70-b8-789c636064000310a500c4ec50360710e72765a52697303030419460caa7a515a79680647ce0f26c48f2499525a9c5405ac3c90fabfe92fcf4d2cc140686b30972c7850efd0cd24092e704cbe725e6a632305415e5e797e803cd2ad14f743084b805001b201795
 	fullSend := `
@@ -296,7 +293,6 @@ full	p1 with/ spaces d1@2 with space
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-
 			in := tc.in[1:] // strip first newline
 			var si DrySendInfo
 			err := si.unmarshalZFSOutput([]byte(in))
@@ -309,7 +305,6 @@ full	p1 with/ spaces d1@2 with space
 			if tc.exp != nil {
 				assert.Equal(t, tc.exp, &si)
 			}
-
 		})
 	}
 }
@@ -324,7 +319,6 @@ func TestTryRecvDestroyOrOverwriteEncryptedErr(t *testing.T) {
 }
 
 func TestZFSSendArgsBuildSendFlags(t *testing.T) {
-
 	type args = ZFSSendFlags
 	type SendTest struct {
 		conf         args
@@ -340,7 +334,7 @@ func TestZFSSendArgsBuildSendFlags(t *testing.T) {
 		return justFlags
 	}
 
-	var sendTests = map[string]SendTest{
+	sendTests := map[string]SendTest{
 		"Empty Args": {
 			conf:         withEncrypted(args{}),
 			flagsInclude: []string{},
@@ -413,7 +407,7 @@ func TestZFSCommonRecvArgsBuild(t *testing.T) {
 		flagsInclude []string
 		flagsExclude []string
 	}
-	var recvTests = map[string]RecvTest{
+	recvTests := map[string]RecvTest{
 		"Empty Args": {
 			conf:         RecvOptions{},
 			flagsInclude: []string{},

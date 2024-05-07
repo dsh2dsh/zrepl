@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/zrepl/yaml-config"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/job"
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 var configcheckArgs struct {

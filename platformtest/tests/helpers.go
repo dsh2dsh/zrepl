@@ -10,10 +10,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/util/limitio"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/util/limitio"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func sendArgVersion(ctx *platformtest.Context, fs, relName string) zfs.ZFSSendArgVersion {
@@ -73,7 +73,7 @@ var dummyDataRand = rand.New(rand.NewSource(99))
 
 func writeDummyData(path string, numBytes int64) {
 	r := io.LimitReader(dummyDataRand, numBytes)
-	d, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	d, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	check(err)
 	defer d.Close()
 	_, err = io.Copy(d, r)
@@ -95,7 +95,6 @@ type resumeSituation struct {
 }
 
 func makeDummyDataSnapshots(ctx *platformtest.Context, sendFS string) (situation dummySnapshotSituation) {
-
 	situation.sendFS = sendFS
 	sendFSMount, err := zfs.ZFSGetMountpoint(ctx, sendFS)
 	require.NoError(ctx, err)
@@ -118,7 +117,6 @@ func makeDummyDataSnapshots(ctx *platformtest.Context, sendFS string) (situation
 }
 
 func makeResumeSituation(ctx *platformtest.Context, src dummySnapshotSituation, recvFS string, sendArgs zfs.ZFSSendArgsUnvalidated, recvOptions zfs.RecvOptions) *resumeSituation {
-
 	situation := &resumeSituation{}
 
 	situation.sendArgs = sendArgs

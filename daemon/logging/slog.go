@@ -11,8 +11,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 func parseSlogFormatter(in *config.LoggingOutletCommon) *SlogFormatter {

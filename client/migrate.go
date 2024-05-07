@@ -9,12 +9,12 @@ import (
 	"github.com/kr/pretty"
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/daemon/job"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/zfs"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/config"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/config"
 )
 
 var MigrateCmd = &cli.Subcommand{

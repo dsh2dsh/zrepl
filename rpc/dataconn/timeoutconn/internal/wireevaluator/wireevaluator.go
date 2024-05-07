@@ -11,9 +11,9 @@ import (
 	netssh "github.com/problame/go-netssh"
 	"github.com/zrepl/yaml-config"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/transport"
-	transportconfig "github.com/zrepl/zrepl/transport/fromconfig"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/transport"
+	transportconfig "github.com/dsh2dsh/zrepl/transport/fromconfig"
 )
 
 func noerror(err error) {
@@ -92,7 +92,6 @@ func main() {
 	default:
 		panic(fmt.Sprintf("unknown mode %q", args.mode))
 	}
-
 }
 
 func getTestCase(tcName string) (TestCase, error) {

@@ -8,8 +8,8 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/problame/go-netssh"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type SSHStdinserverConnecter struct {

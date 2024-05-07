@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 var stepHoldTagRE = regexp.MustCompile("^zrepl_STEP_J_(.+)")

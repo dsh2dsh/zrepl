@@ -8,10 +8,10 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/rpc/dataconn/timeoutconn"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/timeoutconn"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type AuthConn struct {

@@ -10,8 +10,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/endpoint"
 )
 
 // shared between release-all and release-step

@@ -6,9 +6,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/util/envconst"
 )
 
 type Logger = logger.Logger

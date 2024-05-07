@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/zrepl/zrepl/rpc/transportmux"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/rpc/transportmux"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/util/envconst"
 )
 
 type demuxedListener struct {

@@ -6,9 +6,9 @@ import (
 	"net"
 	"sync"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/util/socketpair"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/util/socketpair"
 )
 
 var localListeners struct {
@@ -18,7 +18,6 @@ var localListeners struct {
 }
 
 func GetLocalListener(listenerName string) *LocalListener {
-
 	localListeners.init.Do(func() {
 		localListeners.m = make(map[string]*LocalListener)
 	})
@@ -32,7 +31,6 @@ func GetLocalListener(listenerName string) *LocalListener {
 		localListeners.m[listenerName] = l
 	}
 	return l
-
 }
 
 type connectRequest struct {
@@ -57,7 +55,6 @@ func newLocalListener() *LocalListener {
 
 // Connect to the LocalListener from a client with identity clientIdentity
 func (l *LocalListener) Connect(dialCtx context.Context, clientIdentity string) (conn transport.Wire, err error) {
-
 	// place request
 	req := connectRequest{
 		clientIdentity: clientIdentity,
@@ -95,7 +92,6 @@ func (l *LocalListener) Addr() net.Addr { return localAddr{"<listening>"} }
 
 func (l *LocalListener) Accept(ctx context.Context) (*transport.AuthConn, error) {
 	respondToRequest := func(req connectRequest, res connectResult) (err error) {
-
 		transport.GetLogger(ctx).
 			WithField("res.conn", res.conn).WithField("res.err", res.err).
 			Debug("responding to client request")

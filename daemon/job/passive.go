@@ -8,16 +8,15 @@ import (
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/daemon/snapper"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/rpc"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/transport/fromconfig"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/daemon/snapper"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/rpc"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/transport/fromconfig"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type PassiveSide struct {

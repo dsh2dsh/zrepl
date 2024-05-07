@@ -13,19 +13,19 @@ import (
 	"github.com/kr/pretty"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/replication"
-	"github.com/zrepl/zrepl/replication/driver"
-	"github.com/zrepl/zrepl/replication/logic"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/replication/report"
-	"github.com/zrepl/zrepl/util/bandwidthlimit"
-	"github.com/zrepl/zrepl/util/limitio"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/zfs"
-	zfsprop "github.com/zrepl/zrepl/zfs/property"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/replication"
+	"github.com/dsh2dsh/zrepl/replication/driver"
+	"github.com/dsh2dsh/zrepl/replication/logic"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/replication/report"
+	"github.com/dsh2dsh/zrepl/util/bandwidthlimit"
+	"github.com/dsh2dsh/zrepl/util/limitio"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/zfs"
+	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
 )
 
 // mimics the replication invocations of an active-side job
@@ -49,7 +49,6 @@ type replicationInvocation struct {
 }
 
 func (i replicationInvocation) Do(ctx *platformtest.Context) *report.Report {
-
 	if i.interceptSender == nil {
 		i.interceptSender = func(e *endpoint.Sender) logic.Sender { return e }
 	}
@@ -128,7 +127,6 @@ func (i replicationInvocation) ReceiveSideFilesystem() string {
 }
 
 func ReplicationIncrementalIsPossibleIfCommonSnapshotIsDestroyed(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -177,7 +175,6 @@ func ReplicationIncrementalIsPossibleIfCommonSnapshotIsDestroyed(ctx *platformte
 	report = rep.Do(ctx)
 	ctx.Logf("\n%s", pretty.Sprint(report))
 	_ = fsversion(ctx, rfs, "@2")
-
 }
 
 func ReplicationIncrementalCleansUpStaleAbstractionsWithCacheOnSecondReplication(ctx *platformtest.Context) {
@@ -189,7 +186,6 @@ func ReplicationIncrementalCleansUpStaleAbstractionsWithoutCacheOnSecondReplicat
 }
 
 func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Context, invalidateCacheBeforeSecondReplication bool) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -378,11 +374,9 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 		require.Equal(ctx, *rAbs[0].GetJobID(), rjid)
 		require.Equal(ctx, rAbs[0].GetFilesystemVersion().GetGuid(), snap5.GetGuid())
 	}
-
 }
 
 func ReplicationIncrementalHandlesFromVersionEqTentativeCursorCorrectly(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -473,7 +467,6 @@ func (s *PartialSender) Send(ctx context.Context, r *pdu.SendReq) (r1 *pdu.SendR
 }
 
 func ReplicationIsResumableFullSend__both_GuaranteeResumability(ctx *platformtest.Context) {
-
 	setup := replicationIsResumableFullSendSetup{
 		protection: &pdu.ReplicationConfigProtection{
 			Initial:     pdu.ReplicationGuaranteeKind_GuaranteeResumability,
@@ -488,7 +481,6 @@ func ReplicationIsResumableFullSend__both_GuaranteeResumability(ctx *platformtes
 }
 
 func ReplicationIsResumableFullSend__initial_GuaranteeResumability_incremental_GuaranteeIncrementalReplication(ctx *platformtest.Context) {
-
 	setup := replicationIsResumableFullSendSetup{
 		protection: &pdu.ReplicationConfigProtection{
 			Initial:     pdu.ReplicationGuaranteeKind_GuaranteeResumability,
@@ -503,7 +495,6 @@ func ReplicationIsResumableFullSend__initial_GuaranteeResumability_incremental_G
 }
 
 func ReplicationIsResumableFullSend__initial_GuaranteeIncrementalReplication_incremental_GuaranteeIncrementalReplication(ctx *platformtest.Context) {
-
 	setup := replicationIsResumableFullSendSetup{
 		protection: &pdu.ReplicationConfigProtection{
 			Initial:     pdu.ReplicationGuaranteeKind_GuaranteeIncrementalReplication,
@@ -525,7 +516,6 @@ type replicationIsResumableFullSendSetup struct {
 }
 
 func implReplicationIsResumableFullSend(ctx *platformtest.Context, setup replicationIsResumableFullSendSetup) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -607,11 +597,9 @@ func implReplicationIsResumableFullSend(ctx *platformtest.Context, setup replica
 		require.NoError(ctx, err)
 		require.Empty(ctx, versions)
 	}
-
 }
 
 func ReplicationIncrementalDestroysStepHoldsIffIncrementalStepHoldsAreDisabledButStepHoldsExist(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -794,7 +782,6 @@ type replicationStepCompletedLost_scenario struct {
 }
 
 func replicationStepCompletedLostBehavior_impl(ctx *platformtest.Context, guaranteeKind pdu.ReplicationGuaranteeKind) *replicationStepCompletedLost_scenario {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -895,7 +882,6 @@ func replicationStepCompletedLostBehavior_impl(ctx *platformtest.Context, guaran
 			finalReport:   report.Attempts[0].Filesystems[0],
 		}
 	}
-
 }
 
 type ErroringReceiver struct {
@@ -937,7 +923,6 @@ func (s *NeverEndingSender) sendImpl(ctx context.Context, req *pdu.SendReq, dry 
 }
 
 func ReplicationReceiverErrorWhileStillSending(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -985,7 +970,6 @@ func ReplicationReceiverErrorWhileStillSending(ctx *platformtest.Context) {
 }
 
 func ReplicationFailingInitialParentProhibitsChildReplication(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -1054,7 +1038,6 @@ func ReplicationFailingInitialParentProhibitsChildReplication(ctx *platformtest.
 }
 
 func ReplicationPropertyReplicationWorks(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -1204,7 +1187,6 @@ func ReplicationPropertyReplicationWorks(ctx *platformtest.Context) {
 }
 
 func ReplicationPlaceholderEncryption__UnspecifiedLeadsToFailureAtRuntimeWhenCreatingPlaceholders(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"
@@ -1340,11 +1322,9 @@ func ReplicationPlaceholderEncryption__UnspecifiedIsOkForClientIdentityPlacehold
 
 	mustGetFilesystemVersion(ctx, rfsRoot+"/"+clientIdentity+"/"+pool+"@testsnap")
 	mustGetFilesystemVersion(ctx, rfsRoot+"/"+clientIdentity+"/"+poolchild+"@testsnap")
-
 }
 
 func replicationPlaceholderEncryption__EncryptOnReceiverUseCase__impl(ctx *platformtest.Context, placeholderEncryption endpoint.PlaceholderCreationEncryptionProperty) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "sender"

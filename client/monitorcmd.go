@@ -11,13 +11,13 @@ import (
 	"github.com/dsh2dsh/go-monitoringplugin/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon"
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/daemon/job"
-	"github.com/zrepl/zrepl/version"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/version"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 const snapshotsOkMsg = "job %q: %s snapshot: %v"

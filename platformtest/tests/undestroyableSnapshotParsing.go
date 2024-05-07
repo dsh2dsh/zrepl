@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func UndestroyableSnapshotParsing(t *platformtest.Context) {
@@ -33,5 +33,4 @@ func UndestroyableSnapshotParsing(t *platformtest.Context) {
 		require.Equal(t, []string{"4 5 6"}, dse.Undestroyable)
 		require.Equal(t, []string{"dataset is busy"}, dse.Reason)
 	}
-
 }

@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type ipMapEntry struct {

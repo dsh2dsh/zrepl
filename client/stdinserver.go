@@ -1,17 +1,16 @@
 package client
 
 import (
-	"os"
-
-	"github.com/problame/go-netssh"
-
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/config"
-
 	"context"
 	"errors"
 	"log"
+	"os"
 	"path"
+
+	"github.com/problame/go-netssh"
+
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/config"
 )
 
 var StdinserverCmd = &cli.Subcommand{
@@ -23,7 +22,6 @@ var StdinserverCmd = &cli.Subcommand{
 }
 
 func runStdinserver(config *config.Config, args []string) error {
-
 	// NOTE: the netssh proxying protocol requires exiting with non-zero status if anything goes wrong
 	defer os.Exit(1)
 

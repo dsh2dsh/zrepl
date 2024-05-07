@@ -13,7 +13,7 @@ import (
 	"github.com/go-logfmt/logfmt"
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
 )
 
 type RuntimeLine struct {

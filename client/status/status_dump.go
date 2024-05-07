@@ -8,7 +8,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-isatty"
 
-	"github.com/zrepl/zrepl/client/status/viewmodel"
+	"github.com/dsh2dsh/zrepl/client/status/viewmodel"
 )
 
 func dump(c Client, job string) error {

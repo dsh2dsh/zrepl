@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/zrepl/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/cli"
 )
 
 var pprofActivityTraceCmd = &cli.Subcommand{

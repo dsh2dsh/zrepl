@@ -13,12 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/util/socketpair"
-	"github.com/zrepl/zrepl/util/zreplcircleci"
+	"github.com/dsh2dsh/zrepl/util/socketpair"
+	"github.com/dsh2dsh/zrepl/util/zreplcircleci"
 )
 
 func TestReadTimeout(t *testing.T) {
-
 	a, b, err := socketpair.SocketPair()
 	require.NoError(t, err)
 	defer a.Close()

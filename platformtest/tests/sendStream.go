@@ -12,13 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func sendStreamTest(ctx *platformtest.Context) *zfs.SendStream {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		DESTROYROOT
 		CREATEROOT
@@ -49,11 +48,9 @@ func sendStreamTest(ctx *platformtest.Context) *zfs.SendStream {
 	require.NoError(ctx, err)
 
 	return sendStream
-
 }
 
 func SendStreamCloseAfterBlockedOnPipeWrite(ctx *platformtest.Context) {
-
 	sendStream := sendStreamTest(ctx)
 
 	// let the pipe buffer fill and the zfs process block uninterruptibly
@@ -135,7 +132,6 @@ func SendStreamMultipleCloseAfterEOF(ctx *platformtest.Context) {
 }
 
 func SendStreamMultipleCloseBeforeEOF(ctx *platformtest.Context) {
-
 	sendStream := sendStreamTest(ctx)
 
 	err := sendStream.Close()
@@ -155,7 +151,6 @@ func (c *failingReadCloser) Read(p []byte) (int, error) { return 0, c.err }
 func (c *failingReadCloser) Close() error               { return c.err }
 
 func SendStreamNonEOFReadErrorHandling(ctx *platformtest.Context) {
-
 	sendStream := sendStreamTest(ctx)
 
 	var buf [128]byte
@@ -163,7 +158,7 @@ func SendStreamNonEOFReadErrorHandling(ctx *platformtest.Context) {
 	require.Equal(ctx, len(buf), n)
 	require.NoError(ctx, err)
 
-	var mockError = fmt.Errorf("taeghaefow4piesahwahjocu7ul5tiachaiLipheijae8ooZ8Pies8shohGee9feeTeirai5aiFeiyaecai4kiaLoh4azeih0tea")
+	mockError := fmt.Errorf("taeghaefow4piesahwahjocu7ul5tiachaiLipheijae8ooZ8Pies8shohGee9feeTeirai5aiFeiyaecai4kiaLoh4azeih0tea")
 	mock := &failingReadCloser{err: mockError}
 	orig := sendStream.TestOnly_ReplaceStdoutReader(mock)
 

@@ -10,7 +10,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 type EntryFormatter interface {

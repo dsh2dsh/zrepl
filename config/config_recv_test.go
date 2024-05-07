@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	zfsprop "github.com/zrepl/zrepl/zfs/property"
+	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
 )
 
 func TestRecvOptions(t *testing.T) {
@@ -103,7 +103,6 @@ jobs:
 		override := c.Jobs[0].Ret.(*PullJob).Recv.Properties.Override
 		require.Len(t, override, 1)
 		require.Equal(t, "test123", override["testprop2"])
-
 	})
 
 	t.Run("recv_override_and_inherit", func(t *testing.T) {
@@ -130,5 +129,4 @@ jobs:
 		c := testValidConfig(t, fill(recv_not_specified))
 		assert.NotNil(t, c)
 	})
-
 }

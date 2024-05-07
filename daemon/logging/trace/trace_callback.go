@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/zrepl/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
 )
 
 type SpanInfo interface {

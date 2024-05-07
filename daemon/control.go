@@ -15,14 +15,14 @@ import (
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/daemon/job"
-	"github.com/zrepl/zrepl/daemon/nethelpers"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/version"
-	"github.com/zrepl/zrepl/zfs"
-	"github.com/zrepl/zrepl/zfs/zfscmd"
+	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/daemon/nethelpers"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/version"
+	"github.com/dsh2dsh/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 type controlJob struct {

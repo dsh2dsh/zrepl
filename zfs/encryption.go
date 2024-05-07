@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/zfs/zfscmd"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 var encryptionCLISupport struct {

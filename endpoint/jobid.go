@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 // JobID instances returned by MakeJobID() guarantee their JobID.String()

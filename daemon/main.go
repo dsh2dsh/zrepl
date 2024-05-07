@@ -3,8 +3,8 @@ package daemon
 import (
 	"context"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 type Logger = logger.Logger

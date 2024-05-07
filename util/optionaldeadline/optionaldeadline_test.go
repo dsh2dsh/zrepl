@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/util/chainlock"
-	"github.com/zrepl/zrepl/util/zreplcircleci"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/util/zreplcircleci"
 )
 
 func TestContextWithOptionalDeadline(t *testing.T) {
@@ -93,7 +93,6 @@ func TestContextWithOptionalDeadlineParentCancellation(t *testing.T) {
 	default:
 		t.FailNow()
 	}
-
 }
 
 type testContextKey string

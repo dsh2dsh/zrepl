@@ -5,7 +5,7 @@ import (
 
 	wsemaphore "golang.org/x/sync/semaphore"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 )
 
 type S struct {

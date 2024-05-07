@@ -11,12 +11,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/pruning"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/pruning"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/util/envconst"
 )
 
 // The sender in the replication setup.
@@ -24,7 +24,7 @@ import (
 // Also, it asks the Sender about the replication cursor of each filesystem
 // to enable the 'not_replicated' pruning rule.
 //
-// Try to keep it compatible with github.com/zrepl/zrepl/endpoint.Endpoint
+// Try to keep it compatible with github.com/dsh2dsh/zrepl/endpoint.Endpoint
 type Sender interface {
 	ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error)
 	ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error)
@@ -33,7 +33,7 @@ type Sender interface {
 // The pruning target, i.e., on which snapshots are destroyed.
 // This can be a replication sender or receiver.
 //
-// Try to keep it compatible with github.com/zrepl/zrepl/endpoint.Endpoint
+// Try to keep it compatible with github.com/dsh2dsh/zrepl/endpoint.Endpoint
 type Target interface {
 	ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error)
 	ListFilesystemVersions(ctx context.Context, req *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error)

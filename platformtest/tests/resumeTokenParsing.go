@@ -3,8 +3,8 @@ package tests
 import (
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type resumeTokenTest struct {
@@ -15,7 +15,6 @@ type resumeTokenTest struct {
 }
 
 func (rtt *resumeTokenTest) Test(t *platformtest.Context) {
-
 	resumeSendSupported, err := zfs.ResumeSendSupported(t)
 	if err != nil {
 		t.Errorf("cannot determine whether resume supported: %T %s", err, err)
@@ -44,7 +43,6 @@ func (rtt *resumeTokenTest) Test(t *platformtest.Context) {
 }
 
 func ResumeTokenParsing(ctx *platformtest.Context) {
-
 	// cases generated using resumeTokensGenerate.bash on ZoL 0.8.1
 	cases := []resumeTokenTest{
 		{

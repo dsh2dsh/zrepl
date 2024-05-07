@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 var TestCmd = &cli.Subcommand{

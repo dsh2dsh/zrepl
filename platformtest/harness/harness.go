@@ -13,13 +13,13 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/platformtest/tests"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/platformtest/tests"
 )
 
 var (

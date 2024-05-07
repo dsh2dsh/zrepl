@@ -2,10 +2,10 @@
 package main
 
 import (
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/client"
-	"github.com/zrepl/zrepl/client/status"
-	"github.com/zrepl/zrepl/daemon"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/client"
+	"github.com/dsh2dsh/zrepl/client/status"
+	"github.com/dsh2dsh/zrepl/daemon"
 )
 
 func init() {

@@ -21,12 +21,12 @@ import (
 
 	"github.com/pkg/profile"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/rpc/dataconn"
-	"github.com/zrepl/zrepl/rpc/dataconn/timeoutconn"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/util/devnoop"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/timeoutconn"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/util/devnoop"
 )
 
 func orDie(err error) {
@@ -103,7 +103,6 @@ var args struct {
 }
 
 func server() {
-
 	log := logger.NewStderrDebugLogger()
 	log.Debug("starting server")
 	nl, err := net.Listen("tcp", args.addr)
@@ -115,11 +114,9 @@ func server() {
 	ctx := context.Background()
 
 	srv.Serve(ctx, l)
-
 }
 
 func main() {
-
 	flag.BoolVar(&args.profile, "profile", false, "")
 	flag.BoolVar(&args.devnoopReader, "devnoopReader", false, "")
 	flag.BoolVar(&args.devnoopWriter, "devnoopWriter", false, "")
@@ -143,7 +140,6 @@ func main() {
 }
 
 func client() {
-
 	logger := logger.NewStderrDebugLogger()
 	ctx := context.Background()
 
@@ -169,5 +165,4 @@ func client() {
 	default:
 		orDie(fmt.Errorf("unknown direction%q", args.direction))
 	}
-
 }

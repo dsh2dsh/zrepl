@@ -98,7 +98,7 @@ import (
 	"github.com/kr/pretty"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
 )
 
 var metrics struct {

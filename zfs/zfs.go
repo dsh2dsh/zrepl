@@ -19,11 +19,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/util/circlog"
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/util/nodefault"
-	zfsprop "github.com/zrepl/zrepl/zfs/property"
-	"github.com/zrepl/zrepl/zfs/zfscmd"
+	"github.com/dsh2dsh/zrepl/util/circlog"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 type DatasetPath struct {

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type DatasetMapFilter struct {

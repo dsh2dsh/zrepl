@@ -3,7 +3,7 @@ package daemon
 import (
 	"github.com/dsh2dsh/cron/v3"
 
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 func newCron(log logger.Logger, verbose bool) *cron.Cron {

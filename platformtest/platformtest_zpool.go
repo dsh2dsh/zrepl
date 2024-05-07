@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 var ZpoolExportTimeout time.Duration = 500 * time.Millisecond

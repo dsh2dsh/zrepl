@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/zrepl/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/platformtest"
 )
 
 type Case func(*platformtest.Context)
@@ -13,4 +13,4 @@ func (c Case) String() string {
 	return runtime.FuncForPC(reflect.ValueOf(c).Pointer()).Name()
 }
 
-//go:generate ../../artifacts/generate-platform-test-list github.com/zrepl/zrepl/platformtest/tests
+//go:generate ../../artifacts/generate-platform-test-list github.com/dsh2dsh/zrepl/platformtest/tests

@@ -21,8 +21,8 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type Logger = logger.Logger
@@ -88,7 +88,7 @@ func (*transportCredentials) Info() credentials.ProtocolInfo {
 }
 
 func (t *transportCredentials) Clone() credentials.TransportCredentials {
-	var x = *t
+	x := *t
 	return &x
 }
 

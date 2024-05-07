@@ -4,8 +4,8 @@ import (
 	"context"
 	"net"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type TCPConnecter struct {

@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/rpc/dataconn/base2bufpool"
-	"github.com/zrepl/zrepl/rpc/dataconn/frameconn"
-	"github.com/zrepl/zrepl/rpc/dataconn/heartbeatconn"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/base2bufpool"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/frameconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/heartbeatconn"
 )
 
 type Logger = logger.Logger
@@ -74,7 +74,6 @@ func writeStream(ctx context.Context, c *heartbeatconn.Conn, stream io.Reader, s
 }
 
 func doWriteStream(ctx context.Context, c *heartbeatconn.Conn, stream io.Reader, stype uint32) (errStream, errConn error) {
-
 	// RULE1 (buf == <zero>) XOR (err == nil)
 	type read struct {
 		buf base2bufpool.Buffer
@@ -236,7 +235,6 @@ func readFrames(reads chan<- readFrameResult, noMoreReads chan<- struct{}, c *he
 // readStream calls itself recursively to read multi-frame error trailers
 // Thus, the reads channel needs to be a parameter.
 func readStream(reads <-chan readFrameResult, c *heartbeatconn.Conn, receiver io.Writer, stype uint32) *ReadStreamError {
-
 	var f frameconn.Frame
 	for read := range reads {
 		debug("readStream: read frame %v %v", read.f.Header, read.err)

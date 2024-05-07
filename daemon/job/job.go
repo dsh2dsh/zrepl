@@ -9,10 +9,10 @@ import (
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type Logger = logger.Logger

@@ -11,7 +11,7 @@ import (
 	"github.com/mattn/go-isatty"
 	tview "gitlab.com/tslocum/cview"
 
-	"github.com/zrepl/zrepl/client/status/viewmodel"
+	"github.com/dsh2dsh/zrepl/client/status/viewmodel"
 )
 
 func legacy(c Client, flag statusFlags) error {

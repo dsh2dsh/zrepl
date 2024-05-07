@@ -9,8 +9,8 @@ import (
 
 	"github.com/zrepl/yaml-config"
 
-	"github.com/zrepl/zrepl/util/datasizeunit"
-	zfsprop "github.com/zrepl/zrepl/zfs/property"
+	"github.com/dsh2dsh/zrepl/util/datasizeunit"
+	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
 )
 
 type ParseFlags uint

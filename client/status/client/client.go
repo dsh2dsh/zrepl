@@ -9,7 +9,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/zrepl/zrepl/daemon"
+	"github.com/dsh2dsh/zrepl/daemon"
 )
 
 type Client struct {

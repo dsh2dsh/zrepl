@@ -7,17 +7,16 @@ package transportmux
 
 import (
 	"context"
-	"sync/atomic"
-	"syscall"
-
 	"fmt"
 	"io"
 	"net"
+	"sync/atomic"
+	"syscall"
 	"time"
 
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type Logger = logger.Logger
@@ -90,7 +89,6 @@ func padLabel(out []byte, label string) error {
 }
 
 func Demux(ctx context.Context, rawListener transport.AuthenticatedListener, labels []string, timeout time.Duration) (map[string]transport.AuthenticatedListener, error) {
-
 	padded := make(map[[64]byte]*demuxListener, len(labels))
 	ret := make(map[string]transport.AuthenticatedListener, len(labels))
 	for _, label := range labels {

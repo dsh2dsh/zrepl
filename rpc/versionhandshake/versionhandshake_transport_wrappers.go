@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type HandshakeConnecter struct {

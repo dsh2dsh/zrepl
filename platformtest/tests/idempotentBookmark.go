@@ -5,12 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func IdempotentBookmark(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		DESTROYROOT
 		CREATEROOT
@@ -58,5 +57,4 @@ func IdempotentBookmark(ctx *platformtest.Context) {
 	if _, ok := err.(*zfs.DatasetDoesNotExist); !ok {
 		panic(fmt.Sprintf("has type %T", err))
 	}
-
 }

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/zrepl/zrepl/zfs/zfscmd"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 const (

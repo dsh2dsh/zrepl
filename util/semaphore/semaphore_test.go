@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 )
 
 func TestSemaphore(t *testing.T) {
@@ -48,5 +48,4 @@ func TestSemaphore(t *testing.T) {
 
 	assert.True(t, acquisitions.beforeT == concurrentSemaphore)
 	assert.True(t, acquisitions.afterT == numGoroutines-concurrentSemaphore)
-
 }

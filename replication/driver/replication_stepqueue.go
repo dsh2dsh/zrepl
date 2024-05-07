@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-	"github.com/zrepl/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
 )
 
 type stepQueueRec struct {

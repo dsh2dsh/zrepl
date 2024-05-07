@@ -54,9 +54,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/zrepl/zrepl/util/devnoop"
-
-	"github.com/zrepl/zrepl/rpc/dataconn/heartbeatconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/heartbeatconn"
+	"github.com/dsh2dsh/zrepl/util/devnoop"
 )
 
 func orDie(err error) {
@@ -72,11 +71,12 @@ func orDie(err error) {
 	}
 }
 
-var mode string
-var addr string
+var (
+	mode string
+	addr string
+)
 
 func main() {
-
 	flag.StringVar(&mode, "mode", "", "server|client")
 	flag.StringVar(&addr, "addr", "INVALID", "")
 	flag.Parse()
@@ -86,7 +86,6 @@ func main() {
 		"client": client,
 	}
 	modemap[mode]()
-
 }
 
 func server() {
@@ -112,7 +111,6 @@ func server() {
 		}
 
 	}
-
 }
 
 func client() {

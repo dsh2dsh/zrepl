@@ -7,8 +7,8 @@ import (
 
 	"github.com/dsh2dsh/cron/v3"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type Type string

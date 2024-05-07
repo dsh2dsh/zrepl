@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type ReplicationGuaranteeOptions struct {

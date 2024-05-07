@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/zrepl/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
 )
 
 type mockBatchDestroy struct {
@@ -80,7 +80,6 @@ func (m *mockBatchDestroy) Destroy(ctx context.Context, args []string) error {
 }
 
 func TestBatchDestroySnaps(t *testing.T) {
-
 	errs := make([]error, 10)
 	nilErrs := func() {
 		for i := range errs {
@@ -88,16 +87,16 @@ func TestBatchDestroySnaps(t *testing.T) {
 		}
 	}
 	opsTemplate := []*DestroySnapOp{
-		&DestroySnapOp{"zroot/z", "foo", &errs[0]},
-		&DestroySnapOp{"zroot/a", "foo", &errs[1]},
-		&DestroySnapOp{"zroot/a", "bar", &errs[2]},
-		&DestroySnapOp{"zroot/b", "bar", &errs[3]},
-		&DestroySnapOp{"zroot/b", "zab", &errs[4]},
-		&DestroySnapOp{"zroot/b", "undestroyable", &errs[5]},
-		&DestroySnapOp{"zroot/c", "baz", &errs[6]},
-		&DestroySnapOp{"zroot/c", "randomerror", &errs[7]},
-		&DestroySnapOp{"zroot/c", "bar", &errs[8]},
-		&DestroySnapOp{"zroot/d", "blup", &errs[9]},
+		{"zroot/z", "foo", &errs[0]},
+		{"zroot/a", "foo", &errs[1]},
+		{"zroot/a", "bar", &errs[2]},
+		{"zroot/b", "bar", &errs[3]},
+		{"zroot/b", "zab", &errs[4]},
+		{"zroot/b", "undestroyable", &errs[5]},
+		{"zroot/c", "baz", &errs[6]},
+		{"zroot/c", "randomerror", &errs[7]},
+		{"zroot/c", "bar", &errs[8]},
+		{"zroot/d", "blup", &errs[9]},
 	}
 
 	t.Run("single_undestroyable_dataset", func(t *testing.T) {
@@ -141,10 +140,9 @@ func TestBatchDestroySnaps(t *testing.T) {
 	})
 
 	t.Run("all_undestroyable", func(t *testing.T) {
-
 		opsTemplate := []*DestroySnapOp{
-			&DestroySnapOp{"zroot/a", "foo", new(error)},
-			&DestroySnapOp{"zroot/a", "bar", new(error)},
+			{"zroot/a", "foo", new(error)},
+			{"zroot/a", "bar", new(error)},
 		}
 
 		mock := &mockBatchDestroy{
@@ -217,7 +215,7 @@ func TestBatchDestroySnaps(t *testing.T) {
 	t.Run("ops_without_snapnames", func(t *testing.T) {
 		mock := &mockBatchDestroy{}
 		var err error
-		ops := []*DestroySnapOp{&DestroySnapOp{"somefs", "", &err}}
+		ops := []*DestroySnapOp{{"somefs", "", &err}}
 		doDestroy(context.TODO(), ops, mock)
 		assert.Error(t, err)
 		defer mock.mtx.Lock().Unlock()
@@ -227,7 +225,7 @@ func TestBatchDestroySnaps(t *testing.T) {
 	t.Run("ops_without_fsnames", func(t *testing.T) {
 		mock := &mockBatchDestroy{}
 		var err error
-		ops := []*DestroySnapOp{&DestroySnapOp{"", "fsname", &err}}
+		ops := []*DestroySnapOp{{"", "fsname", &err}}
 		doDestroy(context.TODO(), ops, mock)
 		assert.Error(t, err)
 		defer mock.mtx.Lock().Unlock()
@@ -242,21 +240,21 @@ func TestBatchDestroySnaps(t *testing.T) {
 		var dummy error
 		reqs := []*DestroySnapOp{
 			// should fit (1111@a,b,c)
-			&DestroySnapOp{"1111", "a", &dummy},
-			&DestroySnapOp{"1111", "b", &dummy},
-			&DestroySnapOp{"1111", "c", &dummy},
+			{"1111", "a", &dummy},
+			{"1111", "b", &dummy},
+			{"1111", "c", &dummy},
 
 			// should split
-			&DestroySnapOp{"2222", "01", &dummy},
-			&DestroySnapOp{"2222", "02", &dummy},
-			&DestroySnapOp{"2222", "03", &dummy},
-			&DestroySnapOp{"2222", "04", &dummy},
-			&DestroySnapOp{"2222", "05", &dummy},
-			&DestroySnapOp{"2222", "06", &dummy},
-			&DestroySnapOp{"2222", "07", &dummy},
-			&DestroySnapOp{"2222", "08", &dummy},
-			&DestroySnapOp{"2222", "09", &dummy},
-			&DestroySnapOp{"2222", "10", &dummy},
+			{"2222", "01", &dummy},
+			{"2222", "02", &dummy},
+			{"2222", "03", &dummy},
+			{"2222", "04", &dummy},
+			{"2222", "05", &dummy},
+			{"2222", "06", &dummy},
+			{"2222", "07", &dummy},
+			{"2222", "08", &dummy},
+			{"2222", "09", &dummy},
+			{"2222", "10", &dummy},
 		}
 
 		doDestroy(context.TODO(), reqs, mock)
@@ -275,9 +273,7 @@ func TestBatchDestroySnaps(t *testing.T) {
 			},
 			mock.calls,
 		)
-
 	})
-
 }
 
 func TestExcessiveArgumentsResultInE2BIG(t *testing.T) {

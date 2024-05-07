@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type DeadlineMode uint
@@ -63,11 +63,9 @@ func (d Deadlines) sleepThenSend(wire transport.Wire) {
 	if _, ok := err.(net.Error); !ok {
 		log.Panic("not a net error")
 	}
-
 }
 
 func (d Deadlines) sendThenRead(wire transport.Wire) {
-
 	log.Print("sendThenRead")
 
 	err := d.sendMsg(wire, "hi")
@@ -126,7 +124,6 @@ func (d Deadlines) sendMsg(wire transport.Wire, msg string) error {
 }
 
 func (d Deadlines) recvMsg(wire transport.Wire) (string, error) {
-
 	var buf bytes.Buffer
 	r := io.LimitReader(wire, deadlinesMsgLen)
 	_, err := io.Copy(&buf, r)
@@ -134,5 +131,4 @@ func (d Deadlines) recvMsg(wire transport.Wire) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
-
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/kr/pretty"
 
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 type TestOutlet struct {
@@ -24,7 +24,6 @@ func NewTestOutlet() *TestOutlet {
 }
 
 func TestLogger_Basic(t *testing.T) {
-
 	outlet_arr := []logger.Outlet{
 		NewTestOutlet(),
 		NewTestOutlet(),
@@ -44,5 +43,4 @@ func TestLogger_Basic(t *testing.T) {
 	l.WithError(fmt.Errorf("fooerror")).Error("error")
 
 	t.Log(pretty.Sprint(outlet_arr))
-
 }

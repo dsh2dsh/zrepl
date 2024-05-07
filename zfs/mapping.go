@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zrepl/zrepl/zfs/zfscmd"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 type DatasetFilter interface {
@@ -49,7 +49,6 @@ type ZFSListMappingPropertiesResult struct {
 
 // properties must not contain 'name'
 func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter, properties []string) (datasets []ZFSListMappingPropertiesResult, err error) {
-
 	if filter == nil {
 		panic("filter must not be nil")
 	}

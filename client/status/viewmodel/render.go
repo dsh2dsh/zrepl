@@ -10,12 +10,12 @@ import (
 	"github.com/go-playground/validator/v10"
 	yaml "github.com/zrepl/yaml-config"
 
-	"github.com/zrepl/zrepl/client/status/viewmodel/stringbuilder"
-	"github.com/zrepl/zrepl/daemon"
-	"github.com/zrepl/zrepl/daemon/job"
-	"github.com/zrepl/zrepl/daemon/pruner"
-	"github.com/zrepl/zrepl/daemon/snapper"
-	"github.com/zrepl/zrepl/replication/report"
+	"github.com/dsh2dsh/zrepl/client/status/viewmodel/stringbuilder"
+	"github.com/dsh2dsh/zrepl/daemon"
+	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/daemon/pruner"
+	"github.com/dsh2dsh/zrepl/daemon/snapper"
+	"github.com/dsh2dsh/zrepl/replication/report"
 )
 
 type M struct {

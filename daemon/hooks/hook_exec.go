@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 // Re-export type here so that
 // every file in package hooks doesn't
-// have to import github.com/zrepl/zrepl/zfs
+// have to import github.com/dsh2dsh/zrepl/zfs
 type Filter zfs.DatasetFilter
 
 type Hook interface {
@@ -107,7 +107,6 @@ type Plan struct {
 }
 
 func NewPlan(hooks *List, phase Phase, cb *CallbackHook, extra Env) (*Plan, error) {
-
 	var pre, post []*Step
 	// TODO sanity check unique name of hook?
 	for _, hook := range *hooks {
@@ -288,5 +287,4 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 		// ErrIsFatal is only relevant for Pre
 
 	}
-
 }

@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zrepl/zrepl/rpc/dataconn/frameconn"
-	"github.com/zrepl/zrepl/rpc/dataconn/timeoutconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/frameconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/timeoutconn"
 )
 
 type Conn struct {

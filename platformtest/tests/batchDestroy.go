@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func BatchDestroy(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		DESTROYROOT
 		CREATEROOT
@@ -21,12 +20,12 @@ func BatchDestroy(ctx *platformtest.Context) {
 	`)
 
 	reqs := []*zfs.DestroySnapOp{
-		&zfs.DestroySnapOp{
+		{
 			ErrOut:     new(error),
 			Filesystem: fmt.Sprintf("%s/foo bar", ctx.RootDataset),
 			Name:       "3",
 		},
-		&zfs.DestroySnapOp{
+		{
 			ErrOut:     new(error),
 			Filesystem: fmt.Sprintf("%s/foo bar", ctx.RootDataset),
 			Name:       "2",
@@ -50,5 +49,4 @@ func BatchDestroy(ctx *platformtest.Context) {
 	-  "foo bar@1"
 	-  "foo bar"
 	`)
-
 }

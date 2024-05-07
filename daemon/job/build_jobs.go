@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/util/bandwidthlimit"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/util/bandwidthlimit"
 )
 
 func JobsFromConfig(c *config.Config, parseFlags config.ParseFlags) ([]Job, error) {

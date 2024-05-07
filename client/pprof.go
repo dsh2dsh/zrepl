@@ -1,6 +1,6 @@
 package client
 
-import "github.com/zrepl/zrepl/cli"
+import "github.com/dsh2dsh/zrepl/cli"
 
 var PprofCmd = &cli.Subcommand{
 	Use: "pprof",

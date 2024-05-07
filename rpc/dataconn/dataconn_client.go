@@ -9,9 +9,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/rpc/dataconn/stream"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/stream"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type Client struct {
@@ -27,7 +27,6 @@ func NewClient(connecter transport.Connecter, log Logger) *Client {
 }
 
 func (c *Client) send(ctx context.Context, conn *stream.Conn, endpoint string, req proto.Message, stream io.ReadCloser) error {
-
 	var buf bytes.Buffer
 	_, memErr := buf.WriteString(endpoint)
 	if memErr != nil {
@@ -70,7 +69,6 @@ func (e *ProtocolError) Error() string {
 }
 
 func (c *Client) recv(ctx context.Context, conn *stream.Conn, res proto.Message) error {
-
 	headerBuf, err := conn.ReadStreamedMessage(ctx, ResponseHeaderMaxSize, ResHeader)
 	if err != nil {
 		return err

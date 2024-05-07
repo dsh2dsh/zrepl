@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
 )
 
 //go:generate enumer -type=InitialReplicationAutoResolution -trimprefix=InitialReplicationAutoResolution

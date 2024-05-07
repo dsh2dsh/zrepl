@@ -3,12 +3,11 @@ package tests
 import (
 	"fmt"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func GetNonexistent(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		DESTROYROOT
 		CREATEROOT
@@ -60,5 +59,4 @@ func GetNonexistent(ctx *platformtest.Context) {
 	} else if dsne.Path != nonexistent {
 		panic(err)
 	}
-
 }

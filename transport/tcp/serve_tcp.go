@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/util/tcpsock"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/util/tcpsock"
 )
 
 func TCPListenerFactoryFromConfig(c *config.Global, in *config.TCPServe) (transport.AuthenticatedListenerFactory, error) {

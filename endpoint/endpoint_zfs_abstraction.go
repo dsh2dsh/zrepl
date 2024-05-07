@@ -10,11 +10,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/util/semaphore"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/util/semaphore"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type AbstractionType string

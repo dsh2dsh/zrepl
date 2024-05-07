@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type CloseWriteMode uint
@@ -20,8 +20,10 @@ type CloseWrite struct {
 }
 
 // sent repeatedly
-var closeWriteTestSendData = bytes.Repeat([]byte{0x23, 0x42}, 1<<24)
-var closeWriteErrorMsg = []byte{0xb, 0xa, 0xd, 0xf, 0x0, 0x0, 0xd}
+var (
+	closeWriteTestSendData = bytes.Repeat([]byte{0x23, 0x42}, 1<<24)
+	closeWriteErrorMsg     = []byte{0xb, 0xa, 0xd, 0xf, 0x0, 0x0, 0xd}
+)
 
 func (m CloseWrite) Client(wire transport.Wire) {
 	switch m.mode {
@@ -100,5 +102,4 @@ func (CloseWrite) receiver(wire transport.Wire) {
 
 	closeErr := wire.Close()
 	log.Printf("closeErr=%T %s", closeErr, closeErr)
-
 }

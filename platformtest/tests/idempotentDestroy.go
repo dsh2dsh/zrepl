@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func IdempotentDestroy(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		DESTROYROOT
 		CREATEROOT
@@ -57,7 +56,6 @@ func IdempotentDestroy(ctx *platformtest.Context) {
 			}
 
 			log.Println("SUBEND")
-
 		}()
 	}
 
@@ -71,5 +69,4 @@ func IdempotentDestroy(ctx *platformtest.Context) {
 	if err != nil {
 		panic(err)
 	}
-
 }

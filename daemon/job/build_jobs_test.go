@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/config"
+	"github.com/dsh2dsh/zrepl/config"
 )
 
 func TestValidateReceivingSidesDoNotOverlap(t *testing.T) {
@@ -106,10 +106,8 @@ jobs:
 				assert.Error(t, err)
 				assert.Nil(t, jobs)
 			}
-
 		})
 	}
-
 }
 
 func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
@@ -169,7 +167,6 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 			panic("univisited additional check " + basename)
 		}
 	}
-
 }
 
 func testSampleConfig_BandwidthLimit(t *testing.T, jobs []Job) {
@@ -204,7 +201,6 @@ func testSampleConfig_BandwidthLimit(t *testing.T, jobs []Job) {
 		max := unlimitedSinkMode.receiverConfig.BandwidthLimit.Max
 		assert.Less(t, max, int64(0), max, "unlimited mode <=> negative value for .Max, see bandwidthlimit.Config")
 	}
-
 }
 
 func TestReplicationOptions(t *testing.T) {
@@ -311,8 +307,6 @@ jobs:
 			} else {
 				t.Fatalf("test must define expectOk or expectError")
 			}
-
 		})
 	}
-
 }

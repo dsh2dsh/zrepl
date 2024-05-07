@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 var zabsCreateStepHoldFlags struct {

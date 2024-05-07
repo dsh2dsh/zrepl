@@ -10,10 +10,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/rpc/grpcclientidentity"
-	"github.com/zrepl/zrepl/rpc/netadaptor"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/rpc/grpcclientidentity"
+	"github.com/dsh2dsh/zrepl/rpc/netadaptor"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 // The following constants are relevant for interoperability. We use the same

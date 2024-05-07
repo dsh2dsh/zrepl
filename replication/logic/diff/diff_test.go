@@ -9,11 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	. "github.com/zrepl/zrepl/replication/logic/pdu"
+	. "github.com/dsh2dsh/zrepl/replication/logic/pdu"
 )
 
 func fsvlist(fsv ...string) (r []*FilesystemVersion) {
-
 	r = make([]*FilesystemVersion, len(fsv))
 	for i, f := range fsv {
 
@@ -58,7 +57,6 @@ func doTest(receiver, sender []*FilesystemVersion, validate func(incpath []*File
 }
 
 func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
-
 	l := fsvlist
 
 	// basic functionality
@@ -128,7 +126,6 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 		_, ok := conflict.(*ConflictNoSenderSnapshots)
 		assert.True(t, ok)
 	})
-
 }
 
 func TestIncrementalPath_BookmarkSupport(t *testing.T) {
@@ -165,5 +162,4 @@ func TestIncrementalPath_BookmarkSupport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, l(), ca.SortedReceiverVersions, "See comment in IncrementalPath() on why we don't include the boomkmark here")
 	})
-
 }

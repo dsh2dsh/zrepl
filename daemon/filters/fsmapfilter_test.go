@@ -3,11 +3,10 @@ package filters
 import (
 	"testing"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func TestDatasetMapFilter(t *testing.T) {
-
 	type testCase struct {
 		name      string
 		filter    map[string]string
@@ -101,5 +100,4 @@ func TestDatasetMapFilter(t *testing.T) {
 			}
 		})
 	}
-
 }

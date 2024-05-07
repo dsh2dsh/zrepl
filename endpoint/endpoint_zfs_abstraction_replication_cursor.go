@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 const replicationCursorBookmarkNamePrefix = "zrepl_CURSOR"

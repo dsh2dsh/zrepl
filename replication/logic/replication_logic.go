@@ -10,17 +10,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/replication/driver"
-	. "github.com/zrepl/zrepl/replication/logic/diff"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/replication/report"
-	"github.com/zrepl/zrepl/util/bytecounter"
-	"github.com/zrepl/zrepl/util/chainlock"
-	"github.com/zrepl/zrepl/util/semaphore"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/replication/driver"
+	. "github.com/dsh2dsh/zrepl/replication/logic/diff"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/replication/report"
+	"github.com/dsh2dsh/zrepl/util/bytecounter"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/util/semaphore"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 // Endpoint represents one side of the replication.
@@ -38,7 +37,7 @@ type Endpoint interface {
 type Sender interface {
 	Endpoint
 	// If a non-nil io.ReadCloser is returned, it is guaranteed to be closed before
-	// any next call to the parent github.com/zrepl/zrepl/replication.Endpoint.
+	// any next call to the parent github.com/dsh2dsh/zrepl/replication.Endpoint.
 	// If the send request is for dry run the io.ReadCloser will be nil
 	Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error)
 	SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error)
@@ -49,7 +48,7 @@ type Sender interface {
 type Receiver interface {
 	Endpoint
 	// Receive sends r and sendStream (the latter containing a ZFS send stream)
-	// to the parent github.com/zrepl/zrepl/replication.Endpoint.
+	// to the parent github.com/dsh2dsh/zrepl/replication.Endpoint.
 	Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.ReadCloser) (*pdu.ReceiveRes, error)
 }
 

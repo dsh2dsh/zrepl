@@ -11,8 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/net/websocket"
 
-	"github.com/zrepl/zrepl/daemon/job"
-	"github.com/zrepl/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 )
 
 type pprofServer struct {
@@ -28,7 +28,6 @@ type PprofServerControlMsg struct {
 }
 
 func NewPProfServer(ctx context.Context) *pprofServer {
-
 	s := &pprofServer{
 		cc: make(chan PprofServerControlMsg),
 	}

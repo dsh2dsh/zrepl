@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/pruning/retentiongrid"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/pruning/retentiongrid"
 )
 
 // KeepGrid fits snapshots that match a given regex into a retentiongrid.Grid,

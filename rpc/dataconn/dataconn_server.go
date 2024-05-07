@@ -9,10 +9,10 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/rpc/dataconn/stream"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/stream"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 // WireInterceptor has a chance to exchange the context and connection on each client connection.
@@ -152,7 +152,6 @@ func (s *Server) serveConn(nc *transport.AuthConn) {
 }
 
 func (s *Server) serveConnRequest(ctx context.Context, endpoint string, c *stream.Conn) {
-
 	reqStructured, err := c.ReadStreamedMessage(ctx, RequestStructuredMaxSize, ReqStructured)
 	if err != nil {
 		s.log.WithError(err).Error("error reading structured part")

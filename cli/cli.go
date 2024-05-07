@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-	"github.com/zrepl/zrepl/version"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/version"
 )
 
 var rootArgs struct {

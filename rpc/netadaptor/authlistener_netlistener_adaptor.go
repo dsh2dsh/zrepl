@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/transport"
 )
 
 type Logger = logger.Logger

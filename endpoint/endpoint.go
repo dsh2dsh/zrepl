@@ -12,16 +12,15 @@ import (
 
 	"github.com/kr/pretty"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/util/bandwidthlimit"
-	"github.com/zrepl/zrepl/util/chainedio"
-	"github.com/zrepl/zrepl/util/chainlock"
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/zfs"
-	zfsprop "github.com/zrepl/zrepl/zfs/property"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/util/bandwidthlimit"
+	"github.com/dsh2dsh/zrepl/util/chainedio"
+	"github.com/dsh2dsh/zrepl/util/chainlock"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/zfs"
+	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
 )
 
 type SenderConfig struct {

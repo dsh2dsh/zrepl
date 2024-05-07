@@ -6,13 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func CreateReplicationCursor(ctx *platformtest.Context) {
-
 	platformtest.Run(ctx, platformtest.PanicErr, ctx.RootDataset, `
 		CREATEROOT
 		+  "foo bar"
@@ -76,5 +75,4 @@ func CreateReplicationCursor(ctx *platformtest.Context) {
 	if bm.Guid != snapProps.Guid {
 		panic(fmt.Sprintf("guids do not match: %v != %v", bm.Guid, snapProps.Guid))
 	}
-
 }

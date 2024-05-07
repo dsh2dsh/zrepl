@@ -11,17 +11,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/hooks"
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/hooks"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
-type comparisonAssertionFunc func(require.TestingT, interface{}, interface{}, ...interface{})
-type valueAssertionFunc func(require.TestingT, interface{}, ...interface{})
+type (
+	comparisonAssertionFunc func(require.TestingT, interface{}, interface{}, ...interface{})
+	valueAssertionFunc      func(require.TestingT, interface{}, ...interface{})
+)
 
 type expectStep struct {
 	ExpectedEdge hooks.Edge
@@ -107,43 +108,43 @@ jobs:
 	}
 
 	testTable := []testCase{
-		testCase{
+		{
 			Name: "no_hooks",
 			ExpectStepReports: []expectStep{
 				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
 			},
 		},
-		testCase{
+		{
 			Name:           "timeout",
 			IsSlow:         true,
 			ExpectHadError: true,
 			Config:         []string{`{type: command, path: {{.WorkDir}}/test/test-timeout.sh, timeout: 2s}`},
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST pre_testing %s@%s ZREPL_TIMEOUT=2", testFSName, testSnapshotName)),
 					ErrorTest:    regexpTest(`timed out after 2(.\d+)?s`),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepSkippedDueToPreErr,
 				},
 			},
 		},
-		testCase{
+		{
 			Name:           "check_env",
 			Config:         []string{`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`},
 			ExpectHadError: false,
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST pre_testing %s@%s", testFSName, testSnapshotName)),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST post_testing %s@%s", testFSName, testSnapshotName)),
@@ -151,27 +152,27 @@ jobs:
 			},
 		},
 
-		testCase{
+		{
 			Name:                  "nonfatal_pre_error_continues",
 			ExpectCallbackSkipped: false,
 			ExpectHadError:        true,
 			Config:                []string{`{type: command, path: {{.WorkDir}}/test/test-error.sh}`},
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
 					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepSkippedDueToPreErr, // post-edge is not executed for failing pre-edge
 				},
 			},
 		},
 
-		testCase{
+		{
 			Name:                  "pre_error_fatal_skips_subsequent_pre_edges_and_callback_and_its_post_edge_and_post_edges",
 			ExpectCallbackSkipped: true,
 			ExpectHadFatalErr:     true,
@@ -181,29 +182,29 @@ jobs:
 				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`,
 			},
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
 					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
 				},
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepSkippedDueToFatalErr,
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepSkippedDueToFatalErr},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepSkippedDueToFatalErr},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepSkippedDueToFatalErr,
 				},
-				expectStep{
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepSkippedDueToFatalErr,
 				},
 			},
 		},
 
-		testCase{
+		{
 			Name:              "post_error_fails_are_ignored_even_if_fatal",
 			ExpectHadFatalErr: false, // only occurs during Post, so it's not a fatal error
 			ExpectHadError:    true,
@@ -212,25 +213,25 @@ jobs:
 				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`,
 			},
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					// No-action run of test-post-error.sh
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   require.Empty,
 				},
-				expectStep{
+				{
 					// Pre run of test-report-env.sh
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST pre_testing %s@%s", testFSName, testSnapshotName)),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST post_testing %s@%s", testFSName, testSnapshotName)),
 				},
-				expectStep{
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR post_testing %s@%s", testFSName, testSnapshotName)),
@@ -239,17 +240,17 @@ jobs:
 			},
 		},
 
-		testCase{
+		{
 			Name:   "cleanup_check_env",
 			Config: []string{`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`},
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST pre_testing %s@%s", testFSName, testSnapshotName)),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST post_testing %s@%s", testFSName, testSnapshotName)),
@@ -257,27 +258,27 @@ jobs:
 			},
 		},
 
-		testCase{
+		{
 			Name:              "pre_error_cancels_post",
 			Config:            []string{`{type: command, path: {{.WorkDir}}/test/test-pre-error-post-ok.sh}`},
 			ExpectHadError:    true,
 			ExpectHadFatalErr: false,
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
 					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepSkippedDueToPreErr,
 				},
 			},
 		},
 
-		testCase{
+		{
 			Name: "pre_error_does_not_cancel_other_posts_but_itself",
 			Config: []string{
 				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`,
@@ -286,23 +287,23 @@ jobs:
 			ExpectHadError:    true,
 			ExpectHadFatalErr: false,
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST pre_testing %s@%s", testFSName, testSnapshotName)),
 				},
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
 					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepSkippedDueToPreErr,
 				},
-				expectStep{
+				{
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepOk,
 					OutputTest:   containsTest(fmt.Sprintf("TEST post_testing %s@%s", testFSName, testSnapshotName)),
@@ -310,22 +311,22 @@ jobs:
 			},
 		},
 
-		testCase{
+		{
 			Name:              "exceed_buffer_limit",
 			SuppressOutput:    true,
 			Config:            []string{`{type: command, path: {{.WorkDir}}/test/test-large-stdout.sh}`},
 			ExpectHadError:    false,
 			ExpectHadFatalErr: false,
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepOk,
 					OutputTest: func(t require.TestingT, s interface{}, v ...interface{}) {
 						require.Len(t, s, 1<<20)
 					},
 				},
-				expectStep{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
-				expectStep{
+				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
+				{
 					// No-action run of above hook
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepOk,
@@ -341,13 +342,13 @@ jobs:
 			result in NO hooks running. If it does run, a
 			fatal hooks.RunReport will be returned.
 		*/
-		testCase{
+		{
 			Name: "exclude_all_filesystems",
 			Config: []string{
 				`{type: command, path: {{.WorkDir}}/test/test-error.sh, err_is_fatal: true, filesystems: {"<": false}}`,
 			},
 			ExpectStepReports: []expectStep{
-				expectStep{
+				{
 					ExpectedEdge: hooks.Callback,
 					ExpectStatus: hooks.StepOk,
 				},
@@ -483,7 +484,6 @@ jobs:
 					hook.ErrorTest(t, string(report[i].Report.Error()))
 				}
 			}
-
 		})
 	}
 }

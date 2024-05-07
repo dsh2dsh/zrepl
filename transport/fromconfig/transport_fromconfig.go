@@ -5,12 +5,12 @@ package fromconfig
 import (
 	"fmt"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/transport/local"
-	"github.com/zrepl/zrepl/transport/ssh"
-	"github.com/zrepl/zrepl/transport/tcp"
-	"github.com/zrepl/zrepl/transport/tls"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/transport/local"
+	"github.com/dsh2dsh/zrepl/transport/ssh"
+	"github.com/dsh2dsh/zrepl/transport/tcp"
+	"github.com/dsh2dsh/zrepl/transport/tls"
 )
 
 func ListenerFactoryFromConfig(g *config.Global, in config.ServeEnum, parseFlags config.ParseFlags) (transport.AuthenticatedListenerFactory, error) {

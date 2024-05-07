@@ -5,7 +5,7 @@ package replication
 import (
 	"context"
 
-	"github.com/zrepl/zrepl/replication/driver"
+	"github.com/dsh2dsh/zrepl/replication/driver"
 )
 
 func Do(ctx context.Context, driverConfig driver.Config, planner driver.Planner) (driver.ReportFunc, driver.WaitFunc) {

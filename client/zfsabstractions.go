@@ -7,26 +7,24 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/zrepl/zrepl/cli"
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
-var (
-	ZFSAbstractionsCmd = &cli.Subcommand{
-		Use:   "zfs-abstraction",
-		Short: "manage abstractions that zrepl builds on top of ZFS",
-		SetupSubcommands: func() []*cli.Subcommand {
-			return []*cli.Subcommand{
-				zabsCmdList,
-				zabsCmdReleaseAll,
-				zabsCmdReleaseStale,
-				zabsCmdCreate,
-			}
-		},
-	}
-)
+var ZFSAbstractionsCmd = &cli.Subcommand{
+	Use:   "zfs-abstraction",
+	Short: "manage abstractions that zrepl builds on top of ZFS",
+	SetupSubcommands: func() []*cli.Subcommand {
+		return []*cli.Subcommand{
+			zabsCmdList,
+			zabsCmdReleaseAll,
+			zabsCmdReleaseStale,
+			zabsCmdCreate,
+		}
+	},
+}
 
 // a common set of CLI flags that map to the fields of an
 // endpoint.ListZFSHoldsAndBookmarksQuery
@@ -97,6 +95,7 @@ func (f AbstractionTypesFlag) Type() string { return "abstraction-type" }
 func (f AbstractionTypesFlag) String() string {
 	return endpoint.AbstractionTypeSet(f).String()
 }
+
 func (f AbstractionTypesFlag) FlagValue() map[endpoint.AbstractionType]bool {
 	if len(f) > 0 {
 		return f
@@ -138,6 +137,7 @@ func (flag FilesystemsFilterFlag) Type() string { return "filesystem filter spec
 func (flag FilesystemsFilterFlag) String() string {
 	return fmt.Sprintf("%v", flag.F)
 }
+
 func (flag FilesystemsFilterFlag) FlagValue() endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter {
 	var z FilesystemsFilterFlag
 	if flag == z {

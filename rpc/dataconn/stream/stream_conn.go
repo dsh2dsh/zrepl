@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zrepl/zrepl/rpc/dataconn/heartbeatconn"
-	"github.com/zrepl/zrepl/rpc/dataconn/timeoutconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/heartbeatconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/timeoutconn"
 )
 
 type Conn struct {

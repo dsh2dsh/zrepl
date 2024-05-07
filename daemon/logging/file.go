@@ -7,8 +7,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 func parseFileOutlet(in *config.FileLoggingOutlet, formatter EntryFormatter,

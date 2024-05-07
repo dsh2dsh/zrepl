@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func ReceiveForceRollbackWorksUnencrypted(ctx *platformtest.Context) {

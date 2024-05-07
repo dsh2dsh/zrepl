@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zrepl/zrepl/config"
+	"github.com/dsh2dsh/zrepl/config"
 )
 
 type KeepRule interface {

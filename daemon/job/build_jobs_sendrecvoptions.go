@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type SendingJobConfig interface {

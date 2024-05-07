@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 type HookJobCallback func(ctx context.Context) error

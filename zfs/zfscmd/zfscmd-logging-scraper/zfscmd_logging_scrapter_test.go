@@ -6,11 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
 )
 
 func TestParseHumanFormatter(t *testing.T) {
-
 	type testCase struct {
 		Name      string
 		Input     string
@@ -82,5 +81,4 @@ func TestParseHumanFormatter(t *testing.T) {
 			}
 		})
 	}
-
 }

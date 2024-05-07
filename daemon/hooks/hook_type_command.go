@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/filters"
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/util/circlog"
-	"github.com/zrepl/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/filters"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/util/circlog"
+	"github.com/dsh2dsh/zrepl/util/envconst"
 )
 
 type HookEnvVar string
@@ -102,6 +102,7 @@ func (r *CommandHookReport) String() string {
 
 	return fmt.Sprintf("%s: \"%s\"", msg, cmdLine.String()) // no %q to make copy-pastable
 }
+
 func (r *CommandHookReport) Error() string {
 	if r.Err == nil {
 		return ""

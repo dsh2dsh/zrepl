@@ -10,12 +10,12 @@ import (
 
 	"github.com/dsh2dsh/cron/v3"
 
-	"github.com/zrepl/zrepl/config"
-	"github.com/zrepl/zrepl/daemon/hooks"
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/daemon/hooks"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,

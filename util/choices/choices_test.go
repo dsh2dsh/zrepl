@@ -8,11 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/util/choices"
+	"github.com/dsh2dsh/zrepl/util/choices"
 )
 
 func TestChoices(t *testing.T) {
-
 	var c choices.Choices
 
 	fs := flag.NewFlagSet("testset", flag.ContinueOnError)
@@ -46,5 +45,4 @@ func TestChoices(t *testing.T) {
 	require.NoError(t, err)
 	o.Reset()
 	require.Equal(t, os.O_RDWR, c.Value())
-
 }

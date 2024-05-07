@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zrepl/zrepl/util/envconst"
-	"github.com/zrepl/zrepl/zfs/zfscmd"
+	"github.com/dsh2dsh/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 // NOTE: Update ZFSSendARgs.Validate when changing fields (potentially SECURITY SENSITIVE)

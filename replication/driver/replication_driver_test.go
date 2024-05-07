@@ -9,16 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
-	"github.com/zrepl/zrepl/replication/report"
-
 	"github.com/stretchr/testify/assert"
-
+	"github.com/stretchr/testify/require"
 	jsondiff "github.com/yudai/gojsondiff"
 	jsondiffformatter "github.com/yudai/gojsondiff/formatter"
+
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/replication/report"
 )
 
 type mockPlanner struct {
@@ -149,7 +146,6 @@ func (f *mockStep) ReportInfo() *report.StepInfo {
 //
 // For the time being, let's just exercise the code a bit.
 func TestReplication(t *testing.T) {
-
 	ctx := context.Background()
 	defer trace.WithTaskFromStackUpdateCtx(&ctx)()
 
@@ -220,5 +216,4 @@ func TestReplication(t *testing.T) {
 	for _, step := range steps {
 		t.Logf("\t%s", step)
 	}
-
 }

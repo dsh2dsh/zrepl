@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	. "github.com/zrepl/zrepl/replication/logic/pdu"
+	. "github.com/dsh2dsh/zrepl/replication/logic/pdu"
 )
 
 type ConflictNoCommonAncestor struct {
@@ -99,7 +99,6 @@ func StripBookmarksFromVersionList(fsvslice []*FilesystemVersion) []*FilesystemV
 }
 
 func IncrementalPath(receiver, sender []*FilesystemVersion) (incPath []*FilesystemVersion, conflict error) {
-
 	// Receive-side bookmarks can't be used as incremental-from,
 	// and don't cause recv to fail if there is a newer bookmark than incremetal-form on the receiver.
 	// So, simply mask them out.

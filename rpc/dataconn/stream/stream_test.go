@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/logger"
-	"github.com/zrepl/zrepl/rpc/dataconn/heartbeatconn"
-	"github.com/zrepl/zrepl/util/socketpair"
+	"github.com/dsh2dsh/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/heartbeatconn"
+	"github.com/dsh2dsh/zrepl/util/socketpair"
 )
 
 func TestFrameTypesOk(t *testing.T) {
@@ -24,7 +24,6 @@ func TestFrameTypesOk(t *testing.T) {
 }
 
 func TestStreamer(t *testing.T) {
-
 	anc, bnc, err := socketpair.SocketPair()
 	require.NoError(t, err)
 
@@ -68,7 +67,6 @@ func TestStreamer(t *testing.T) {
 	}()
 
 	wg.Wait()
-
 }
 
 type errReader struct {

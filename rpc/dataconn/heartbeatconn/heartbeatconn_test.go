@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/zrepl/zrepl/rpc/dataconn/frameconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/frameconn"
 )
 
 func TestFrameTypes(t *testing.T) {
@@ -14,7 +14,6 @@ func TestFrameTypes(t *testing.T) {
 }
 
 func TestNegativeTimer(t *testing.T) {
-
 	timer := time.NewTimer(-1 * time.Second)
 	defer timer.Stop()
 	time.Sleep(100 * time.Millisecond)

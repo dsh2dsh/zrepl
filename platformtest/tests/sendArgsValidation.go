@@ -7,13 +7,13 @@ import (
 	"github.com/kr/pretty"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/endpoint"
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/replication/logic"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/replication/report"
-	"github.com/zrepl/zrepl/util/nodefault"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/replication/logic"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/replication/report"
+	"github.com/dsh2dsh/zrepl/util/nodefault"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func SendArgsValidationEncryptedSendOfUnencryptedDatasetForbidden__EncryptionSupported_true(ctx *platformtest.Context) {
@@ -25,7 +25,6 @@ func SendArgsValidationEncryptedSendOfUnencryptedDatasetForbidden__EncryptionSup
 }
 
 func sendArgsValidationEncryptedSendOfUnencryptedDatasetForbidden_impl(ctx *platformtest.Context, testForEncryptionSupported bool) {
-
 	supported, err := zfs.EncryptionCLISupported(ctx)
 	check(err)
 	if supported != testForEncryptionSupported {
@@ -79,7 +78,6 @@ func sendArgsValidationEncryptedSendOfUnencryptedDatasetForbidden_impl(ctx *plat
 }
 
 func SendArgsValidationResumeTokenEncryptionMismatchForbidden(ctx *platformtest.Context) {
-
 	supported, err := zfs.EncryptionCLISupported(ctx)
 	check(err)
 	if !supported {
@@ -156,7 +154,6 @@ func SendArgsValidationResumeTokenEncryptionMismatchForbidden(ctx *platformtest.
 		require.True(ctx, ok)
 		require.Equal(ctx, mismatchError.What, zfs.ZFSSendArgsResumeTokenMismatchEncryptionSet)
 	}
-
 }
 
 func SendArgsValidationResumeTokenDifferentFilesystemForbidden(ctx *platformtest.Context) {
@@ -231,7 +228,6 @@ type sendArgsValidationEndToEndTest struct {
 }
 
 func implSendArgsValidationEndToEndTest(ctx *platformtest.Context, setup sendArgsValidationEndToEndTest) {
-
 	senderEncrypted := ""
 	if setup.encryptedSenderFilesystem {
 		senderEncrypted = "encrypted"
@@ -365,7 +361,6 @@ initial_then_incremental:
 		}
 
 	}
-
 }
 
 func SendArgsValidationEE_EncryptionAndRaw(ctx *platformtest.Context) {
@@ -383,17 +378,20 @@ func SendArgsValidationEE_EncryptionAndRaw(ctx *platformtest.Context) {
 		// Sender FS is unencrypted
 		{SFSEnc: false, SndEnc: false, SndRaw: false, RFSEnc: false, Outcome: ValidationAccepts},
 		{SFSEnc: false, SndEnc: false, SndRaw: true, RFSEnc: false, Outcome: ValidationAccepts}, // allow unencrypted raw sends (#503)
-		{SFSEnc: false, SndEnc: true, SndRaw: false, RFSEnc: false, Outcome: ValidationRejects,
+		{
+			SFSEnc: false, SndEnc: true, SndRaw: false, RFSEnc: false, Outcome: ValidationRejects,
 			RejectErrorNoResume: `encrypted send mandated by policy, but filesystem .* is not encrypted`,
 			RejectErrorResume:   `encrypted send mandated by policy, but filesystem .* is not encrypted`,
 		},
-		{SFSEnc: false, SndEnc: true, SndRaw: true, RFSEnc: false, Outcome: ValidationRejects,
+		{
+			SFSEnc: false, SndEnc: true, SndRaw: true, RFSEnc: false, Outcome: ValidationRejects,
 			RejectErrorNoResume: `encrypted send mandated by policy, but filesystem .* is not encrypted`,
 			RejectErrorResume:   `encrypted send mandated by policy, but filesystem .* is not encrypted`,
 		},
 		// Sender FS is encrypted
 		{SFSEnc: true, SndEnc: false, SndRaw: false, RFSEnc: false, Outcome: ValidationAccepts}, // passes because keys are loaded, thus can send plain.
-		{SFSEnc: true, SndEnc: false, SndRaw: true, RFSEnc: false, Outcome: ValidationRejects,
+		{
+			SFSEnc: true, SndEnc: false, SndRaw: true, RFSEnc: false, Outcome: ValidationRejects,
 			RejectErrorNoResume: `policy mandates raw\+unencrypted sends, but filesystem .* is encrypted`,
 			RejectErrorResume:   `resume token has rawok=true which would result in encrypted send, but policy mandates unencrypted sends only`,
 		},

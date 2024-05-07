@@ -10,19 +10,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 
-	"github.com/zrepl/zrepl/daemon/logging/trace"
-
-	"github.com/google/uuid"
-
-	"github.com/zrepl/zrepl/replication/logic"
-	"github.com/zrepl/zrepl/replication/logic/pdu"
-	"github.com/zrepl/zrepl/rpc/dataconn"
-	"github.com/zrepl/zrepl/rpc/grpcclientidentity/grpchelper"
-	"github.com/zrepl/zrepl/rpc/versionhandshake"
-	"github.com/zrepl/zrepl/transport"
-	"github.com/zrepl/zrepl/util/envconst"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/replication/logic"
+	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn"
+	"github.com/dsh2dsh/zrepl/rpc/grpcclientidentity/grpchelper"
+	"github.com/dsh2dsh/zrepl/rpc/versionhandshake"
+	"github.com/dsh2dsh/zrepl/transport"
+	"github.com/dsh2dsh/zrepl/util/envconst"
 )
 
 // Client implements the active side of a replication setup.
@@ -35,15 +33,16 @@ type Client struct {
 	closed        chan struct{}
 }
 
-var _ logic.Endpoint = &Client{}
-var _ logic.Sender = &Client{}
-var _ logic.Receiver = &Client{}
+var (
+	_ logic.Endpoint = &Client{}
+	_ logic.Sender   = &Client{}
+	_ logic.Receiver = &Client{}
+)
 
 type DialContextFunc = func(ctx context.Context, network string, addr string) (net.Conn, error)
 
 // config must be validated, NewClient will panic if it is not valid
 func NewClient(cn transport.Connecter, loggers Loggers) *Client {
-
 	cn = versionhandshake.Connecter(cn, envconst.Duration("ZREPL_RPC_CLIENT_VERSIONHANDSHAKE_TIMEOUT", 10*time.Second))
 
 	muxedConnecter := mux(cn)
@@ -98,7 +97,6 @@ func (c *Client) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 	}
 
 	return res, stream, nil
-
 }
 
 func (c *Client) Receive(ctx context.Context, req *pdu.ReceiveReq, stream io.ReadCloser) (*pdu.ReceiveRes, error) {

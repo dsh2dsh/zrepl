@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func ListFilesystemsNoFilter(t *platformtest.Context) {
@@ -30,5 +30,4 @@ func ListFilesystemsNoFilter(t *platformtest.Context) {
 	}
 	onlyTestPoolStr := datasetToStringSortedTrimPrefix(mustDatasetPath(t.RootDataset), onlyTestPool)
 	require.Equal(t, []string{"bar baz", "foo bar", "foo bar/bar blup", "foo bar/blah", "foo bar/blah/a volume"}, onlyTestPoolStr)
-
 }

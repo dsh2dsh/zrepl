@@ -12,8 +12,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/zrepl/zrepl/rpc/dataconn/base2bufpool"
-	"github.com/zrepl/zrepl/rpc/dataconn/timeoutconn"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/base2bufpool"
+	"github.com/dsh2dsh/zrepl/rpc/dataconn/timeoutconn"
 )
 
 type FrameHeader struct {
@@ -64,8 +64,10 @@ func Wrap(nc *timeoutconn.Conn) *Conn {
 	}
 }
 
-var ErrReadFrameLengthShort = errors.New("read frame length too short")
-var ErrFixedFrameLengthMismatch = errors.New("read frame length mismatch")
+var (
+	ErrReadFrameLengthShort     = errors.New("read frame length too short")
+	ErrFixedFrameLengthMismatch = errors.New("read frame length mismatch")
+)
 
 type Buffer struct {
 	bufpoolBuffer base2bufpool.Buffer
@@ -94,7 +96,6 @@ var ErrShutdown = fmt.Errorf("frameconn: shutting down")
 // The only way to guarantee that all previously written frames can reach the peer's layers on top
 // of frameconn is to send an empty frame (no payload) and to ignore empty frames on the receiving side.
 func (c *Conn) ReadFrame() (Frame, error) {
-
 	if c.shutdown.IsShuttingDown() {
 		return Frame{}, ErrShutdown
 	}
@@ -114,7 +115,6 @@ func (c *Conn) ReadFrame() (Frame, error) {
 
 // callers must have readMtx locked
 func (c *Conn) readFrame() (Frame, error) {
-
 	if c.nextReadErr != nil {
 		ret := c.nextReadErr
 		c.nextReadErr = nil

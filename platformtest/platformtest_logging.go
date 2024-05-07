@@ -3,8 +3,8 @@ package platformtest
 import (
 	"context"
 
-	"github.com/zrepl/zrepl/daemon/logging"
-	"github.com/zrepl/zrepl/logger"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/logger"
 )
 
 type Logger = logger.Logger

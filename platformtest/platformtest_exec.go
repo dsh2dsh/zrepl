@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/zrepl/zrepl/util/circlog"
+	"github.com/dsh2dsh/zrepl/util/circlog"
 )
 
 type ex struct {

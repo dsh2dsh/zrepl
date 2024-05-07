@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zrepl/zrepl/platformtest"
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/platformtest"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func ListFilesystemVersionsTypeFilteringAndPrefix(t *platformtest.Context) {
@@ -70,7 +70,6 @@ func ListFilesystemVersionsTypeFilteringAndPrefix(t *platformtest.Context) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"#foo 1", "#foo 2", "@foo 1", "@foo 2"}, versionRelnamesSorted(vs))
-
 }
 
 func ListFilesystemVersionsZeroExistIsNotAnError(t *platformtest.Context) {
@@ -172,5 +171,4 @@ func ListFilesystemVersionsUserrefs(t *platformtest.Context) {
 		require.Equal(t, e.relName, vs[i].RelName())
 		require.Equal(t, e.userrefs, vs[i].UserRefs)
 	}
-
 }

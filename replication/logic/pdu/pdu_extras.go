@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zrepl/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 func (v *FilesystemVersion) GetRelName() string {
