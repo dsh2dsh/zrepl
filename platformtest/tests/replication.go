@@ -1448,11 +1448,11 @@ func replicationInitialImpl(ctx *platformtest.Context, iras logic.InitialReplica
 }
 
 func ReplicationInitialAll(ctx *platformtest.Context) {
-	replicationInitialImpl(ctx, logic.InitialReplicationAutoResolutionAll, []string{"3", "2", "1"})
+	_ = replicationInitialImpl(ctx, logic.InitialReplicationAutoResolutionAll, []string{"3", "2", "1"})
 }
 
 func ReplicationInitialMostRecent(ctx *platformtest.Context) {
-	replicationInitialImpl(ctx, logic.InitialReplicationAutoResolutionMostRecent, []string{"1"})
+	_ = replicationInitialImpl(ctx, logic.InitialReplicationAutoResolutionMostRecent, []string{"1"})
 }
 
 func ReplicationInitialFail(ctx *platformtest.Context) {

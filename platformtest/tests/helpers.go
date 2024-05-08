@@ -1,8 +1,8 @@
 package tests
 
 import (
+	"crypto/rand"
 	"io"
-	"math/rand"
 	"os"
 	"path"
 	"sort"
@@ -69,10 +69,14 @@ func check(err error) {
 	}
 }
 
-var dummyDataRand = rand.New(rand.NewSource(99))
+type dummyDataRand struct{}
+
+func (self dummyDataRand) Read(b []byte) (n int, err error) {
+	return rand.Read(b)
+}
 
 func writeDummyData(path string, numBytes int64) {
-	r := io.LimitReader(dummyDataRand, numBytes)
+	r := io.LimitReader(dummyDataRand{}, numBytes)
 	d, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	check(err)
 	defer d.Close()

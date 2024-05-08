@@ -47,7 +47,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"os"
 	"os/exec"
