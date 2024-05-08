@@ -17,6 +17,7 @@ import (
 type planArgs struct {
 	prefix          string
 	timestampFormat string
+	timestampLocal  bool
 	hooks           *hooks.List
 }
 
@@ -60,8 +61,11 @@ type snapProgress struct {
 	runResults hooks.PlanReport
 }
 
-func (plan *plan) formatNow(format string) string {
-	now := time.Now().UTC()
+func (plan *plan) formatNow(format string, localTime bool) string {
+	now := time.Now()
+	if !localTime {
+		now = now.UTC()
+	}
 	switch strings.ToLower(format) {
 	case "dense":
 		format = "20060102_150405_000"
@@ -84,7 +88,8 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 	anyFsHadErr := false
 	// TODO channel programs -> allow a little jitter?
 	for fs, progress := range plan.snaps {
-		suffix := plan.formatNow(plan.args.timestampFormat)
+		suffix := plan.formatNow(plan.args.timestampFormat,
+			plan.args.timestampLocal)
 		snapname := fmt.Sprintf("%s%s", plan.args.prefix, suffix)
 
 		ctx := logging.WithInjectedField(ctx, "fs", fs.ToString())

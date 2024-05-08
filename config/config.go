@@ -250,6 +250,7 @@ type SnapshottingPeriodic struct {
 	Cron            string   `yaml:"cron,optional"`
 	Hooks           HookList `yaml:"hooks,optional"`
 	TimestampFormat string   `yaml:"timestamp_format,optional,default=dense"`
+	TimestampLocal  bool     `yaml:"timestamp_local,optional"`
 }
 
 func (self *SnapshottingPeriodic) CronSpec() string {

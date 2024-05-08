@@ -47,6 +47,7 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
 		planArgs: planArgs{
 			prefix:          in.Prefix,
 			timestampFormat: in.TimestampFormat,
+			timestampLocal:  in.TimestampLocal,
 			hooks:           hookList,
 		},
 		cronSpec: cronSpec,

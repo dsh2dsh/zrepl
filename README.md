@@ -185,6 +185,23 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
     pruning configured to keep all snapshots, but anyway it spends some time
     executing zfs commands.
 
+  * Snapshots can be named using local time in timestamps, instead of UTC.
+    Configuration example:
+
+    ``` yaml
+    snapshotting:
+      type: "periodic"
+      cron: "*/15 * * * *"
+      prefix: "zrepl_frequently_"
+      timestamp_format: "20060102_150405_MST"
+      timestamp_local: true
+    ```
+
+    `timestamp_local` defines time zone of timestamps. By default it's `UTC`,
+    but with `timestamp_local: true` it's local time zone. So instead of snaphot
+    names like `zrepl_frequently_20240508_140000_000` it'll be something like
+    `zrepl_frequently_20240508_160000_CEST`.
+
   * Small cosmetic changes
 
 ## User Documentation
