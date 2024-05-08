@@ -142,10 +142,10 @@ func TestCmd_Pipe(t *testing.T) {
 		},
 		{
 			name:       "pipe on the left side",
-			cmd:        CommandContext(ctx, "echo", "foobar"),
-			pipeCmds:   [][]string{{"true"}},
+			cmd:        CommandContext(ctx, "cat"),
+			pipeCmds:   [][]string{{"echo", "foobar"}},
 			pipeLeft:   true,
-			wantCmdStr: "true | echo foobar",
+			wantCmdStr: "echo foobar | cat",
 		},
 		{
 			name:       "cmd error",
