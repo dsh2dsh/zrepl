@@ -26,12 +26,12 @@ require (
 	github.com/yudai/gojsondiff v1.0.0
 	github.com/zrepl/yaml-config v0.0.0-20191220194647-cbb6b0cf4bdd
 	gitlab.com/tslocum/cview v1.5.3
-	golang.org/x/net v0.24.0
+	golang.org/x/net v0.25.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/sys v0.19.0
-	golang.org/x/tools v0.20.0
+	golang.org/x/sys v0.20.0
+	golang.org/x/tools v0.21.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.34.0
+	google.golang.org/protobuf v1.34.1
 )
 
 require (
@@ -69,8 +69,8 @@ require (
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	gitlab.com/tslocum/cbind v0.1.4 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
-	golang.org/x/term v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/term v0.20.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
