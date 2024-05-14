@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/syslog"
 	"os"
-	"reflect"
 	"time"
 
 	"github.com/zrepl/yaml-config"
@@ -21,7 +20,7 @@ const (
 )
 
 type Config struct {
-	Jobs   []JobEnum `yaml:"jobs"`
+	Jobs   []JobEnum `yaml:"jobs,optional"`
 	Global *Global   `yaml:"global,optional,fromdefaults"`
 }
 
@@ -299,18 +298,6 @@ type Global struct {
 	Monitoring []MonitoringEnum       `yaml:"monitoring,optional"`
 	Control    *GlobalControl         `yaml:"control,optional,fromdefaults"`
 	Serve      *GlobalServe           `yaml:"serve,optional,fromdefaults"`
-}
-
-func Default(i interface{}) {
-	v := reflect.ValueOf(i)
-	if v.Kind() != reflect.Ptr {
-		panic(v)
-	}
-	y := `{}`
-	err := yaml.Unmarshal([]byte(y), v.Interface())
-	if err != nil {
-		panic(err)
-	}
 }
 
 type ConnectEnum struct {
@@ -688,8 +675,16 @@ func ParseConfigBytes(bytes []byte) (*Config, error) {
 	if err := yaml.UnmarshalStrict(bytes, &c); err != nil {
 		return nil, err
 	}
+	if c != nil {
+		return c, nil
+	}
+	// There was no yaml document in the file, deserialize from default.
+	// => See TestFromdefaultsEmptyDoc in yaml-config package.
+	if err := yaml.UnmarshalStrict([]byte("{}"), &c); err != nil {
+		return nil, err
+	}
 	if c == nil {
-		return nil, fmt.Errorf("config is empty or only consists of comments")
+		panic("the fallback to deserialize from `{}` should work")
 	}
 	return c, nil
 }
