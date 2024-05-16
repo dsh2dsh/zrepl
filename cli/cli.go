@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/rpc/grpcclientidentity/grpchelper"
 	"github.com/dsh2dsh/zrepl/version"
 )
 
@@ -124,6 +125,7 @@ func (s *Subcommand) tryParseConfig() {
 		}
 	}
 	s.config = config
+	grpchelper.CallTimeout = config.Global.RpcTimeout
 }
 
 func AddSubcommand(s *Subcommand) {

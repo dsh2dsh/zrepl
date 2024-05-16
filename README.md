@@ -202,6 +202,15 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
     names like `zrepl_frequently_20240508_140000_000` it'll be something like
     `zrepl_frequently_20240508_160000_CEST`.
 
+  * Configurable RPC timeout (1 minute by default). Configuration example:
+
+    ``` yaml
+    global:
+      rpc_timeout: "2m30s"
+    ```
+
+    sets RPC timeout to 2 minutes and 30 seconds.
+
   * Small cosmetic changes
 
 ## User Documentation

@@ -23,9 +23,9 @@ import (
 const (
 	StartKeepalivesAfterInactivityDuration = 5 * time.Second
 	KeepalivePeerTimeout                   = 10 * time.Second
-
-	callTimeout = time.Minute
 )
+
+var CallTimeout = time.Minute
 
 type Logger = logger.Logger
 
@@ -40,9 +40,16 @@ func ClientConn(cn transport.Connecter, log Logger) *grpc.ClientConn {
 	dialerOption := grpc.WithContextDialer(grpcclientidentity.NewDialer(log, cn))
 	cred := grpc.WithTransportCredentials(
 		grpcclientidentity.NewTransportCredentials(log))
-	timeout := grpc.WithUnaryInterceptor(WithTimeout(callTimeout, log))
+
+	opts := []grpc.DialOption{dialerOption, cred, ka}
+	if CallTimeout > 0 {
+		opts = append(opts, grpc.WithUnaryInterceptor(WithTimeout(
+			CallTimeout, log)))
+		log.WithField("timeout", CallTimeout).Info("with RPC timeout")
+	}
+
 	cc, err := grpc.NewClient("passthrough:///doesn't matter done by dialer",
-		dialerOption, cred, ka, timeout)
+		opts...)
 	if err != nil {
 		log.WithError(err).Error("cannot create gRPC client conn (non-blocking)")
 		// It's ok to panic here: the we call grpc.DialContext without the

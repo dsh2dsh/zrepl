@@ -19,6 +19,10 @@ const (
 	ParseFlagsNoCertCheck ParseFlags = 1 << iota
 )
 
+func New() *Config {
+	return &Config{Global: NewGlobal()}
+}
+
 type Config struct {
 	Jobs   []JobEnum `yaml:"jobs,optional"`
 	Global *Global   `yaml:"global,optional,fromdefaults"`
@@ -293,7 +297,13 @@ format: "human"
 
 var _ yaml.Defaulter = &LoggingOutletEnumList{}
 
+func NewGlobal() *Global {
+	return &Global{RpcTimeout: time.Minute}
+}
+
 type Global struct {
+	RpcTimeout time.Duration `yaml:"rpc_timeout,optional"`
+
 	Logging    *LoggingOutletEnumList `yaml:"logging,optional,fromdefaults"`
 	Monitoring []MonitoringEnum       `yaml:"monitoring,optional"`
 	Control    *GlobalControl         `yaml:"control,optional,fromdefaults"`
@@ -671,7 +681,7 @@ func ParseConfig(path string) (i *Config, err error) {
 }
 
 func ParseConfigBytes(bytes []byte) (*Config, error) {
-	var c *Config
+	c := New()
 	if err := yaml.UnmarshalStrict(bytes, &c); err != nil {
 		return nil, err
 	}
