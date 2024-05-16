@@ -21,7 +21,7 @@ var encryptionCLISupport struct {
 func EncryptionCLISupported(ctx context.Context) (bool, error) {
 	encryptionCLISupport.once.Do(func() {
 		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, "zfs", "load-key").WithLogError(false)
+		cmd := zfscmd.CommandContext(ctx, ZfsBin, "load-key").WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
 			encryptionCLISupport.err = fmt.Errorf(

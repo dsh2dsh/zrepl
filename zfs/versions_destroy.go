@@ -225,7 +225,7 @@ func (d destroyerImpl) DestroySnapshotsCommaSyntaxSupported(ctx context.Context,
 ) (bool, error) {
 	batchDestroyFeatureCheck.once.Do(func() {
 		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "destroy").
+		cmd := zfscmd.CommandContext(ctx, ZfsBin, "destroy").
 			WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		if _, ok := err.(*exec.ExitError); !ok {

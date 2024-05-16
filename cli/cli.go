@@ -12,6 +12,7 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/rpc/grpcclientidentity/grpchelper"
 	"github.com/dsh2dsh/zrepl/version"
+	"github.com/dsh2dsh/zrepl/zfs"
 )
 
 var rootArgs struct {
@@ -126,6 +127,7 @@ func (s *Subcommand) tryParseConfig() {
 	}
 	s.config = config
 	grpchelper.CallTimeout = config.Global.RpcTimeout
+	zfs.ZfsBin = config.Global.ZfsBin
 }
 
 func AddSubcommand(s *Subcommand) {

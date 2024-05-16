@@ -20,7 +20,7 @@ func TestZFSListHandlesProducesZFSErrorOnNonZeroExit(t *testing.T) {
 
 	ctx := context.Background()
 
-	ZFS_BINARY = "./test_helpers/zfs_failer.sh"
+	ZfsBin = "./test_helpers/zfs_failer.sh"
 
 	_, err = ZFSList(ctx, []string{"fictionalprop"}, "nonexistent/dataset")
 

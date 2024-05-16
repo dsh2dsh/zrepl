@@ -298,11 +298,12 @@ format: "human"
 var _ yaml.Defaulter = &LoggingOutletEnumList{}
 
 func NewGlobal() *Global {
-	return &Global{RpcTimeout: time.Minute}
+	return &Global{RpcTimeout: time.Minute, ZfsBin: "zfs"}
 }
 
 type Global struct {
 	RpcTimeout time.Duration `yaml:"rpc_timeout,optional"`
+	ZfsBin     string        `yaml:"zfs_bin,optional"`
 
 	Logging    *LoggingOutletEnumList `yaml:"logging,optional,fromdefaults"`
 	Monitoring []MonitoringEnum       `yaml:"monitoring,optional"`

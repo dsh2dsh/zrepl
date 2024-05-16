@@ -50,7 +50,7 @@ var resumeSendSupportedCheck struct {
 func ResumeSendSupported(ctx context.Context) (bool, error) {
 	resumeSendSupportedCheck.once.Do(func() {
 		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, "zfs", "send").WithLogError(false)
+		cmd := zfscmd.CommandContext(ctx, ZfsBin, "send").WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
 			resumeSendSupportedCheck.err = fmt.Errorf(
@@ -99,7 +99,7 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 	}
 
 	if !sup.flagSupport.checked {
-		cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "receive").
+		cmd := zfscmd.CommandContext(ctx, ZfsBin, "receive").
 			WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		upgradeWhile(func() {
@@ -199,7 +199,7 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	//	toname = pool1/test@b
 	//cannot resume send: 'pool1/test@b' used in the initial send no longer exists
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "send", "-nvt", string(token))
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "send", "-nvt", string(token))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {

@@ -41,7 +41,7 @@ func ZFSHold(ctx context.Context, fs string, v FilesystemVersion, tag string,
 	}
 
 	fullPath := v.FullPath(fs)
-	cmd := zfscmd.CommandContext(ctx, "zfs", "hold", tag, fullPath).
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "hold", tag, fullPath).
 		WithLogError(false)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -63,7 +63,7 @@ func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 	}
 
 	dp := fmt.Sprintf("%s@%s", fs, snap)
-	cmd := zfscmd.CommandContext(ctx, "zfs", "holds", "-H", dp)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "holds", "-H", dp)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, &ZFSError{output, fmt.Errorf("zfs holds failed: %w", err)}
@@ -102,7 +102,7 @@ func ZFSRelease(ctx context.Context, tag string, snaps ...string) error {
 
 		args := []string{"release", tag}
 		args = append(args, snaps[i:j]...)
-		cmd := zfscmd.CommandContext(ctx, "zfs", args...).WithLogError(false)
+		cmd := zfscmd.CommandContext(ctx, ZfsBin, args...).WithLogError(false)
 		output, err := cmd.CombinedOutput()
 		if pe, ok := err.(*os.PathError); err != nil && ok && pe.Err == syscall.E2BIG {
 			maxInvocationLen = maxInvocationLen / 2

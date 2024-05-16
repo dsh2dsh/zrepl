@@ -211,6 +211,15 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
     sets RPC timeout to 2 minutes and 30 seconds.
 
+  * Configurable path to zfs binary ("zfs" by default). Configuration example:
+
+    ``` yaml
+    global:
+      zfs_bin: "/sbin/zfs"
+    ```
+
+    sets zfs binary path to "/sbin/zfs".
+
   * Small cosmetic changes
 
 ## User Documentation

@@ -110,7 +110,7 @@ func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *DatasetPath, parent
 	}
 
 	cmdline = append(cmdline, fs.ToString())
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, cmdline...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, cmdline...)
 
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {

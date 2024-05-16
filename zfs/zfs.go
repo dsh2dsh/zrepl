@@ -158,7 +158,7 @@ func (e *ZFSError) Error() string {
 	return fmt.Sprintf("zfs exited with error: %s\nstderr:\n%s", e.WaitErr.Error(), e.Stderr)
 }
 
-var ZFS_BINARY string = "zfs"
+var ZfsBin string = "zfs"
 
 func ZFSList(ctx context.Context, properties []string, zfsArgs ...string) (res [][]string, err error) {
 	args := make([]string, 0, 4+len(zfsArgs))
@@ -169,7 +169,7 @@ func ZFSList(ctx context.Context, properties []string, zfsArgs ...string) (res [
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdout, stderrBuf, err := cmd.StdoutPipeWithErrorBuf()
 	if err != nil {
 		return
@@ -247,7 +247,7 @@ func ZFSListChan(ctx context.Context, out chan ZFSListResult, properties []strin
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdout, stderrBuf, err := cmd.StdoutPipeWithErrorBuf()
 	if err != nil {
 		sendResult(nil, err)
@@ -958,7 +958,7 @@ func ZFSSend(
 	}
 	stderrBuf := circlog.MustNewCircularLog(zfsSendStderrCaptureMaxSize)
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	cmd.SetStdio(zfscmd.Stdio{
 		Stdin:  nil,
 		Stdout: stdoutWriter,
@@ -1132,7 +1132,7 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 	}
 	args = append(args, sargs...)
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, &ZFSError{output, err}
@@ -1272,7 +1272,7 @@ func ZFSRecv(
 
 	ctx, cancelCmd := context.WithCancel(ctx)
 	defer cancelCmd()
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 
 	// TODO report bug upstream
 	// Setup an unused stdout buffer.
@@ -1430,7 +1430,7 @@ func ZFSRecvClearResumeToken(ctx context.Context, fs string) error {
 		return err
 	}
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "recv", "-A", fs).
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "recv", "-A", fs).
 		WithLogError(false)
 	o, err := cmd.CombinedOutput()
 	if err != nil {
@@ -1478,7 +1478,7 @@ func zfsSet(ctx context.Context, path string, props map[string]string) error {
 
 	args = append(args, path)
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
 		err = &ZFSError{
@@ -1641,7 +1641,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 		args = append(args, "-t", strings.Join(dstypes, ","))
 	}
 	args = append(args, strings.Join(props, ","), path)
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdout, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -1805,7 +1805,7 @@ func ZFSDestroy(ctx context.Context, arg string) (err error) {
 
 	defer prometheus.NewTimer(prom.ZFSDestroyDuration.WithLabelValues(dstype, filesystem))
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "destroy", arg)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "destroy", arg)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
 		err = &ZFSError{
@@ -1845,7 +1845,7 @@ func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string, recursive bo
 		return fmt.Errorf("zfs snapshot: %w", err)
 	}
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "snapshot", snapname)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "snapshot", snapname)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
 		err = &ZFSError{
@@ -1917,7 +1917,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 		return bm, err
 	}
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, "bookmark", snapname, bookmarkname)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "bookmark", snapname, bookmarkname)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
 		if ddne := tryDatasetDoesNotExist(snapname, stdio); ddne != nil {
@@ -1961,7 +1961,7 @@ func ZFSRollback(ctx context.Context, fs *DatasetPath, snapshot FilesystemVersio
 	args = append(args, rollbackArgs...)
 	args = append(args, snapabs)
 
-	cmd := zfscmd.CommandContext(ctx, ZFS_BINARY, args...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
 		err = &ZFSError{
