@@ -11,6 +11,7 @@ version: 1
 before:
   hooks:
     - "go mod tidy"
+    - "go mod vendor"
 
 dist: "./release-dist"
 
@@ -38,3 +39,14 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+source:
+  # Whether this pipe is enabled or not.
+  enabled: true
+
+  # Additional files/globs you want to add to the source archive.
+  #
+  # Since: v1.11
+  # Templates: allowed
+  files:
+    - "vendor"
