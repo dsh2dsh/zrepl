@@ -123,7 +123,7 @@ type FS interface {
 	EqualToPreviousAttempt(fs FS) bool
 	// The returned steps are assumed to be dependent on exactly
 	// their direct predecessors in the returned list.
-	PlanFS(context.Context) ([]Step, error)
+	PlanFS(context.Context, bool) ([]Step, error)
 	ReportInfo() *report.FilesystemInfo
 }
 
@@ -190,6 +190,7 @@ type Config struct {
 	StepQueueConcurrency     int           `validate:"gte=1"`
 	MaxAttempts              int           `validate:"eq=-1|gt=0"`
 	ReconnectHardFailTimeout time.Duration `validate:"gt=0"`
+	OneStep                  bool
 }
 
 var validate = validator.New()
@@ -450,7 +451,7 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs) {
 			// avoid explosion of tasks with name f.report().Info.Name
 			ctx, endTask := trace.WithTaskAndSpan(ctx, "repl-fs", f.report().Info.Name)
 			defer endTask()
-			f.do(ctx, stepQueue, prevs[f])
+			f.do(ctx, stepQueue, prevs[f], a.config.OneStep)
 			f.l.HoldWhile(func() {
 				// every return from f means it's unblocked...
 				f.blockedOn = report.FsBlockedOnNothing
@@ -484,7 +485,7 @@ func (f *fs) initialRepOrdWakeupChildren() {
 	}
 }
 
-func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
+func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 	defer f.l.Lock().Unlock()
 	defer f.initialRepOrdWakeupChildren()
 
@@ -502,8 +503,8 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
 			// transition before we call PlanFS
 			f.blockedOn = report.FsBlockedOnNothing
 		})
-		psteps, err = f.fs.PlanFS(ctx) // no shadow
-		errTime = time.Now()           // no shadow
+		psteps, err = f.fs.PlanFS(ctx, oneStep) // no shadow
+		errTime = time.Now()                    // no shadow
 	})
 	if err != nil {
 		f.planning.err = newTimedError(err, errTime)

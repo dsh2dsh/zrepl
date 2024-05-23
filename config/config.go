@@ -151,6 +151,7 @@ type BandwidthLimit struct {
 type Replication struct {
 	Protection  *ReplicationOptionsProtection  `yaml:"protection,optional,fromdefaults"`
 	Concurrency *ReplicationOptionsConcurrency `yaml:"concurrency,optional,fromdefaults"`
+	OneStep     bool                           `yaml:"one_step,optional"`
 }
 
 type ReplicationOptionsProtection struct {

@@ -797,7 +797,7 @@ func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 	if fromV == "" { // Initial
 		flags = append(flags, toV)
 	} else {
-		flags = append(flags, "-i", fromV, toV)
+		flags = append(flags, "-I", fromV, toV)
 	}
 	return flags, nil
 }
@@ -1268,7 +1268,7 @@ func ZFSRecv(
 
 	args := []string{"recv"}
 	args = append(args, opts.buildRecvFlags()...)
-	args = append(args, v.FullPath(fs))
+	args = append(args, fs)
 
 	ctx, cancelCmd := context.WithCancel(ctx)
 	defer cancelCmd()

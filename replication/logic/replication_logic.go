@@ -134,8 +134,10 @@ func (f *Filesystem) EqualToPreviousAttempt(other driver.FS) bool {
 	return f.Path == g.Path
 }
 
-func (f *Filesystem) PlanFS(ctx context.Context) ([]driver.Step, error) {
-	steps, err := f.doPlanning(ctx)
+func (f *Filesystem) PlanFS(ctx context.Context, oneStep bool) ([]driver.Step,
+	error,
+) {
+	steps, err := f.doPlanning(ctx, oneStep)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +324,9 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	return q, nil
 }
 
-func (fs *Filesystem) doPlanning(ctx context.Context) ([]*Step, error) {
+func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
+	error,
+) {
 	log := func(ctx context.Context) logger.Logger {
 		return getLogger(ctx).WithField("filesystem", fs.Path)
 	}
@@ -432,16 +436,26 @@ func (fs *Filesystem) doPlanning(ctx context.Context) ([]*Step, error) {
 			}
 		}
 
-		steps = make([]*Step, 0, len(remainingSFSVs)) // shadow
-		steps = append(steps, resumeStep)
-		for i := 0; i < len(remainingSFSVs)-1; i++ {
-			steps = append(steps, &Step{
+		if oneStep && len(remainingSFSVs) > 1 {
+			steps = []*Step{resumeStep, {
 				parent:   fs,
 				sender:   fs.sender,
 				receiver: fs.receiver,
-				from:     remainingSFSVs[i],
-				to:       remainingSFSVs[i+1],
-			})
+				from:     remainingSFSVs[0],
+				to:       remainingSFSVs[len(remainingSFSVs)-1],
+			}}
+		} else {
+			steps = make([]*Step, 0, len(remainingSFSVs)) // shadow
+			steps = append(steps, resumeStep)
+			for i := 0; i < len(remainingSFSVs)-1; i++ {
+				steps = append(steps, &Step{
+					parent:   fs,
+					sender:   fs.sender,
+					receiver: fs.receiver,
+					from:     remainingSFSVs[i],
+					to:       remainingSFSVs[i+1],
+				})
+			}
 		}
 	} else { // resumeToken == nil
 		path, conflict := IncrementalPath(rfsvs, sfsvs)
@@ -457,11 +471,21 @@ func (fs *Filesystem) doPlanning(ctx context.Context) ([]*Step, error) {
 		if conflict != nil {
 			return nil, conflict
 		}
-		if len(path) == 0 {
+
+		switch {
+		case len(path) == 0:
 			steps = nil
-		} else if len(path) == 1 {
+		case len(path) == 1:
 			panic(fmt.Sprintf("len(path) must be two for incremental repl, and initial repl must start with nil, got path[0]=%#v", path[0]))
-		} else {
+		case oneStep:
+			steps = []*Step{{
+				parent:   fs,
+				sender:   fs.sender,
+				receiver: fs.receiver,
+				from:     path[0], // nil in case of initial repl
+				to:       path[len(path)-1],
+			}}
+		default:
 			steps = make([]*Step, 0, len(path)) // shadow
 			for i := 0; i < len(path)-1; i++ {
 				steps = append(steps, &Step{

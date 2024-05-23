@@ -220,6 +220,20 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
     sets zfs binary path to "/sbin/zfs".
 
+  * Replication able to generate a stream package that sends all intermediary
+    snapshots (`zfs send -I`), instead of every intermediary snapshot one by one
+    (`zfs send -i`). Configuration example:
+
+    ``` yaml
+    jobs:
+      - name: "zroot-to-zdisk"
+        type: "push"
+        replication:
+          # Send all intermediary snapshots as a stream package, instead of
+          # sending them one by one. Default: false.
+          one_step: true
+    ```
+
   * Small cosmetic changes
 
 ## User Documentation

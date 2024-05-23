@@ -301,14 +301,17 @@ func modePullFromConfig(g *config.Global, in *config.PullJob, jobID endpoint.Job
 	return m, nil
 }
 
-func replicationDriverConfigFromConfig(in *config.Replication) (c driver.Config, err error) {
-	c = driver.Config{
-		StepQueueConcurrency:     in.Concurrency.Steps,
-		MaxAttempts:              envconst.Int("ZREPL_REPLICATION_MAX_ATTEMPTS", 3),
-		ReconnectHardFailTimeout: envconst.Duration("ZREPL_REPLICATION_RECONNECT_HARD_FAIL_TIMEOUT", 10*time.Minute),
+func replicationDriverConfigFromConfig(in *config.Replication) (driver.Config,
+	error,
+) {
+	c := driver.Config{
+		StepQueueConcurrency: in.Concurrency.Steps,
+		MaxAttempts:          envconst.Int("ZREPL_REPLICATION_MAX_ATTEMPTS", 3),
+		OneStep:              in.OneStep,
+		ReconnectHardFailTimeout: envconst.Duration(
+			"ZREPL_REPLICATION_RECONNECT_HARD_FAIL_TIMEOUT", 10*time.Minute),
 	}
-	err = c.Validate()
-	return c, err
+	return c, c.Validate()
 }
 
 func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, parseFlags config.ParseFlags) (j *ActiveSide, err error) {
