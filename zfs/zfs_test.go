@@ -93,10 +93,6 @@ func TestZFSPropertySource(t *testing.T) {
 	}
 }
 
-func TestDrySendRegexesHaveSameCaptureGroupCount(t *testing.T) {
-	assert.Equal(t, sendDryRunInfoLineRegexFull.NumSubexp(), sendDryRunInfoLineRegexIncremental.NumSubexp())
-}
-
 func TestDrySendInfo(t *testing.T) {
 	// # full send
 	// $ zfs send -Pnv -t 1-9baebea70-b8-789c636064000310a500c4ec50360710e72765a52697303030419460caa7a515a79680647ce0f26c48f2499525a9c5405ac3c90fabfe92fcf4d2cc140686b30972c7850efd0cd24092e704cbe725e6a632305415e5e797e803cd2ad14f743084b805001b201795
@@ -179,7 +175,8 @@ full	p1 with/ spaces d1@2 with space
 
 	tcs := []tc{
 		{
-			name: "fullSend", in: fullSend,
+			name: "fullSend",
+			in:   fullSend,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeFull,
 				Filesystem:   "zroot/test/a",
@@ -189,7 +186,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "incSend", in: incSend,
+			name: "incSend",
+			in:   incSend,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeIncremental,
 				Filesystem:   "zroot/test/a",
@@ -199,7 +197,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "incSendBookmark", in: incSendBookmark,
+			name: "incSendBookmark",
+			in:   incSendBookmark,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeIncremental,
 				Filesystem:   "zroot/test/a",
@@ -209,7 +208,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "incNoToken", in: incNoToken,
+			name: "incNoToken",
+			in:   incNoToken,
 			exp: &DrySendInfo{
 				Type:       DrySendTypeIncremental,
 				Filesystem: "zroot/test/a",
@@ -221,7 +221,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "fullNoToken", in: fullNoToken,
+			name: "fullNoToken",
+			in:   fullNoToken,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeFull,
 				Filesystem:   "zroot/test/a",
@@ -231,7 +232,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "fullWithSpaces", in: fullWithSpaces,
+			name: "fullWithSpaces",
+			in:   fullWithSpaces,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeFull,
 				Filesystem:   "pool1/otherjob/ds with spaces",
@@ -241,7 +243,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "fullWithSpacesInIntermediateComponent", in: fullWithSpacesInIntermediateComponent,
+			name: "fullWithSpacesInIntermediateComponent",
+			in:   fullWithSpacesInIntermediateComponent,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeFull,
 				Filesystem:   "pool1/otherjob/another ds with spaces/childfs",
@@ -251,7 +254,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "incrementalWithSpaces", in: incrementalWithSpaces,
+			name: "incrementalWithSpaces",
+			in:   incrementalWithSpaces,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeIncremental,
 				Filesystem:   "pool1/otherjob/another ds with spaces",
@@ -261,7 +265,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "incrementalWithSpacesInIntermediateComponent", in: incrementalWithSpacesInIntermediateComponent,
+			name: "incrementalWithSpacesInIntermediateComponent",
+			in:   incrementalWithSpacesInIntermediateComponent,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeIncremental,
 				Filesystem:   "pool1/otherjob/another ds with spaces/childfs",
@@ -271,7 +276,8 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "incrementalZeroSizedOpenZFS_pre0.7.12", in: incZeroSized_0_7_12,
+			name: "incrementalZeroSizedOpenZFS_pre0.7.12",
+			in:   incZeroSized_0_7_12,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeIncremental,
 				Filesystem:   "p1 with/ spaces d1",
@@ -281,12 +287,96 @@ full	p1 with/ spaces d1@2 with space
 			},
 		},
 		{
-			name: "fullZeroSizedOpenZFS_pre0.7.12", in: fullZeroSized_0_7_12,
+			name: "fullZeroSizedOpenZFS_pre0.7.12",
+			in:   fullZeroSized_0_7_12,
 			exp: &DrySendInfo{
 				Type:         DrySendTypeFull,
 				Filesystem:   "p1 with/ spaces d1",
 				To:           "p1 with/ spaces d1@2 with space",
 				SizeEstimate: 0,
+			},
+		},
+		{
+			name: "incremental package without size",
+			in: `
+incremental	snap1	pool1/ds@snap2	624
+incremental	snap2	pool1/ds@snap3	624
+`,
+			exp: &DrySendInfo{
+				Type:         DrySendTypeIncremental,
+				Filesystem:   "pool1/ds",
+				From:         "snap1",
+				To:           "pool1/ds@snap3",
+				SizeEstimate: 1248,
+			},
+		},
+		{
+			name: "incremental package with size",
+			in: `
+incremental	snap1	pool1/ds@snap2	624
+incremental	snap2	pool1/ds@snap3	624
+size	1248
+`,
+			exp: &DrySendInfo{
+				Type:         DrySendTypeIncremental,
+				Filesystem:   "pool1/ds",
+				From:         "snap1",
+				To:           "pool1/ds@snap3",
+				SizeEstimate: 1248,
+			},
+		},
+		{
+			name: "dry send type changed",
+			in: `
+full	pool1/ds@snap2	624
+incremental	snap2	pool1/ds@snap3	624
+size	1248
+`,
+			expErr: true,
+		},
+		{
+			name: "no match for info line",
+			in: `
+size	1248
+`,
+			expErr: true,
+		},
+		{
+			name: "cannot not parse size",
+			in: `
+incremental	snap2	pool1/ds@snap3	624
+size	XXX
+`,
+			expErr: true,
+		},
+		{
+			name: "incremental package with size less",
+			in: `
+incremental	snap1	pool1/ds@snap2	624
+incremental	snap2	pool1/ds@snap3	624
+size	1000
+`,
+			exp: &DrySendInfo{
+				Type:         DrySendTypeIncremental,
+				Filesystem:   "pool1/ds",
+				From:         "snap1",
+				To:           "pool1/ds@snap3",
+				SizeEstimate: 1248,
+			},
+		},
+		{
+			name: "incremental package with size more",
+			in: `
+incremental	snap1	pool1/ds@snap2	624
+incremental	snap2	pool1/ds@snap3	624
+size	1500
+`,
+			exp: &DrySendInfo{
+				Type:         DrySendTypeIncremental,
+				Filesystem:   "pool1/ds",
+				From:         "snap1",
+				To:           "pool1/ds@snap3",
+				SizeEstimate: 1500,
 			},
 		},
 	}
@@ -300,9 +390,9 @@ full	p1 with/ spaces d1@2 with space
 			t.Logf("err=%T %s", err, err)
 
 			if tc.expErr {
-				assert.Error(t, err)
-			}
-			if tc.exp != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 				assert.Equal(t, tc.exp, &si)
 			}
 		})

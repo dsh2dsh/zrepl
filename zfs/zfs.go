@@ -1018,81 +1018,93 @@ type DrySendInfo struct {
 	SizeEstimate uint64 // 0 if size estimate is not possible
 }
 
-var (
-	// keep same number of capture groups for unmarshalInfoLine homogeneity
-
-	sendDryRunInfoLineRegexFull = regexp.MustCompile(`^(?P<type>full)\t()(?P<to>[^\t]+@[^\t]+)(\t(?P<size>[0-9]+))?$`)
-	// cannot enforce '[#@]' in incremental source, see test cases
-	sendDryRunInfoLineRegexIncremental = regexp.MustCompile(`^(?P<type>incremental)\t(?P<from>[^\t]+)\t(?P<to>[^\t]+@[^\t]+)(\t(?P<size>[0-9]+))?$`)
-)
-
 // see test cases for example output
 func (s *DrySendInfo) unmarshalZFSOutput(output []byte) error {
 	debug("DrySendInfo.unmarshalZFSOutput: output=%q", output)
 	scan := bufio.NewScanner(bytes.NewReader(output))
 	for scan.Scan() {
 		l := scan.Text()
-		if regexMatched, err := s.unmarshalInfoLine(l); err != nil {
+		if err := s.unmarshalInfoLine(l); err != nil {
 			return fmt.Errorf("line %q: %w", l, err)
-		} else if regexMatched {
-			return nil
 		}
 	}
-	return fmt.Errorf("no match for info line (regex1 %s) (regex2 %s)",
-		sendDryRunInfoLineRegexFull, sendDryRunInfoLineRegexIncremental)
+
+	if s.Type != DrySendTypeFull && s.Type != DrySendTypeIncremental {
+		return fmt.Errorf("no match for info line in:\n%s", output)
+	}
+	return nil
 }
 
 // unmarshal info line, looks like this:
 //
 //	full	zroot/test/a@1	5389768
 //	incremental	zroot/test/a@1	zroot/test/a@2	5383936
+//	size 5383936
 //
 // => see test cases
-func (s *DrySendInfo) unmarshalInfoLine(l string) (regexMatched bool, err error) {
-	mFull := sendDryRunInfoLineRegexFull.FindStringSubmatch(l)
-	mInc := sendDryRunInfoLineRegexIncremental.FindStringSubmatch(l)
-	var matchingExpr *regexp.Regexp
-	var m []string
-	if mFull == nil && mInc == nil {
-		return false, nil
-	} else if mFull != nil && mInc != nil {
-		panic(fmt.Sprintf("ambiguous ZFS dry send output: %q", l))
-	} else if mFull != nil {
-		matchingExpr, m = sendDryRunInfoLineRegexFull, mFull
-	} else if mInc != nil {
-		matchingExpr, m = sendDryRunInfoLineRegexIncremental, mInc
+func (s *DrySendInfo) unmarshalInfoLine(l string) error {
+	dryFields := strings.SplitN(l, "\t", 5)
+	n := len(dryFields)
+	if n == 0 {
+		return nil
 	}
 
-	fields := make(map[string]string, matchingExpr.NumSubexp())
-	for i, name := range matchingExpr.SubexpNames() {
-		if i != 0 {
-			fields[name] = m[i]
+	snapType := dryFields[0]
+	var from, to, size string
+	switch {
+	case snapType == "full" && n > 1:
+		to = dryFields[1]
+		if n > 2 {
+			size = dryFields[2]
+		}
+	case snapType == "incremental" && n > 2:
+		from, to = dryFields[1], dryFields[2]
+		if n > 3 {
+			size = dryFields[3]
+		}
+		if s.From == "" {
+			s.From = from
+		}
+	case snapType == "size" && n > 1:
+		size = dryFields[1]
+	default:
+		return nil
+	}
+
+	if snapType == "full" || snapType == "incremental" {
+		if sendType, err := DrySendTypeFromString(snapType); err != nil {
+			return err
+		} else if s.Type == "" {
+			s.Type = sendType
+		} else if sendType != s.Type {
+			return fmt.Errorf("dry send type changed from %q to %q", s.Type, sendType)
+		}
+		s.To = to
+		if s.Filesystem == "" {
+			toFS, _, _, err := DecomposeVersionString(to)
+			if err != nil {
+				return fmt.Errorf("'to' is not a valid filesystem version: %s", err)
+			}
+			s.Filesystem = toFS
+		}
+		if size == "" {
+			// workaround for OpenZFS 0.7 prior to
+			//
+			//   https://github.com/openzfs/zfs/commit/835db58592d7d947e5818eb7281882e2a46073e0#diff-66bd524398bcd2ac70d90925ab6d8073L1245
+			//
+			// see https://github.com/zrepl/zrepl/issues/289
+			return nil
 		}
 	}
 
-	s.Type, err = DrySendTypeFromString(fields["type"])
-	if err != nil {
-		return true, err
+	if sizeEstimate, err := strconv.ParseUint(size, 10, 64); err != nil {
+		return fmt.Errorf("cannot not parse size %q: %s", size, err)
+	} else if snapType == "size" {
+		s.SizeEstimate = max(sizeEstimate, s.SizeEstimate)
+	} else {
+		s.SizeEstimate += sizeEstimate
 	}
-
-	s.From = fields["from"]
-	s.To = fields["to"]
-	toFS, _, _, err := DecomposeVersionString(s.To)
-	if err != nil {
-		return true, fmt.Errorf("'to' is not a valid filesystem version: %s", err)
-	}
-	s.Filesystem = toFS
-
-	if fields["size"] == "" {
-		// workaround for OpenZFS 0.7 prior to https://github.com/openzfs/zfs/commit/835db58592d7d947e5818eb7281882e2a46073e0#diff-66bd524398bcd2ac70d90925ab6d8073L1245
-		// see https://github.com/zrepl/zrepl/issues/289
-		fields["size"] = "0"
-	}
-	s.SizeEstimate, err = strconv.ParseUint(fields["size"], 10, 64)
-	if err != nil {
-		return true, fmt.Errorf("cannot not parse size: %s", err)
-	}
-	return true, nil
+	return nil
 }
 
 // to may be "", in which case a full ZFS send is done
