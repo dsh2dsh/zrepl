@@ -796,8 +796,10 @@ func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 
 	if fromV == "" { // Initial
 		flags = append(flags, toV)
-	} else {
+	} else if a.From.RelName[0] == '@' { // snapshot
 		flags = append(flags, "-I", fromV, toV)
+	} else {
+		flags = append(flags, "-i", fromV, toV)
 	}
 	return flags, nil
 }
