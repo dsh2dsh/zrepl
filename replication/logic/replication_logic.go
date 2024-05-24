@@ -480,25 +480,22 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 			steps = nil
 		case len(path) == 1:
 			panic(fmt.Sprintf("len(path) must be two for incremental repl, and initial repl must start with nil, got path[0]=%#v", path[0]))
-		case oneStep:
-			steps = []*Step{{
-				parent:   fs,
-				sender:   fs.sender,
-				receiver: fs.receiver,
-				from:     path[0], // nil in case of initial repl
-				to:       path[len(path)-1],
-			}}
 		default:
 			steps = make([]*Step, 0, len(path)) // shadow
 			for i := 0; i < len(path)-1; i++ {
-				steps = append(steps, &Step{
+				step := &Step{
 					parent:   fs,
 					sender:   fs.sender,
 					receiver: fs.receiver,
 
 					from: path[i], // nil in case of initial repl
 					to:   path[i+1],
-				})
+				}
+				steps = append(steps, step)
+				if step.from.Type == pdu.FilesystemVersion_Snapshot && oneStep {
+					step.to = path[len(path)-1]
+					break
+				}
 			}
 		}
 	}
