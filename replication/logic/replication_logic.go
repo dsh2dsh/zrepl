@@ -460,11 +460,14 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 	} else { // resumeToken == nil
 		path, conflict := IncrementalPath(rfsvs, sfsvs)
 		if conflict != nil {
-			updPath, updConflict := tryAutoresolveConflict(conflict, *fs.policy.ConflictResolution)
+			updPath, updConflict := tryAutoresolveConflict(conflict,
+				*fs.policy.ConflictResolution)
 			if updConflict == nil {
-				log(ctx).WithField("conflict", conflict).Info("conflict automatically resolved")
+				log(ctx).WithField("conflict", conflict).Info(
+					"conflict automatically resolved")
 			} else {
-				log(ctx).WithField("conflict", conflict).Error("cannot resolve conflict")
+				log(ctx).WithField("conflict", conflict).Error(
+					"cannot resolve conflict")
 			}
 			path, conflict = updPath, updConflict
 		}
@@ -512,8 +515,10 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 	for _, step := range steps {
 		step := step // local copy that is moved into the closure
 		fanOutAdd(func(ctx context.Context) {
-			// TODO instead of the semaphore, rely on resource-exhaustion signaled by the remote endpoint to limit size-estimate requests
-			// Send is handled over rpc/dataconn ATM, which doesn't support the resource exhaustion status codes that gRPC defines
+			// TODO: instead of the semaphore, rely on resource-exhaustion signaled by
+			// the remote endpoint to limit size-estimate requests. Send is handled
+			// over rpc/dataconn ATM, which doesn't support the resource exhaustion
+			// status codes that gRPC defines.
 			guard, err := fs.sizeEstimateRequestSem.Acquire(ctx)
 			if err != nil {
 				fanOutCancel()
@@ -523,7 +528,8 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 
 			err = step.updateSizeEstimate(ctx)
 			if err != nil {
-				log(ctx).WithError(err).WithField("step", step).Error("error computing size estimate")
+				log(ctx).WithError(err).WithField("step", step).Error(
+					"error computing size estimate")
 				fanOutCancel()
 			}
 			errs <- err

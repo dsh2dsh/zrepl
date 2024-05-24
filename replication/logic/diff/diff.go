@@ -88,7 +88,8 @@ func SortVersionListByCreateTXGThenBookmarkLTSnapshot(fsvslice []*FilesystemVers
 	return sorted
 }
 
-func StripBookmarksFromVersionList(fsvslice []*FilesystemVersion) []*FilesystemVersion {
+func StripBookmarksFromVersionList(fsvslice []*FilesystemVersion,
+) []*FilesystemVersion {
 	fslice := make([]*FilesystemVersion, 0, len(fsvslice))
 	for _, fv := range fsvslice {
 		if fv.Type != FilesystemVersion_Bookmark {
@@ -98,14 +99,18 @@ func StripBookmarksFromVersionList(fsvslice []*FilesystemVersion) []*FilesystemV
 	return fslice
 }
 
-func IncrementalPath(receiver, sender []*FilesystemVersion) (incPath []*FilesystemVersion, conflict error) {
-	// Receive-side bookmarks can't be used as incremental-from,
-	// and don't cause recv to fail if there is a newer bookmark than incremetal-form on the receiver.
-	// So, simply mask them out.
-	// This will also hide them in the report, but it keeps the code in this function simple,
-	// and a user who complains about them missing in a conflict message will likely require
-	// more education about bookmarks than a slightly more accurate error message. They'll get
-	// that when they open an issue.
+func IncrementalPath(receiver, sender []*FilesystemVersion) (
+	incPath []*FilesystemVersion, conflict error,
+) {
+	// Receive-side bookmarks can't be used as incremental-from, and don't cause
+	// recv to fail if there is a newer bookmark than incremetal-form on the
+	// receiver.
+	//
+	// So, simply mask them out. This will also hide them in the report, but it
+	// keeps the code in this function simple, and a user who complains about them
+	// missing in a conflict message will likely require more education about
+	// bookmarks than a slightly more accurate error message. They'll get that
+	// when they open an issue.
 	receiver = StripBookmarksFromVersionList(receiver)
 
 	receiver = SortVersionListByCreateTXGThenBookmarkLTSnapshot(receiver)
@@ -155,7 +160,8 @@ findCandidate:
 	// incPath must not contain bookmarks except initial one,
 	incPath = make([]*FilesystemVersion, 0, len(sender))
 	incPath = append(incPath, sender[mrcaCandidate.s])
-	// it's ok if incPath[0] is a bookmark, but not the subsequent ones in the incPath
+	// it's ok if incPath[0] is a bookmark, but not the subsequent ones in the
+	// incPath
 	for i := mrcaCandidate.s + 1; i < len(sender); i++ {
 		if sender[i].Type == FilesystemVersion_Snapshot && incPath[len(incPath)-1].Guid != sender[i].Guid {
 			incPath = append(incPath, sender[i])
