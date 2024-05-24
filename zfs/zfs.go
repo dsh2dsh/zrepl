@@ -1111,32 +1111,6 @@ func (s *DrySendInfo) unmarshalInfoLine(l string) error {
 // May return BookmarkSizeEstimationNotSupported as err if from is a bookmark.
 func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 ) (*DrySendInfo, error) {
-	if sendArgs.From != nil && strings.Contains(sendArgs.From.RelName, "#") {
-		/* TODO:
-		 * XXX feature check & support this as well
-		 *
-		 * ZFS at the time of writing does not support dry-run send because
-		 * size-estimation uses fromSnap's deadlist. However, for a bookmark, that
-		 * deadlist no longer exists. Redacted send & recv will bring this
-		 * functionality, see https://github.com/openzfs/openzfs/pull/484
-		 */
-		fromAbs, err := absVersion(sendArgs.FS, sendArgs.From)
-		if err != nil {
-			return nil, fmt.Errorf("error building abs version for 'from': %w", err)
-		}
-		toAbs, err := absVersion(sendArgs.FS, sendArgs.To)
-		if err != nil {
-			return nil, fmt.Errorf("error building abs version for 'to': %w", err)
-		}
-		return &DrySendInfo{
-			Type:         DrySendTypeIncremental,
-			Filesystem:   sendArgs.FS,
-			From:         fromAbs,
-			To:           toAbs,
-			SizeEstimate: 0,
-		}, nil
-	}
-
 	args := []string{"send", "-n", "-v", "-P"}
 	sargs, err := sendArgs.buildSendCommandLine()
 	if err != nil {
