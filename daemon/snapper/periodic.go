@@ -146,6 +146,7 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 
 	st := periodicStateSyncUp
 	if s.args.interval == 0 {
+		s.state = Waiting
 		st = periodicStateWait
 		s.runPeriodic(ctx)
 	}
