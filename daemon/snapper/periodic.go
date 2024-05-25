@@ -12,6 +12,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/hooks"
+	"github.com/dsh2dsh/zrepl/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/util/envconst"
@@ -67,7 +68,8 @@ type periodicArgs struct {
 
 	cron     *cron.Cron
 	cronSpec string
-	wakeup   chan struct{}
+	wakeUp   chan struct{}
+	wakeSig  <-chan struct{}
 }
 
 type Periodic struct {
@@ -122,6 +124,8 @@ type (
 	state   func(a periodicArgs, u updater) state
 )
 
+func (s *Periodic) RunPeriodic() bool { return true }
+
 func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 	cron *cron.Cron,
 ) {
@@ -133,7 +137,8 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 	s.args.ctx = ctx
 	s.args.dryRun = false // for future expansion
 	s.args.cron = cron
-	s.args.wakeup = make(chan struct{})
+	s.args.wakeUp = make(chan struct{})
+	s.args.wakeSig = wakeup.Wait(ctx)
 
 	u := func(u func(*Periodic)) State {
 		s.mtx.Lock()
@@ -167,7 +172,7 @@ func (s *Periodic) runPeriodic(ctx context.Context) {
 	log := getLogger(ctx).WithField("cron", cronSpec)
 	id, err := s.args.cron.AddFunc(cronSpec, func() {
 		select {
-		case s.args.wakeup <- struct{}{}:
+		case s.args.wakeUp <- struct{}{}:
 			s.wakeupBusy = 0
 		case <-ctx.Done():
 		default:
@@ -226,6 +231,7 @@ func periodicStateSyncUp(a periodicArgs, u updater) state {
 		t := time.NewTimer(time.Until(syncPoint))
 		select {
 		case <-t.C:
+		case <-a.wakeSig:
 		case <-a.ctx.Done():
 			t.Stop()
 		}
@@ -294,7 +300,8 @@ func periodicStateWait(a periodicArgs, u updater) state {
 	})
 
 	select {
-	case <-a.wakeup:
+	case <-a.wakeUp:
+	case <-a.wakeSig:
 	case <-a.ctx.Done():
 	}
 	if a.ctx.Err() != nil {
