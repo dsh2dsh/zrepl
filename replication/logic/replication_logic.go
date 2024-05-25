@@ -507,23 +507,22 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 	log(ctx).Debug("compute send size estimate")
 	errs := make(chan error, len(steps))
 	fanOutCtx, fanOutCancel := context.WithCancel(ctx)
-	_, fanOutAdd, fanOutWait := trace.WithTaskGroup(fanOutCtx, "compute-size-estimate")
+	taskCtx, fanOutAdd, fanOutWait := trace.WithTaskGroup(fanOutCtx,
+		"compute-size-estimate")
 	defer fanOutCancel()
 	for _, step := range steps {
-		step := step // local copy that is moved into the closure
+		// TODO: instead of the semaphore, rely on resource-exhaustion signaled by
+		// the remote endpoint to limit size-estimate requests. Send is handled
+		// over rpc/dataconn ATM, which doesn't support the resource exhaustion
+		// status codes that gRPC defines.
+		guard, err := fs.sizeEstimateRequestSem.Acquire(taskCtx)
+		if err != nil {
+			fanOutCancel()
+			break
+		}
 		fanOutAdd(func(ctx context.Context) {
-			// TODO: instead of the semaphore, rely on resource-exhaustion signaled by
-			// the remote endpoint to limit size-estimate requests. Send is handled
-			// over rpc/dataconn ATM, which doesn't support the resource exhaustion
-			// status codes that gRPC defines.
-			guard, err := fs.sizeEstimateRequestSem.Acquire(ctx)
-			if err != nil {
-				fanOutCancel()
-				return
-			}
 			defer guard.Release()
-
-			err = step.updateSizeEstimate(ctx)
+			err := step.updateSizeEstimate(ctx)
 			if err != nil {
 				log(ctx).WithError(err).WithField("step", step).Error(
 					"error computing size estimate")
