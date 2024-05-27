@@ -220,7 +220,7 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
     sets zfs binary path to "/sbin/zfs".
 
-  * Replication able to generate a stream package that sends all intermediary
+  * Replication is able to generate a stream package that sends all intermediary
     snapshots (`zfs send -I`), instead of every intermediary snapshot one by one
     (`zfs send -i`). Configuration example:
 
@@ -232,6 +232,27 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
           # Send all intermediary snapshots as a stream package, instead of
           # sending them one by one. Default: false.
           one_step: true
+    ```
+
+    Replication with `one_step: true` is much faster. For instance a job on my
+    desktop configured like:
+
+    ``` yaml
+    replication:
+      one_step: true
+      concurrency:
+        steps: 4
+        size_estimates: 8
+    ```
+
+    replicates over WLAN for 1m32s, instead of 8m with configuration like
+
+    ``` yaml
+    replication:
+      one_step: false
+      concurrency:
+        steps: 4
+        size_estimates: 4
     ```
 
   * Small cosmetic changes
