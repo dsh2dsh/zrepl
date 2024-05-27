@@ -1,9 +1,6 @@
 # Build
 artifacts/
 
-# Golang
-vendor/
-
 # IDEs
 .idea/
 .vscode/
