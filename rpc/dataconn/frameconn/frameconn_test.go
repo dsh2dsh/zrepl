@@ -9,7 +9,6 @@ import (
 
 func TestIsPublicFrameType(t *testing.T) {
 	for i := uint32(0); i < 256; i++ {
-		i := i
 		t.Run(fmt.Sprintf("^%d", i), func(t *testing.T) {
 			assert.False(t, IsPublicFrameType(^i))
 		})

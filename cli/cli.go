@@ -51,7 +51,6 @@ var completionCmdMap = map[string]completionCmdInfo{
 
 func init() {
 	for sh, info := range completionCmdMap {
-		sh, info := sh, info
 		genCompletionCmd.AddCommand(&cobra.Command{
 			Use:     fmt.Sprintf("%s path/to/out/file", sh),
 			Short:   fmt.Sprintf("generate %s completions", sh),

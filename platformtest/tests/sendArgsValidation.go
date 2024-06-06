@@ -400,7 +400,6 @@ func SendArgsValidationEE_EncryptionAndRaw(ctx *platformtest.Context) {
 	}
 
 	for _, tc := range tcs {
-		tc := tc // closure would copy by ref otherwise
 		ctx.QueueSubtest(fmt.Sprintf("%#v", tc), func(ctx *platformtest.Context) {
 			implSendArgsValidationEndToEndTest(ctx, sendArgsValidationEndToEndTest{
 				encryptedSenderFilesystem: tc.SFSEnc,

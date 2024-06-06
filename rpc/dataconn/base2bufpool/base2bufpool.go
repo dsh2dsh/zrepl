@@ -85,7 +85,6 @@ func New(minShift, maxShift uint, noFitBehavior NoFitBehavior) *Pool {
 	}
 	pools := make([]pool, maxShift-minShift+1)
 	for i := uint(0); i < uint(len(pools)); i++ {
-		i := i // the closure below must copy i
 		pools[i] = pool{
 			shift: minShift + i,
 			bufs:  make([][]byte, 0, 10),

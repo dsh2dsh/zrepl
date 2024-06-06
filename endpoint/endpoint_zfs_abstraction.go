@@ -630,7 +630,6 @@ func ListAbstractionsStreamed(ctx context.Context, query ListZFSHoldsAndBookmark
 		_, add, wait := trace.WithTaskGroup(ctx, "list-abstractions-impl-fs")
 		defer wait()
 		for _, fs := range fss {
-			fs := fs // capture by copy
 			add(func(ctx context.Context) {
 				g, err := sem.Acquire(ctx)
 				if err != nil {

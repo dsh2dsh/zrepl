@@ -1,6 +1,9 @@
 linters:
   enable:
-  - goimports
+    - "asciicheck"
+    - "bidichk"
+    - "copyloopvar"
+    - "goimports"
 
 issues:
   exclude-rules:

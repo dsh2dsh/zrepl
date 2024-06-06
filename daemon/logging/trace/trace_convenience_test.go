@@ -19,7 +19,6 @@ func TestGetCallerOrPanic(t *testing.T) {
 }
 
 func TestWithTaskGroupRunTasksConcurrently(t *testing.T) {
-
 	// spawn a task group where each task waits for the other to start
 	// => without concurrency, they would hang
 
@@ -33,7 +32,6 @@ func TestWithTaskGroupRunTasksConcurrently(t *testing.T) {
 	var hadTimeout uint32
 	started0, started1 := make(chan struct{}), make(chan struct{})
 	for i := 0; i < 2; i++ {
-		i := i // capture by copy
 		add(func(ctx context.Context) {
 			switch i {
 			case 0:
@@ -58,5 +56,4 @@ func TestWithTaskGroupRunTasksConcurrently(t *testing.T) {
 
 	waitEnd()
 	assert.Zero(t, hadTimeout, "either bad impl or scheduler timeout (which is %v)", schedulerTimeout)
-
 }
