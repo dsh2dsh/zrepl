@@ -799,7 +799,11 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 				panic(fmt.Sprintf("fromdefaults not supported at field '%s' %v", e.Key, field.Type()))
 			}
 
-			v := reflect.New(field.Type().Elem())
+			v := field
+			if field.IsNil() {
+				v = reflect.New(field.Type().Elem())
+			}
+
 			if defaulterOK {
 				v.Interface().(Defaulter).SetDefault()
 			} else {
