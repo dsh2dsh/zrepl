@@ -7,7 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 func testValidGlobalSection(t *testing.T, s string) *Config {

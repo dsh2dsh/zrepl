@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 func TestPositiveDurationOrManual(t *testing.T) {
@@ -37,5 +38,4 @@ func TestPositiveDurationOrManual(t *testing.T) {
 			}
 		})
 	}
-
 }

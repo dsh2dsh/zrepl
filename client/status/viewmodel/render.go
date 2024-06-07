@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	yaml "github.com/zrepl/yaml-config"
 
 	"github.com/dsh2dsh/zrepl/client/status/viewmodel/stringbuilder"
+	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/daemon"
 	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/daemon/pruner"

@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 type A struct {
@@ -25,7 +26,6 @@ type C struct {
 }
 
 func TestDepFromDefaults(t *testing.T) {
-
 	type testcase struct {
 		name   string
 		yaml   string
@@ -86,5 +86,4 @@ b:
 			require.Equal(t, tc.expect, &a)
 		})
 	}
-
 }

@@ -103,3 +103,27 @@ func TestEmptyConfig(t *testing.T) {
 		require.Empty(t, config.Jobs)
 	}
 }
+
+func TestPushJob(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "push"
+    connect:
+      type: "local"
+      listener_name: "foo"
+      client_identity: "bar"
+    filesystems:
+      "<": true
+    snapshotting:
+      type: "manual"
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+`)
+
+	require.NotEmpty(t, c.Jobs)
+	pushJob := c.Jobs[0].Ret.(*PushJob)
+	require.NotNil(t, pushJob)
+	assert.True(t, pushJob.Replication.OneStep)
+}

@@ -5,11 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 func TestBits(t *testing.T) {
-
 	tcs := []struct {
 		input      string
 		expectRate float64
@@ -39,7 +39,6 @@ func TestBits(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.input, func(t *testing.T) {
-
 			var bits Bits
 			err := yaml.Unmarshal([]byte(tc.input), &bits)
 			if tc.expectErr != "" {
@@ -51,7 +50,5 @@ func TestBits(t *testing.T) {
 				assert.Equal(t, tc.expectRate, bits.bits)
 			}
 		})
-
 	}
-
 }

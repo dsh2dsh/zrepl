@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/kr/pretty"
-	"github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 type Duration struct{ d time.Duration }

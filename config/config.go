@@ -6,8 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/zrepl/yaml-config"
-
+	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/util/datasizeunit"
 	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
 )
@@ -58,6 +57,10 @@ func (j JobEnum) Name() string {
 		panic(fmt.Sprintf("unknown job type %T", v))
 	}
 	return name
+}
+
+func NewActiveJob() ActiveJob {
+	return ActiveJob{Replication: NewReplication()}
 }
 
 type ActiveJob struct {
@@ -148,6 +151,10 @@ type BandwidthLimit struct {
 	BucketCapacity datasizeunit.Bits `yaml:"bucket_capacity,default=128 KiB"`
 }
 
+func NewReplication() *Replication {
+	return &Replication{OneStep: true}
+}
+
 type Replication struct {
 	Protection  *ReplicationOptionsProtection  `yaml:"protection,optional,fromdefaults"`
 	Concurrency *ReplicationOptionsConcurrency `yaml:"concurrency,optional,fromdefaults"`
@@ -173,6 +180,10 @@ type PlaceholderRecvOptions struct {
 	Encryption string `yaml:"encryption,default=inherit"`
 }
 
+func NewPushJob() *PushJob {
+	return &PushJob{ActiveJob: NewActiveJob()}
+}
+
 type PushJob struct {
 	ActiveJob    `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
@@ -182,6 +193,10 @@ type PushJob struct {
 
 func (j *PushJob) GetFilesystems() FilesystemsFilter { return j.Filesystems }
 func (j *PushJob) GetSendOptions() *SendOptions      { return j.Send }
+
+func NewPullJob() *PullJob {
+	return &PullJob{ActiveJob: NewActiveJob()}
+}
 
 type PullJob struct {
 	ActiveJob `yaml:",inline"`
@@ -526,9 +541,9 @@ func enumUnmarshal(u func(interface{}, bool) error, types map[string]interface{}
 func (t *JobEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
 	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
 		"snap":   &SnapJob{},
-		"push":   &PushJob{},
+		"push":   NewPushJob(),
 		"sink":   &SinkJob{},
-		"pull":   &PullJob{},
+		"pull":   NewPullJob(),
 		"source": &SourceJob{},
 	})
 	return

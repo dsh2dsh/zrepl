@@ -9,9 +9,9 @@ import (
 	"path"
 
 	netssh "github.com/problame/go-netssh"
-	"github.com/zrepl/yaml-config"
 
 	"github.com/dsh2dsh/zrepl/config"
+	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/transport"
 	transportconfig "github.com/dsh2dsh/zrepl/transport/fromconfig"
 )
