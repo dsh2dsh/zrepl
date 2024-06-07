@@ -220,9 +220,10 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
     sets zfs binary path to "/sbin/zfs".
 
-  * Replication is able to generate a stream package that sends all intermediary
-    snapshots (`zfs send -I`), instead of every intermediary snapshot one by one
-    (`zfs send -i`). Configuration example:
+  * Replication by default generates a stream package that sends all
+    intermediary snapshots (`zfs send -I`), instead of every intermediary
+    snapshot one by one (`zfs send -i`). If you want change it back to original
+    slow mode:
 
     ``` yaml
     jobs:
@@ -230,8 +231,8 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
         type: "push"
         replication:
           # Send all intermediary snapshots as a stream package, instead of
-          # sending them one by one. Default: false.
-          one_step: true
+          # sending them one by one. Default: true.
+          one_step: false
     ```
 
     Replication with `one_step: true` is much faster. For instance a job on my
@@ -239,7 +240,6 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
     ``` yaml
     replication:
-      one_step: true
       concurrency:
         steps: 4
         size_estimates: 8

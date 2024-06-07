@@ -127,3 +127,79 @@ jobs:
 	require.NotNil(t, pushJob)
 	assert.True(t, pushJob.Replication.OneStep)
 }
+
+func TestPushJob_withOneStep(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "push"
+    connect:
+      type: "local"
+      listener_name: "foo"
+      client_identity: "bar"
+    filesystems:
+      "<": true
+    snapshotting:
+      type: "manual"
+    replication:
+      one_step: false
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+`)
+
+	require.NotEmpty(t, c.Jobs)
+	pushJob := c.Jobs[0].Ret.(*PushJob)
+	require.NotNil(t, pushJob)
+	assert.False(t, pushJob.Replication.OneStep)
+}
+
+func TestPullJob(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "pull"
+    connect:
+      type: "tls"
+      address: "server1.foo.bar:8888"
+      ca: "/certs/ca.crt"
+      cert: "/certs/cert.crt"
+      key: "/certs/key.pem"
+      server_cn: "server1"
+    root_fs: "pool2/backup_servers"
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+`)
+
+	require.NotEmpty(t, c.Jobs)
+	pullJob := c.Jobs[0].Ret.(*PullJob)
+	require.NotNil(t, pullJob)
+	assert.True(t, pullJob.Replication.OneStep)
+}
+
+func TestPullJob_withOneStep(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "pull"
+    connect:
+      type: "tls"
+      address: "server1.foo.bar:8888"
+      ca: "/certs/ca.crt"
+      cert: "/certs/cert.crt"
+      key: "/certs/key.pem"
+      server_cn: "server1"
+    root_fs: "pool2/backup_servers"
+    replication:
+      one_step: false
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+`)
+
+	require.NotEmpty(t, c.Jobs)
+	pullJob := c.Jobs[0].Ret.(*PullJob)
+	require.NotNil(t, pullJob)
+	assert.False(t, pullJob.Replication.OneStep)
+}
