@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"net"
-	"os"
 
 	. "gopkg.in/check.v1"
 
@@ -43,91 +42,120 @@ var marshalTests = []struct {
 	{
 		nil,
 		"null\n",
-	}, {
+	},
+	{
 		(*marshalerType)(nil),
 		"null\n",
-	}, {
+	},
+	{
 		&struct{}{},
 		"{}\n",
-	}, {
+	},
+	{
 		map[string]string{"v": "hi"},
 		"v: hi\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": "hi"},
 		"v: hi\n",
-	}, {
+	},
+	{
 		map[string]string{"v": "true"},
 		"v: \"true\"\n",
-	}, {
+	},
+	{
 		map[string]string{"v": "false"},
 		"v: \"false\"\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": true},
 		"v: true\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": false},
 		"v: false\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": 10},
 		"v: 10\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": -10},
 		"v: -10\n",
-	}, {
+	},
+	{
 		map[string]uint{"v": 42},
 		"v: 42\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": int64(4294967296)},
 		"v: 4294967296\n",
-	}, {
+	},
+	{
 		map[string]int64{"v": int64(4294967296)},
 		"v: 4294967296\n",
-	}, {
+	},
+	{
 		map[string]uint64{"v": 4294967296},
 		"v: 4294967296\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": "10"},
 		"v: \"10\"\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": 0.1},
 		"v: 0.1\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": float64(0.1)},
 		"v: 0.1\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": float32(0.99)},
 		"v: 0.99\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": -0.1},
 		"v: -0.1\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": math.Inf(+1)},
 		"v: .inf\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": math.Inf(-1)},
 		"v: -.inf\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": math.NaN()},
 		"v: .nan\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": nil},
 		"v: null\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"v": ""},
 		"v: \"\"\n",
-	}, {
-		map[string][]string{"v": []string{"A", "B"}},
+	},
+	{
+		map[string][]string{"v": {"A", "B"}},
 		"v:\n- A\n- B\n",
-	}, {
-		map[string][]string{"v": []string{"A", "B\nC"}},
+	},
+	{
+		map[string][]string{"v": {"A", "B\nC"}},
 		"v:\n- A\n- |-\n  B\n  C\n",
-	}, {
-		map[string][]interface{}{"v": []interface{}{"A", 1, map[string][]int{"B": []int{2, 3}}}},
+	},
+	{
+		map[string][]interface{}{"v": {"A", 1, map[string][]int{"B": {2, 3}}}},
 		"v:\n- A\n- 1\n- B:\n  - 2\n  - 3\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"a": map[interface{}]interface{}{"b": "c"}},
 		"a:\n  b: c\n",
-	}, {
+	},
+	{
 		map[string]interface{}{"a": "-"},
 		"a: '-'\n",
 	},
@@ -142,42 +170,50 @@ var marshalTests = []struct {
 	{
 		&struct{ Hello string }{"world"},
 		"hello: world\n",
-	}, {
+	},
+	{
 		&struct {
 			A struct {
 				B string
 			}
 		}{struct{ B string }{"c"}},
 		"a:\n  b: c\n",
-	}, {
+	},
+	{
 		&struct {
 			A *struct {
 				B string
 			}
 		}{&struct{ B string }{"c"}},
 		"a:\n  b: c\n",
-	}, {
+	},
+	{
 		&struct {
 			A *struct {
 				B string
 			}
 		}{},
 		"a: null\n",
-	}, {
+	},
+	{
 		&struct{ A int }{1},
 		"a: 1\n",
-	}, {
+	},
+	{
 		&struct{ A []int }{[]int{1, 2}},
 		"a:\n- 1\n- 2\n",
-	}, {
+	},
+	{
 		&struct{ A [2]int }{[2]int{1, 2}},
 		"a:\n- 1\n- 2\n",
-	}, {
+	},
+	{
 		&struct {
-			B int "a"
+			B int `yaml:"a"`
 		}{1},
 		"a: 1\n",
-	}, {
+	},
+	{
 		&struct{ A bool }{true},
 		"a: true\n",
 	},
@@ -185,54 +221,61 @@ var marshalTests = []struct {
 	// Conditional flag
 	{
 		&struct {
-			A int "a,omitempty"
-			B int "b,omitempty"
-		}{1, 0},
-		"a: 1\n",
-	}, {
-		&struct {
-			A int "a,omitempty"
-			B int "b,omitempty"
-		}{0, 0},
-		"{}\n",
-	}, {
-		&struct {
-			A *struct{ X, y int } "a,omitempty,flow"
-		}{&struct{ X, y int }{1, 2}},
-		"a: {x: 1}\n",
-	}, {
-		&struct {
-			A *struct{ X, y int } "a,omitempty,flow"
-		}{nil},
-		"{}\n",
-	}, {
-		&struct {
-			A *struct{ X, y int } "a,omitempty,flow"
-		}{&struct{ X, y int }{}},
-		"a: {x: 0}\n",
-	}, {
-		&struct {
-			A struct{ X, y int } "a,omitempty,flow"
-		}{struct{ X, y int }{1, 2}},
-		"a: {x: 1}\n",
-	}, {
-		&struct {
-			A struct{ X, y int } "a,omitempty,flow"
-		}{struct{ X, y int }{0, 1}},
-		"{}\n",
-	}, {
-		&struct {
-			A float64 "a,omitempty"
-			B float64 "b,omitempty"
+			A int `yaml:"a,omitempty"`
+			B int `yaml:"b,omitempty"`
 		}{1, 0},
 		"a: 1\n",
 	},
 	{
 		&struct {
-			T1 time.Time  "t1,omitempty"
-			T2 time.Time  "t2,omitempty"
-			T3 *time.Time "t3,omitempty"
-			T4 *time.Time "t4,omitempty"
+			A int `yaml:"a,omitempty"`
+			B int `yaml:"b,omitempty"`
+		}{0, 0},
+		"{}\n",
+	},
+	{
+		&struct {
+			A *struct{ X, y int } `yaml:"a,omitempty,flow"`
+		}{&struct{ X, y int }{1, 2}},
+		"a: {x: 1}\n",
+	},
+	{
+		&struct {
+			A *struct{ X, y int } `yaml:"a,omitempty,flow"`
+		}{nil},
+		"{}\n",
+	},
+	{
+		&struct {
+			A *struct{ X, y int } `yaml:"a,omitempty,flow"`
+		}{&struct{ X, y int }{}},
+		"a: {x: 0}\n",
+	},
+	{
+		&struct {
+			A struct{ X, y int } `yaml:"a,omitempty,flow"`
+		}{struct{ X, y int }{1, 2}},
+		"a: {x: 1}\n",
+	},
+	{
+		&struct {
+			A struct{ X, y int } `yaml:"a,omitempty,flow"`
+		}{struct{ X, y int }{0, 1}},
+		"{}\n",
+	},
+	{
+		&struct {
+			A float64 `yaml:"a,omitempty"`
+			B float64 `yaml:"b,omitempty"`
+		}{1, 0},
+		"a: 1\n",
+	},
+	{
+		&struct {
+			T1 time.Time  `yaml:"t1,omitempty"`
+			T2 time.Time  `yaml:"t2,omitempty"`
+			T3 *time.Time `yaml:"t3,omitempty"`
+			T4 *time.Time `yaml:"t4,omitempty"`
 		}{
 			T2: time.Date(2018, 1, 9, 10, 40, 47, 0, time.UTC),
 			T4: newTime(time.Date(2098, 1, 9, 10, 40, 47, 0, time.UTC)),
@@ -250,19 +293,21 @@ var marshalTests = []struct {
 	// Flow flag
 	{
 		&struct {
-			A []int "a,flow"
+			A []int `yaml:"a,flow"`
 		}{[]int{1, 2}},
 		"a: [1, 2]\n",
-	}, {
+	},
+	{
 		&struct {
-			A map[string]string "a,flow"
+			A map[string]string `yaml:"a,flow"`
 		}{map[string]string{"b": "c", "d": "e"}},
 		"a: {b: c, d: e}\n",
-	}, {
+	},
+	{
 		&struct {
 			A struct {
 				B, D string
-			} "a,flow"
+			} `yaml:"a,flow"`
 		}{struct{ B, D string }{"c", "e"}},
 		"a: {b: c, d: e}\n",
 	},
@@ -280,7 +325,7 @@ var marshalTests = []struct {
 	{
 		&struct {
 			A int
-			B int "-"
+			B int `yaml:"-"`
 		}{1, 2},
 		"a: 1\n",
 	},
@@ -326,10 +371,12 @@ var marshalTests = []struct {
 	{
 		map[string]string{"a": "\x00"},
 		"a: \"\\0\"\n",
-	}, {
+	},
+	{
 		map[string]string{"a": "\x80\x81\x82"},
 		"a: !!binary gIGC\n",
-	}, {
+	},
+	{
 		map[string]string{"a": strings.Repeat("\x90", 54)},
 		"a: !!binary |\n  " + strings.Repeat("kJCQ", 17) + "kJ\n  CQ\n",
 	},
@@ -401,14 +448,14 @@ var marshalTests = []struct {
 }
 
 func (s *S) TestLineWrapping(c *C) {
-	var v = map[string]string{
+	v := map[string]string{
 		"a": "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 ",
 	}
 	data, err := yaml.Marshal(v)
 	c.Assert(err, IsNil)
 	c.Assert(string(data), Equals,
-		"a: 'abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 abcdefghijklmnopqrstuvwxyz\n" +
-		"  ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 '\n")
+		"a: 'abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 abcdefghijklmnopqrstuvwxyz\n"+
+			"  ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 '\n")
 
 	// The API does not allow this process to be reversed as it's intended
 	// for migration only. v3 drops this method and instead offers more
@@ -476,13 +523,13 @@ var marshalErrorTests = []struct {
 }{{
 	value: &struct {
 		B       int
-		inlineB ",inline"
+		inlineB `yaml:",inline"`
 	}{1, inlineB{2, inlineC{3}}},
 	panic: `Duplicated key 'b' in struct struct \{ B int; .*`,
 }, {
 	value: &struct {
 		A int
-		B map[string]int ",inline"
+		B map[string]int `yaml:",inline"`
 	}{1, map[string]int{"a": 2}},
 	panic: `Can't have key "a" in inlined map; conflicts with struct field`,
 }}
@@ -538,7 +585,7 @@ func (o marshalerType) MarshalYAML() (interface{}, error) {
 }
 
 type marshalerValue struct {
-	Field marshalerType "_"
+	Field marshalerType `yaml:"_"`
 }
 
 func (s *S) TestMarshaler(c *C) {

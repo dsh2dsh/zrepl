@@ -308,7 +308,7 @@ var unmarshalTests = []struct {
 	{
 		"a: 1",
 		&struct {
-			B int "a"
+			B int `yaml:"a"`
 		}{1},
 	},
 	{
@@ -545,7 +545,7 @@ var unmarshalTests = []struct {
 		"a: 1\nb: 2\n",
 		&struct {
 			A int
-			B int "-"
+			B int `yaml:"-"`
 		}{1, 0},
 	},
 
@@ -1016,11 +1016,11 @@ func (o *unmarshalerType) UnmarshalYAML(unmarshal func(v interface{}, not_strict
 }
 
 type unmarshalerPointer struct {
-	Field *unmarshalerType "_"
+	Field *unmarshalerType `yaml:"_"`
 }
 
 type unmarshalerValue struct {
-	Field unmarshalerType "_"
+	Field unmarshalerType `yaml:"_"`
 }
 
 func (s *S) TestUnmarshalerPointerField(c *C) {
@@ -1263,7 +1263,7 @@ func (s *S) TestMergeStruct(c *C) {
 }
 
 var unmarshalNullTests = []func() interface{}{
-	func() interface{} { var v interface{}; v = "v"; return &v },
+	func() interface{} { var v interface{} = "v"; return &v },
 	func() interface{} { s := "s"; return &s },
 	func() interface{} { s := "s"; sptr := &s; return &sptr },
 	func() interface{} { i := 1; return &i },

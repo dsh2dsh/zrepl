@@ -229,7 +229,6 @@ type decoder struct {
 	aliases map[*node]bool
 	mapType reflect.Type
 	terrors []string
-	strict  bool
 
 	decodeCount int
 	aliasCount  int
@@ -465,14 +464,10 @@ func (d *decoder) scalar(n *node, out reflect.Value) bool {
 			out.SetString(resolved.(string))
 			return true
 		}
-		if resolved != nil {
-			out.SetString(n.value)
-			return true
-		}
+		out.SetString(n.value)
+		return true
 	case reflect.Interface:
-		if resolved == nil {
-			out.Set(reflect.Zero(out.Type()))
-		} else if tag == yaml_TIMESTAMP_TAG {
+		if tag == yaml_TIMESTAMP_TAG {
 			// It looks like a timestamp but for backward compatibility
 			// reasons we set it as a string, so that code that unmarshals
 			// timestamp-like values into interface{} will continue to
@@ -858,7 +853,7 @@ func (d *decoder) mappingStruct(n *node, out reflect.Value, strict bool) (good b
 				isZeroPositive = v >= 0
 			case uint32:
 				isPositive = v > 0
-				isZeroPositive = v >= 0
+				isZeroPositive = true
 			default:
 				d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s must be positive but check is not implemented for given type", n.line, e.Key))
 			}
@@ -913,5 +908,5 @@ func (d *decoder) merge(n *node, out reflect.Value, strict bool) {
 }
 
 func isMerge(n *node) bool {
-	return n.kind == scalarNode && n.value == "<<" && (n.implicit == true || n.tag == yaml_MERGE_TAG)
+	return n.kind == scalarNode && n.value == "<<" && (n.implicit || n.tag == yaml_MERGE_TAG)
 }

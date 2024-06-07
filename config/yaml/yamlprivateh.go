@@ -78,7 +78,7 @@ func is_z(b []byte, i int) bool {
 }
 
 // Check if the beginning of the buffer is a BOM.
-func is_bom(b []byte, i int) bool {
+func is_bom(b []byte, _ int) bool {
 	return b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF
 }
 
@@ -94,7 +94,7 @@ func is_tab(b []byte, i int) bool {
 
 // Check if the character at the specified position is blank (space or tab).
 func is_blank(b []byte, i int) bool {
-	//return is_space(b, i) || is_tab(b, i)
+	// return is_space(b, i) || is_tab(b, i)
 	return b[i] == ' ' || b[i] == '\t'
 }
 
@@ -113,7 +113,7 @@ func is_crlf(b []byte, i int) bool {
 
 // Check if the character is a line break or NUL.
 func is_breakz(b []byte, i int) bool {
-	//return is_break(b, i) || is_z(b, i)
+	// return is_break(b, i) || is_z(b, i)
 	return (        // is_break:
 	b[i] == '\r' || // CR (#xD)
 		b[i] == '\n' || // LF (#xA)
@@ -124,23 +124,9 @@ func is_breakz(b []byte, i int) bool {
 		b[i] == 0)
 }
 
-// Check if the character is a line break, space, or NUL.
-func is_spacez(b []byte, i int) bool {
-	//return is_space(b, i) || is_breakz(b, i)
-	return ( // is_space:
-	b[i] == ' ' ||
-		// is_breakz:
-		b[i] == '\r' || // CR (#xD)
-		b[i] == '\n' || // LF (#xA)
-		b[i] == 0xC2 && b[i+1] == 0x85 || // NEL (#x85)
-		b[i] == 0xE2 && b[i+1] == 0x80 && b[i+2] == 0xA8 || // LS (#x2028)
-		b[i] == 0xE2 && b[i+1] == 0x80 && b[i+2] == 0xA9 || // PS (#x2029)
-		b[i] == 0)
-}
-
 // Check if the character is a line break, space, tab, or NUL.
 func is_blankz(b []byte, i int) bool {
-	//return is_blank(b, i) || is_breakz(b, i)
+	// return is_blank(b, i) || is_breakz(b, i)
 	return ( // is_blank:
 	b[i] == ' ' || b[i] == '\t' ||
 		// is_breakz:
@@ -169,5 +155,4 @@ func width(b byte) int {
 		return 4
 	}
 	return 0
-
 }

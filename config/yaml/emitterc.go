@@ -130,10 +130,9 @@ func yaml_emitter_emit(emitter *yaml_emitter_t, event *yaml_event_t) bool {
 // Check if we need to accumulate more events before emitting.
 //
 // We accumulate extra
-//  - 1 event for DOCUMENT-START
-//  - 2 events for SEQUENCE-START
-//  - 3 events for MAPPING-START
-//
+//   - 1 event for DOCUMENT-START
+//   - 2 events for SEQUENCE-START
+//   - 3 events for MAPPING-START
 func yaml_emitter_need_more_events(emitter *yaml_emitter_t) bool {
 	if emitter.events_head == len(emitter.events) {
 		return true
@@ -142,13 +141,10 @@ func yaml_emitter_need_more_events(emitter *yaml_emitter_t) bool {
 	switch emitter.events[emitter.events_head].typ {
 	case yaml_DOCUMENT_START_EVENT:
 		accumulate = 1
-		break
 	case yaml_SEQUENCE_START_EVENT:
 		accumulate = 2
-		break
 	case yaml_MAPPING_START_EVENT:
 		accumulate = 3
-		break
 	default:
 		return false
 	}
@@ -310,7 +306,6 @@ func yaml_emitter_emit_stream_start(emitter *yaml_emitter_t, event *yaml_event_t
 
 // Expect DOCUMENT-START or STREAM-END.
 func yaml_emitter_emit_document_start(emitter *yaml_emitter_t, event *yaml_event_t, first bool) bool {
-
 	if event.typ == yaml_DOCUMENT_START_EVENT {
 
 		if event.version_directive != nil {
@@ -647,8 +642,8 @@ func yaml_emitter_emit_block_mapping_value(emitter *yaml_emitter_t, event *yaml_
 
 // Expect a node.
 func yaml_emitter_emit_node(emitter *yaml_emitter_t, event *yaml_event_t,
-	root bool, sequence bool, mapping bool, simple_key bool) bool {
-
+	root bool, sequence bool, mapping bool, simple_key bool,
+) bool {
 	emitter.root_context = root
 	emitter.sequence_context = sequence
 	emitter.mapping_context = mapping
@@ -670,7 +665,7 @@ func yaml_emitter_emit_node(emitter *yaml_emitter_t, event *yaml_event_t,
 }
 
 // Expect ALIAS.
-func yaml_emitter_emit_alias(emitter *yaml_emitter_t, event *yaml_event_t) bool {
+func yaml_emitter_emit_alias(emitter *yaml_emitter_t, _ *yaml_event_t) bool {
 	if !yaml_emitter_process_anchor(emitter) {
 		return false
 	}
@@ -738,7 +733,7 @@ func yaml_emitter_emit_mapping_start(emitter *yaml_emitter_t, event *yaml_event_
 }
 
 // Check if the document content is an empty scalar.
-func yaml_emitter_check_empty_document(emitter *yaml_emitter_t) bool {
+func yaml_emitter_check_empty_document(_ *yaml_emitter_t) bool {
 	return false // [Go] Huh?
 }
 
@@ -796,7 +791,6 @@ func yaml_emitter_check_simple_key(emitter *yaml_emitter_t) bool {
 
 // Determine an acceptable scalar style.
 func yaml_emitter_select_scalar_style(emitter *yaml_emitter_t, event *yaml_event_t) bool {
-
 	no_tag := len(emitter.tag_data.handle) == 0 && len(emitter.tag_data.suffix) == 0
 	if no_tag && !event.implicit && !event.quoted_implicit {
 		return yaml_emitter_set_emitter_error(emitter, "neither tag nor implicit flags are specified")
@@ -983,22 +977,22 @@ func yaml_emitter_analyze_tag(emitter *yaml_emitter_t, tag []byte) bool {
 // Check if a scalar is valid.
 func yaml_emitter_analyze_scalar(emitter *yaml_emitter_t, value []byte) bool {
 	var (
-		block_indicators   = false
-		flow_indicators    = false
-		line_breaks        = false
-		special_characters = false
+		block_indicators   bool
+		flow_indicators    bool
+		line_breaks        bool
+		special_characters bool
 
-		leading_space  = false
-		leading_break  = false
-		trailing_space = false
-		trailing_break = false
-		break_space    = false
-		space_break    = false
+		leading_space  bool
+		leading_break  bool
+		trailing_space bool
+		trailing_break bool
+		break_space    bool
+		space_break    bool
 
-		preceded_by_whitespace = false
-		followed_by_whitespace = false
-		previous_space         = false
-		previous_break         = false
+		preceded_by_whitespace bool
+		followed_by_whitespace bool
+		previous_space         bool
+		previous_break         bool
 	)
 
 	emitter.scalar_data.value = value
@@ -1131,7 +1125,6 @@ func yaml_emitter_analyze_scalar(emitter *yaml_emitter_t, value []byte) bool {
 
 // Check if the event data is valid.
 func yaml_emitter_analyze_event(emitter *yaml_emitter_t, event *yaml_event_t) bool {
-
 	emitter.anchor_data.anchor = nil
 	emitter.tag_data.handle = nil
 	emitter.tag_data.suffix = nil
@@ -1368,7 +1361,6 @@ func yaml_emitter_write_plain_scalar(emitter *yaml_emitter_t, value []byte, allo
 }
 
 func yaml_emitter_write_single_quoted_scalar(emitter *yaml_emitter_t, value []byte, allow_breaks bool) bool {
-
 	if !yaml_emitter_write_indicator(emitter, []byte{'\''}, true, false, false) {
 		return false
 	}
