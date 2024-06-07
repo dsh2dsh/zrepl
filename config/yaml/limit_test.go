@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 var limitTests = []struct {

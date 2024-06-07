@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	yaml "github.com/zrepl/yaml-config"
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 // An example showing how to unmarshal embedded

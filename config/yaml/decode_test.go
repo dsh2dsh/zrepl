@@ -9,7 +9,8 @@ import (
 	"time"
 
 	. "gopkg.in/check.v1"
-	yaml "github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 var unmarshalIntTest = 123
@@ -24,45 +25,59 @@ var unmarshalTests = []struct {
 	},
 	{
 		"{}", &struct{}{},
-	}, {
+	},
+	{
 		"v: hi",
 		map[string]string{"v": "hi"},
-	}, {
+	},
+	{
 		"v: hi", map[string]interface{}{"v": "hi"},
-	}, {
+	},
+	{
 		"v: true",
 		map[string]string{"v": "true"},
-	}, {
+	},
+	{
 		"v: true",
 		map[string]interface{}{"v": true},
-	}, {
+	},
+	{
 		"v: 10",
 		map[string]interface{}{"v": 10},
-	}, {
+	},
+	{
 		"v: 0b10",
 		map[string]interface{}{"v": 2},
-	}, {
+	},
+	{
 		"v: 0xA",
 		map[string]interface{}{"v": 10},
-	}, {
+	},
+	{
 		"v: 4294967296",
 		map[string]int64{"v": 4294967296},
-	}, {
+	},
+	{
 		"v: 0.1",
 		map[string]interface{}{"v": 0.1},
-	}, {
+	},
+	{
 		"v: .1",
 		map[string]interface{}{"v": 0.1},
-	}, {
+	},
+	{
 		"v: .Inf",
 		map[string]interface{}{"v": math.Inf(+1)},
-	}, {
+	},
+	{
 		"v: -.Inf",
 		map[string]interface{}{"v": math.Inf(-1)},
-	}, {
+	},
+	{
 		"v: -10",
 		map[string]interface{}{"v": -10},
-	}, {
+	},
+	{
 		"v: -.1",
 		map[string]interface{}{"v": -0.1},
 	},
@@ -77,16 +92,20 @@ var unmarshalTests = []struct {
 	{
 		"canonical: 6.8523e+5",
 		map[string]interface{}{"canonical": 6.8523e+5},
-	}, {
+	},
+	{
 		"expo: 685.230_15e+03",
 		map[string]interface{}{"expo": 685.23015e+03},
-	}, {
+	},
+	{
 		"fixed: 685_230.15",
 		map[string]interface{}{"fixed": 685230.15},
-	}, {
+	},
+	{
 		"neginf: -.inf",
 		map[string]interface{}{"neginf": math.Inf(-1)},
-	}, {
+	},
+	{
 		"fixed: 685_230.15",
 		map[string]float64{"fixed": 685230.15},
 	},
@@ -97,16 +116,20 @@ var unmarshalTests = []struct {
 	{
 		"canonical: y",
 		map[string]interface{}{"canonical": true},
-	}, {
+	},
+	{
 		"answer: NO",
 		map[string]interface{}{"answer": false},
-	}, {
+	},
+	{
 		"logical: True",
 		map[string]interface{}{"logical": true},
-	}, {
+	},
+	{
 		"option: on",
 		map[string]interface{}{"option": true},
-	}, {
+	},
+	{
 		"option: on",
 		map[string]bool{"option": true},
 	},
@@ -114,25 +137,32 @@ var unmarshalTests = []struct {
 	{
 		"canonical: 685230",
 		map[string]interface{}{"canonical": 685230},
-	}, {
+	},
+	{
 		"decimal: +685_230",
 		map[string]interface{}{"decimal": 685230},
-	}, {
+	},
+	{
 		"octal: 02472256",
 		map[string]interface{}{"octal": 685230},
-	}, {
+	},
+	{
 		"hexa: 0x_0A_74_AE",
 		map[string]interface{}{"hexa": 685230},
-	}, {
+	},
+	{
 		"bin: 0b1010_0111_0100_1010_1110",
 		map[string]interface{}{"bin": 685230},
-	}, {
+	},
+	{
 		"bin: -0b101010",
 		map[string]interface{}{"bin": -42},
-	}, {
+	},
+	{
 		"bin: -0b1000000000000000000000000000000000000000000000000000000000000000",
 		map[string]interface{}{"bin": -9223372036854775808},
-	}, {
+	},
+	{
 		"decimal: +685_230",
 		map[string]int{"decimal": 685230},
 	},
@@ -143,16 +173,20 @@ var unmarshalTests = []struct {
 	{
 		"empty:",
 		map[string]interface{}{"empty": nil},
-	}, {
+	},
+	{
 		"canonical: ~",
 		map[string]interface{}{"canonical": nil},
-	}, {
+	},
+	{
 		"english: null",
 		map[string]interface{}{"english": nil},
-	}, {
+	},
+	{
 		"~: null key",
 		map[interface{}]string{nil: "null key"},
-	}, {
+	},
+	{
 		"empty:",
 		map[string]*bool{"empty": nil},
 	},
@@ -161,16 +195,20 @@ var unmarshalTests = []struct {
 	{
 		"seq: [A,B]",
 		map[string]interface{}{"seq": []interface{}{"A", "B"}},
-	}, {
+	},
+	{
 		"seq: [A,B,C,]",
-		map[string][]string{"seq": []string{"A", "B", "C"}},
-	}, {
+		map[string][]string{"seq": {"A", "B", "C"}},
+	},
+	{
 		"seq: [A,1,C]",
-		map[string][]string{"seq": []string{"A", "1", "C"}},
-	}, {
+		map[string][]string{"seq": {"A", "1", "C"}},
+	},
+	{
 		"seq: [A,1,C]",
-		map[string][]int{"seq": []int{1}},
-	}, {
+		map[string][]int{"seq": {1}},
+	},
+	{
 		"seq: [A,1,C]",
 		map[string]interface{}{"seq": []interface{}{"A", 1, "C"}},
 	},
@@ -178,16 +216,20 @@ var unmarshalTests = []struct {
 	{
 		"seq:\n - A\n - B",
 		map[string]interface{}{"seq": []interface{}{"A", "B"}},
-	}, {
+	},
+	{
 		"seq:\n - A\n - B\n - C",
-		map[string][]string{"seq": []string{"A", "B", "C"}},
-	}, {
+		map[string][]string{"seq": {"A", "B", "C"}},
+	},
+	{
 		"seq:\n - A\n - 1\n - C",
-		map[string][]string{"seq": []string{"A", "1", "C"}},
-	}, {
+		map[string][]string{"seq": {"A", "1", "C"}},
+	},
+	{
 		"seq:\n - A\n - 1\n - C",
-		map[string][]int{"seq": []int{1}},
-	}, {
+		map[string][]int{"seq": {1}},
+	},
+	{
 		"seq:\n - A\n - 1\n - C",
 		map[string]interface{}{"seq": []interface{}{"A", 1, "C"}},
 	},
@@ -214,48 +256,62 @@ var unmarshalTests = []struct {
 	{
 		"hello: world",
 		&struct{ Hello string }{"world"},
-	}, {
+	},
+	{
 		"a: {b: c}",
 		&struct{ A struct{ B string } }{struct{ B string }{"c"}},
-	}, {
+	},
+	{
 		"a: {b: c}",
 		&struct{ A *struct{ B string } }{&struct{ B string }{"c"}},
-	}, {
+	},
+	{
 		"a: {b: c}",
 		&struct{ A map[string]string }{map[string]string{"b": "c"}},
-	}, {
+	},
+	{
 		"a: {b: c}",
 		&struct{ A *map[string]string }{&map[string]string{"b": "c"}},
-	}, {
+	},
+	{
 		"a:",
 		&struct{ A map[string]string }{},
-	}, {
+	},
+	{
 		"a: 1",
 		&struct{ A int }{1},
-	}, {
+	},
+	{
 		"a: 1",
 		&struct{ A float64 }{1},
-	}, {
+	},
+	{
 		"a: 1.0",
 		&struct{ A int }{1},
-	}, {
+	},
+	{
 		"a: 1.0",
 		&struct{ A uint }{1},
-	}, {
+	},
+	{
 		"a: [1, 2]",
 		&struct{ A []int }{[]int{1, 2}},
-	}, {
+	},
+	{
 		"a: [1, 2]",
 		&struct{ A [2]int }{[2]int{1, 2}},
-	}, {
+	},
+	{
 		"a: 1",
 		&struct{ B int }{0},
-	}, {
+	},
+	{
 		"a: 1",
 		&struct {
 			B int "a"
 		}{1},
-	}, {
+	},
+	{
 		"a: y",
 		&struct{ A bool }{true},
 	},
@@ -264,13 +320,16 @@ var unmarshalTests = []struct {
 	{
 		"v: 42",
 		map[string]uint{"v": 42},
-	}, {
+	},
+	{
 		"v: -42",
 		map[string]uint{},
-	}, {
+	},
+	{
 		"v: 4294967296",
 		map[string]uint64{"v": 4294967296},
-	}, {
+	},
+	{
 		"v: -4294967296",
 		map[string]uint64{},
 	},
@@ -387,7 +446,8 @@ var unmarshalTests = []struct {
 	{
 		"v: 4294967297",
 		map[string]int32{},
-	}, {
+	},
+	{
 		"v: 128",
 		map[string]int8{},
 	},
@@ -396,25 +456,30 @@ var unmarshalTests = []struct {
 	{
 		"'1': '\"2\"'",
 		map[interface{}]interface{}{"1": "\"2\""},
-	}, {
+	},
+	{
 		"v:\n- A\n- 'B\n\n  C'\n",
-		map[string][]string{"v": []string{"A", "B\nC"}},
+		map[string][]string{"v": {"A", "B\nC"}},
 	},
 
 	// Explicit tags.
 	{
 		"v: !!float '1.1'",
 		map[string]interface{}{"v": 1.1},
-	}, {
+	},
+	{
 		"v: !!float 0",
 		map[string]interface{}{"v": float64(0)},
-	}, {
+	},
+	{
 		"v: !!float -1",
 		map[string]interface{}{"v": float64(-1)},
-	}, {
+	},
+	{
 		"v: !!null ''",
 		map[string]interface{}{"v": nil},
-	}, {
+	},
+	{
 		"%TAG !y! tag:yaml.org,2002:\n---\nv: !y!int '1'",
 		map[string]interface{}{"v": 1},
 	},
@@ -429,14 +494,16 @@ var unmarshalTests = []struct {
 	{
 		"a: &x 1\nb: &y 2\nc: *x\nd: *y\n",
 		&struct{ A, B, C, D int }{1, 2, 1, 2},
-	}, {
+	},
+	{
 		"a: &a {c: 1}\nb: *a",
 		&struct {
 			A, B struct {
 				C int
 			}
 		}{struct{ C int }{1}, struct{ C int }{1}},
-	}, {
+	},
+	{
 		"a: &a [1, 2]\nb: *a",
 		&struct{ B []int }{[]int{1, 2}},
 	},
@@ -445,13 +512,16 @@ var unmarshalTests = []struct {
 	{
 		"foo: ''",
 		map[string]*string{"foo": new(string)},
-	}, {
+	},
+	{
 		"foo: null",
 		map[string]*string{"foo": nil},
-	}, {
+	},
+	{
 		"foo: null",
 		map[string]string{"foo": ""},
-	}, {
+	},
+	{
 		"foo: null",
 		map[string]interface{}{"foo": nil},
 	},
@@ -460,10 +530,12 @@ var unmarshalTests = []struct {
 	{
 		"foo: ~",
 		map[string]*string{"foo": nil},
-	}, {
+	},
+	{
 		"foo: ~",
 		map[string]string{"foo": ""},
-	}, {
+	},
+	{
 		"foo: ~",
 		map[string]interface{}{"foo": nil},
 	},
@@ -558,10 +630,12 @@ var unmarshalTests = []struct {
 	{
 		"a: !!binary gIGC\n",
 		map[string]string{"a": "\x80\x81\x82"},
-	}, {
+	},
+	{
 		"a: !!binary |\n  " + strings.Repeat("kJCQ", 17) + "kJ\n  CQ\n",
 		map[string]string{"a": strings.Repeat("\x90", 54)},
-	}, {
+	},
+	{
 		"a: !!binary |\n  " + strings.Repeat("A", 70) + "\n  ==\n",
 		map[string]string{"a": strings.Repeat("\x00", 52)},
 	},
@@ -587,11 +661,11 @@ var unmarshalTests = []struct {
 	// Support encoding.TextUnmarshaler.
 	{
 		"a: 1.2.3.4\n",
-		map[string]textUnmarshaler{"a": textUnmarshaler{S: "1.2.3.4"}},
+		map[string]textUnmarshaler{"a": {S: "1.2.3.4"}},
 	},
 	{
 		"a: 2015-02-24T18:19:39Z\n",
-		map[string]textUnmarshaler{"a": textUnmarshaler{"2015-02-24T18:19:39Z"}},
+		map[string]textUnmarshaler{"a": {"2015-02-24T18:19:39Z"}},
 	},
 
 	// Timestamps
@@ -695,9 +769,10 @@ var unmarshalTests = []struct {
 	{
 		"a: 123456e1\n",
 		M{"a": 123456e1},
-	}, {
+	},
+	{
 		"a: 123456E1\n",
-		M{"a": 123456E1},
+		M{"a": 123456e1},
 	},
 	// yaml-test-suite 3GZX: Spec Example 7.1. Alias Nodes
 	{
@@ -729,10 +804,12 @@ a:
 b:
   ? a
   : a`,
-		&M{"a": "b",
+		&M{
+			"a": "b",
 			"b": M{
 				"a": "a",
-			}},
+			},
+		},
 	},
 }
 
@@ -764,7 +841,7 @@ func (s *S) TestUnmarshal(c *C) {
 func (s *S) TestUnmarshalFullTimestamp(c *C) {
 	// Full timestamp in same format as encoded. This is confirmed to be
 	// properly decoded by Python as a timestamp as well.
-	var str = "2015-02-24T18:19:39.123456789-03:00"
+	str := "2015-02-24T18:19:39.123456789-03:00"
 	var t time.Time
 	err := yaml.Unmarshal([]byte(str), &t)
 	c.Assert(err, IsNil)
@@ -870,14 +947,14 @@ var unmarshalErrorTests = []struct {
 	{"a:\n  1:\nb\n  2:", ".*could not find expected ':'"},
 	{
 		"a: &a [00,00,00,00,00,00,00,00,00]\n" +
-		"b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\n" +
-		"c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\n" +
-		"d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\n" +
-		"e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\n" +
-		"f: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\n" +
-		"g: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\n" +
-		"h: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\n" +
-		"i: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n",
+			"b: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\n" +
+			"c: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\n" +
+			"d: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\n" +
+			"e: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\n" +
+			"f: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\n" +
+			"g: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\n" +
+			"h: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\n" +
+			"i: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]\n",
 		"yaml: document contains excessive aliasing",
 	},
 }
@@ -1012,23 +1089,23 @@ func (s *S) TestUnmarshalerTypeError(c *C) {
 
 type proxyTypeError struct{}
 
-func (v *proxyTypeError) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (v *proxyTypeError) UnmarshalYAML(unmarshal func(interface{}, bool) error) error {
 	var s string
 	var a int32
 	var b int64
-	if err := unmarshal(&s); err != nil {
+	if err := unmarshal(&s, false); err != nil {
 		panic(err)
 	}
 	if s == "a" {
-		if err := unmarshal(&b); err == nil {
+		if err := unmarshal(&b, false); err == nil {
 			panic("should have failed")
 		}
-		return unmarshal(&a)
+		return unmarshal(&a, false)
 	}
-	if err := unmarshal(&a); err == nil {
+	if err := unmarshal(&a, false); err == nil {
 		panic("should have failed")
 	}
-	return unmarshal(&b)
+	return unmarshal(&b, false)
 }
 
 func (s *S) TestUnmarshalerTypeErrorProxying(c *C) {
@@ -1149,7 +1226,7 @@ inlineSequenceMap:
 `
 
 func (s *S) TestMerge(c *C) {
-	var want = map[interface{}]interface{}{
+	want := map[interface{}]interface{}{
 		"x":     1,
 		"y":     2,
 		"r":     10,
@@ -1187,10 +1264,10 @@ func (s *S) TestMergeStruct(c *C) {
 
 var unmarshalNullTests = []func() interface{}{
 	func() interface{} { var v interface{}; v = "v"; return &v },
-	func() interface{} { var s = "s"; return &s },
-	func() interface{} { var s = "s"; sptr := &s; return &sptr },
-	func() interface{} { var i = 1; return &i },
-	func() interface{} { var i = 1; iptr := &i; return &iptr },
+	func() interface{} { s := "s"; return &s },
+	func() interface{} { s := "s"; sptr := &s; return &sptr },
+	func() interface{} { i := 1; return &i },
+	func() interface{} { i := 1; iptr := &i; return &iptr },
 	func() interface{} { m := map[string]int{"s": 1}; return &m },
 	func() interface{} { m := map[string]int{"s": 1}; return m },
 }
@@ -1223,7 +1300,9 @@ var unmarshalStrictTests = []struct {
 }{{
 	data:  "a: 1\nc: 2\n",
 	value: struct{ A, B int }{A: 1},
-	error: `yaml: unmarshal errors:\n  line 2: field c not found in type struct { A int; B int }`,
+	error: `yaml: unmarshal errors:
+  line 2: field c not found in type struct { A int; B int }
+  line 0: field b is required but not given`,
 }, {
 	data:  "a: 1\nb: 2\na: 3\n",
 	value: struct{ A, B int }{A: 3, B: 2},
@@ -1257,7 +1336,9 @@ var unmarshalStrictTests = []struct {
 			},
 		},
 	},
-	error: `yaml: unmarshal errors:\n  line 4: field c already set in type struct { A int; yaml_test.inlineB "yaml:\\",inline\\"" }`,
+	error: `yaml: unmarshal errors:
+  line 4: field c already set in type struct { A int; yaml_test.inlineB "yaml:\\",inline\\"" }
+  line 0: field c is required but has zero value`,
 }, {
 	data: "c: 1\na: 1\nb: 2\nc: 3\n",
 	value: struct {

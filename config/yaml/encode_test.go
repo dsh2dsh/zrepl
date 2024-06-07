@@ -12,7 +12,8 @@ import (
 	"os"
 
 	. "gopkg.in/check.v1"
-	yaml "github.com/zrepl/yaml-config"
+
+	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 type jsonNumberT string
