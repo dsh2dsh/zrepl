@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-
 	"github.com/dsh2dsh/zrepl/client/status/viewmodel/stringbuilder"
+	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/daemon"
 	"github.com/dsh2dsh/zrepl/daemon/job"
@@ -55,10 +54,8 @@ type Params struct {
 	ShortKeybindingOverview string
 }
 
-var validate = validator.New()
-
 func (m *M) Update(p Params) {
-	if err := validate.Struct(p); err != nil {
+	if err := config.Validator().Struct(&p); err != nil {
 		panic(err)
 	}
 

@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/kr/pretty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/replication/report"
 	"github.com/dsh2dsh/zrepl/util/chainlock"
@@ -193,10 +193,8 @@ type Config struct {
 	OneStep                  bool
 }
 
-var validate = validator.New()
-
 func (c Config) Validate() error {
-	return validate.Struct(c)
+	return config.Validator().Struct(&c)
 }
 
 // caller must ensure config.Validate() == nil

@@ -82,6 +82,7 @@ b:
 			var a A
 			err := yaml.UnmarshalStrict([]byte(tc.yaml), &a)
 			require.NoError(t, err)
+			require.NoError(t, Validator().Struct(&a))
 
 			require.Equal(t, tc.expect, &a)
 		})

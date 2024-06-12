@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/dsh2dsh/zrepl/config"
 )
 
 type B struct {
@@ -23,15 +23,12 @@ type Config struct {
 	Width            int `validate:"gte=1"`
 }
 
-var validate = validator.New()
-
-func New(config Config) *B {
-
-	if err := validate.Struct(config); err != nil {
+func New(cfg Config) *B {
+	if err := config.Validator().Struct(&cfg); err != nil {
 		panic(err)
 	}
 
-	return &B{sb: &strings.Builder{}, width: config.Width, indentMultiplier: config.IndentMultiplier}
+	return &B{sb: &strings.Builder{}, width: cfg.Width, indentMultiplier: cfg.IndentMultiplier}
 }
 
 func (b *B) String() string { return b.sb.String() }

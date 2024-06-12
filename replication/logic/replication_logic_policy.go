@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
-
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
 )
@@ -66,10 +64,8 @@ type PlannerPolicy struct {
 	SizeEstimationConcurrency int                    `validate:"gte=1"`
 }
 
-var validate = validator.New()
-
 func (p PlannerPolicy) Validate() error {
-	if err := validate.Struct(p); err != nil {
+	if err := config.Validator().Struct(&p); err != nil {
 		return err
 	}
 	if err := p.ConflictResolution.Validate(); err != nil {
