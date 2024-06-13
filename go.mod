@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/bits-and-blooms/bitset v1.13.0
+	github.com/creasty/defaults v1.7.0
 	github.com/dsh2dsh/cron/v3 v3.0.2
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.17.0

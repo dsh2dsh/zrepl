@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/creasty/defaults"
+
 	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/util/datasizeunit"
 	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
@@ -22,12 +24,18 @@ const (
 )
 
 func New() *Config {
-	return &Config{Global: NewGlobal()}
+	return new(Config)
 }
 
 type Config struct {
 	Jobs   []JobEnum `yaml:"jobs,optional" validate:"dive,required"`
-	Global *Global   `yaml:"global,optional,fromdefaults"`
+	Global *Global   `yaml:"global,optional" default:"{}" validate:"required"`
+}
+
+func (c *Config) lateInit() {
+	if len(*c.Global.Logging) == 0 {
+		c.Global.Logging.SetDefaults()
+	}
 }
 
 func (c *Config) Job(name string) (*JobEnum, error) {
@@ -62,17 +70,13 @@ func (j JobEnum) Name() string {
 	return name
 }
 
-func NewActiveJob() ActiveJob {
-	return ActiveJob{Replication: NewReplication()}
-}
-
 type ActiveJob struct {
 	Type               string                   `yaml:"type" validate:"required"`
 	Name               string                   `yaml:"name" validate:"required"`
 	Connect            ConnectEnum              `yaml:"connect" validate:"required"`
 	Pruning            PruningSenderReceiver    `yaml:"pruning" validate:"required"`
-	Replication        *Replication             `yaml:"replication,optional,fromdefaults"`
-	ConflictResolution *ConflictResolution      `yaml:"conflict_resolution,optional,fromdefaults"`
+	Replication        *Replication             `yaml:"replication,optional" default:"{}" validate:"required"`
+	ConflictResolution *ConflictResolution      `yaml:"conflict_resolution,optional" default:"{}" validate:"required"`
 	MonitorSnapshots   MonitorSnapshots         `yaml:"monitor,optional"`
 	Interval           PositiveDurationOrManual `yaml:"interval,optional"`
 	Cron               string                   `yaml:"cron,optional"`
@@ -88,7 +92,7 @@ func (self *ActiveJob) CronSpec() string {
 }
 
 type ConflictResolution struct {
-	InitialReplication string `yaml:"initial_replication,optional,default=all"`
+	InitialReplication string `yaml:"initial_replication,optional" default:"all"`
 }
 
 type MonitorSnapshots struct {
@@ -119,16 +123,16 @@ type SnapJob struct {
 }
 
 type SendOptions struct {
-	Encrypted        bool `yaml:"encrypted,optional,default=false"`
-	Raw              bool `yaml:"raw,optional,default=false"`
-	SendProperties   bool `yaml:"send_properties,optional,default=false"`
-	BackupProperties bool `yaml:"backup_properties,optional,default=false"`
-	LargeBlocks      bool `yaml:"large_blocks,optional,default=false"`
-	Compressed       bool `yaml:"compressed,optional,default=false"`
-	EmbeddedData     bool `yaml:"embedded_data,optional,default=false"`
-	Saved            bool `yaml:"saved,optional,default=false"`
+	Encrypted        bool `yaml:"encrypted,optional"`
+	Raw              bool `yaml:"raw,optional"`
+	SendProperties   bool `yaml:"send_properties,optional"`
+	BackupProperties bool `yaml:"backup_properties,optional"`
+	LargeBlocks      bool `yaml:"large_blocks,optional"`
+	Compressed       bool `yaml:"compressed,optional"`
+	EmbeddedData     bool `yaml:"embedded_data,optional"`
+	Saved            bool `yaml:"saved,optional"`
 
-	BandwidthLimit *BandwidthLimit `yaml:"bandwidth_limit,optional,fromdefaults"`
+	BandwidthLimit *BandwidthLimit `yaml:"bandwidth_limit,optional" default:"{}" validate:"required"`
 	ExecPipe       [][]string      `yaml:"execpipe,optional"`
 }
 
@@ -138,40 +142,33 @@ type RecvOptions struct {
 	// Future:
 	// Reencrypt bool `yaml:"reencrypt"`
 
-	Properties *PropertyRecvOptions `yaml:"properties,fromdefaults" validate:"required"`
-
-	BandwidthLimit *BandwidthLimit `yaml:"bandwidth_limit,optional,fromdefaults"`
-
-	Placeholder *PlaceholderRecvOptions `yaml:"placeholder,fromdefaults" validate:"required"`
-
-	ExecPipe [][]string `yaml:"execpipe,optional"`
+	Properties     *PropertyRecvOptions    `yaml:"properties,optional" default:"{}" validateX:"required"`
+	BandwidthLimit *BandwidthLimit         `yaml:"bandwidth_limit,optional" default:"{}" validate:"required"`
+	Placeholder    *PlaceholderRecvOptions `yaml:"placeholder,optional" default:"{}" validate:"required"`
+	ExecPipe       [][]string              `yaml:"execpipe,optional"`
 }
 
 var _ yaml.Unmarshaler = &datasizeunit.Bits{}
 
 type BandwidthLimit struct {
-	Max            datasizeunit.Bits `yaml:"max,default=-1 B" validate:"required"`
-	BucketCapacity datasizeunit.Bits `yaml:"bucket_capacity,default=128 KiB" validate:"required"`
-}
-
-func NewReplication() *Replication {
-	return &Replication{OneStep: true}
+	Max            datasizeunit.Bits `yaml:"max,optional" default:"-1 B" validate:"required"`
+	BucketCapacity datasizeunit.Bits `yaml:"bucket_capacity,optional" default:"128 KiB" validate:"required"`
 }
 
 type Replication struct {
-	Protection  *ReplicationOptionsProtection  `yaml:"protection,optional,fromdefaults"`
-	Concurrency *ReplicationOptionsConcurrency `yaml:"concurrency,optional,fromdefaults"`
-	OneStep     bool                           `yaml:"one_step,optional"`
+	Protection  *ReplicationOptionsProtection  `yaml:"protection,optional" default:"{}" validate:"required"`
+	Concurrency *ReplicationOptionsConcurrency `yaml:"concurrency,optional" default:"{}" validate:"required"`
+	OneStep     bool                           `yaml:"one_step,optional" default:"true"`
 }
 
 type ReplicationOptionsProtection struct {
-	Initial     string `yaml:"initial,optional,default=guarantee_resumability"`
-	Incremental string `yaml:"incremental,optional,default=guarantee_resumability"`
+	Initial     string `yaml:"initial,optional" default:"guarantee_resumability"`
+	Incremental string `yaml:"incremental,optional" default:"guarantee_resumability"`
 }
 
 type ReplicationOptionsConcurrency struct {
-	Steps         int `yaml:"steps,optional,default=1"`
-	SizeEstimates int `yaml:"size_estimates,optional,default=4"`
+	Steps         int `yaml:"steps,optional" default:"1"`
+	SizeEstimates int `yaml:"size_estimates,optional" default:"4"`
 }
 
 type PropertyRecvOptions struct {
@@ -180,31 +177,23 @@ type PropertyRecvOptions struct {
 }
 
 type PlaceholderRecvOptions struct {
-	Encryption string `yaml:"encryption,default=inherit" validate:"required"`
-}
-
-func NewPushJob() *PushJob {
-	return &PushJob{ActiveJob: NewActiveJob()}
+	Encryption string `yaml:"encryption,optional" default:"inherit" validate:"required"`
 }
 
 type PushJob struct {
 	ActiveJob    `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting" validate:"required"`
 	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required"`
-	Send         *SendOptions      `yaml:"send,fromdefaults,optional"`
+	Send         *SendOptions      `yaml:"send,optional" default:"{}" validate:"required"`
 }
 
 func (j *PushJob) GetFilesystems() FilesystemsFilter { return j.Filesystems }
 func (j *PushJob) GetSendOptions() *SendOptions      { return j.Send }
 
-func NewPullJob() *PullJob {
-	return &PullJob{ActiveJob: NewActiveJob()}
-}
-
 type PullJob struct {
 	ActiveJob `yaml:",inline"`
 	RootFS    string       `yaml:"root_fs" validate:"required"`
-	Recv      *RecvOptions `yaml:"recv,fromdefaults,optional"`
+	Recv      *RecvOptions `yaml:"recv,optional" default:"{}" validate:"required"`
 }
 
 func (j *PullJob) GetRootFS() string             { return j.RootFS }
@@ -242,7 +231,7 @@ func (i *PositiveDurationOrManual) UnmarshalYAML(u func(interface{}, bool) error
 type SinkJob struct {
 	PassiveJob `yaml:",inline"`
 	RootFS     string       `yaml:"root_fs" validate:"required"`
-	Recv       *RecvOptions `yaml:"recv,optional,fromdefaults"`
+	Recv       *RecvOptions `yaml:"recv,optional" default:"{}" validate:"required"`
 }
 
 func (j *SinkJob) GetRootFS() string             { return j.RootFS }
@@ -253,7 +242,7 @@ type SourceJob struct {
 	PassiveJob   `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting" validate:"required"`
 	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required"`
-	Send         *SendOptions      `yaml:"send,optional,fromdefaults"`
+	Send         *SendOptions      `yaml:"send,optional" default:"{}" validate:"required"`
 }
 
 func (j *SourceJob) GetFilesystems() FilesystemsFilter { return j.Filesystems }
@@ -271,7 +260,7 @@ type SnapshottingPeriodic struct {
 	Interval        Duration `yaml:"interval,optional"`
 	Cron            string   `yaml:"cron,optional"`
 	Hooks           HookList `yaml:"hooks,optional"`
-	TimestampFormat string   `yaml:"timestamp_format,optional,default=dense"`
+	TimestampFormat string   `yaml:"timestamp_format,optional" default:"dense"`
 	TimestampLocal  bool     `yaml:"timestamp_local,optional"`
 }
 
@@ -299,6 +288,10 @@ type PruningLocal struct {
 
 type LoggingOutletEnumList []LoggingOutletEnum
 
+func (l *LoggingOutletEnumList) SetDefaults() {
+	l.SetDefault()
+}
+
 func (l *LoggingOutletEnumList) SetDefault() {
 	def := `
 type: "stdout"
@@ -314,20 +307,19 @@ format: "human"
 	*l = []LoggingOutletEnum{{Ret: s}}
 }
 
-var _ yaml.Defaulter = &LoggingOutletEnumList{}
-
-func NewGlobal() *Global {
-	return &Global{RpcTimeout: time.Minute, ZfsBin: "zfs"}
-}
+var (
+	_ defaults.Setter = &LoggingOutletEnumList{}
+	_ yaml.Defaulter  = &LoggingOutletEnumList{}
+)
 
 type Global struct {
-	RpcTimeout time.Duration `yaml:"rpc_timeout,optional"`
-	ZfsBin     string        `yaml:"zfs_bin,optional"`
+	RpcTimeout time.Duration `yaml:"rpc_timeout,optional" default:"1m" validate:"gt=0s"`
+	ZfsBin     string        `yaml:"zfs_bin,optional" default:"zfs" validate:"required"`
 
-	Logging    *LoggingOutletEnumList `yaml:"logging,optional,fromdefaults"`
+	Logging    *LoggingOutletEnumList `yaml:"logging,optional" default:"[]" validate:"required,dive"`
 	Monitoring []MonitoringEnum       `yaml:"monitoring,optional"`
-	Control    *GlobalControl         `yaml:"control,optional,fromdefaults"`
-	Serve      *GlobalServe           `yaml:"serve,optional,fromdefaults"`
+	Control    *GlobalControl         `yaml:"control,optional" default:"{}" validate:"required"`
+	Serve      *GlobalServe           `yaml:"serve,optional" default:"{}" validate:"required"`
 }
 
 type ConnectEnum struct {
@@ -341,7 +333,7 @@ type ConnectCommon struct {
 type TCPConnect struct {
 	ConnectCommon `yaml:",inline"`
 	Address       string        `yaml:"address" validate:"required,hostname_port"`
-	DialTimeout   time.Duration `yaml:"dial_timeout,default=10s" validate:"min=0s"`
+	DialTimeout   time.Duration `yaml:"dial_timeout,optional" default:"10s" validate:"min=0s"`
 }
 
 type TLSConnect struct {
@@ -351,7 +343,7 @@ type TLSConnect struct {
 	Cert          string        `yaml:"cert" validate:"required"`
 	Key           string        `yaml:"key" validate:"required"`
 	ServerCN      string        `yaml:"server_cn" validate:"required"`
-	DialTimeout   time.Duration `yaml:"dial_timeout,default=10s" validate:"min=0s"`
+	DialTimeout   time.Duration `yaml:"dial_timeout,optional" default:"10s" validate:"min=0s"`
 }
 
 type SSHStdinserverConnect struct {
@@ -363,14 +355,14 @@ type SSHStdinserverConnect struct {
 	TransportOpenCommand []string      `yaml:"transport_open_command,optional"` // TODO unused
 	SSHCommand           string        `yaml:"ssh_command,optional"`            // TODO unused
 	Options              []string      `yaml:"options,optional"`
-	DialTimeout          time.Duration `yaml:"dial_timeout,zeropositive,default=10s" validate:"required"`
+	DialTimeout          time.Duration `yaml:"dial_timeout,optional" default:"10s" validate:"min=0s"`
 }
 
 type LocalConnect struct {
 	ConnectCommon  `yaml:",inline"`
 	ListenerName   string        `yaml:"listener_name" validate:"required"`
 	ClientIdentity string        `yaml:"client_identity" validate:"required"`
-	DialTimeout    time.Duration `yaml:"dial_timeout,default=2s" validate:"min=0s"`
+	DialTimeout    time.Duration `yaml:"dial_timeout,optional" default:"2s" validate:"min=0s"`
 }
 
 type ServeEnum struct {
@@ -384,19 +376,19 @@ type ServeCommon struct {
 type TCPServe struct {
 	ServeCommon    `yaml:",inline"`
 	Listen         string            `yaml:"listen" validate:"required,hostname_port"`
-	ListenFreeBind bool              `yaml:"listen_freebind,default=false"`
+	ListenFreeBind bool              `yaml:"listen_freebind,optional"`
 	Clients        map[string]string `yaml:"clients" validate:"dive,required"`
 }
 
 type TLSServe struct {
 	ServeCommon      `yaml:",inline"`
 	Listen           string        `yaml:"listen" validate:"required,hostname_port"`
-	ListenFreeBind   bool          `yaml:"listen_freebind,default=false"`
+	ListenFreeBind   bool          `yaml:"listen_freebind,optional"`
 	Ca               string        `yaml:"ca" validate:"required"`
 	Cert             string        `yaml:"cert" validate:"required"`
 	Key              string        `yaml:"key" validate:"required"`
 	ClientCNs        []string      `yaml:"client_cns" validate:"dive,required"`
-	HandshakeTimeout time.Duration `yaml:"handshake_timeout,default=10s" validate:"min=0s"`
+	HandshakeTimeout time.Duration `yaml:"handshake_timeout,optional" default:"10s" validate:"min=0s"`
 }
 
 type StdinserverServer struct {
@@ -415,7 +407,7 @@ type PruningEnum struct {
 
 type PruneKeepNotReplicated struct {
 	Type                 string `yaml:"type" validate:"required"`
-	KeepSnapshotAtCursor bool   `yaml:"keep_snapshot_at_cursor,optional,default=true"`
+	KeepSnapshotAtCursor bool   `yaml:"keep_snapshot_at_cursor,optional" default:"true"`
 }
 
 type PruneKeepLastN struct {
@@ -427,7 +419,7 @@ type PruneKeepLastN struct {
 type PruneKeepRegex struct { // FIXME rename to KeepRegex
 	Type   string `yaml:"type" validate:"required"`
 	Regex  string `yaml:"regex" validate:"required"`
-	Negate bool   `yaml:"negate,optional,default=false"`
+	Negate bool   `yaml:"negate,optional"`
 }
 
 type LoggingOutletEnum struct {
@@ -439,7 +431,7 @@ type LoggingOutletCommon struct {
 	Level      string   `yaml:"level" validate:"required"`
 	Format     string   `yaml:"format" validate:"required"`
 	HideFields []string `yaml:"hide_fields,optional"`
-	Time       bool     `yaml:"time,default=true"`
+	Time       bool     `yaml:"time,optional" default:"true"`
 }
 
 type FileLoggingOutlet struct {
@@ -449,20 +441,20 @@ type FileLoggingOutlet struct {
 
 type StdoutLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	Color               bool `yaml:"color,default=true"`
+	Color               bool `yaml:"color,optional" default:"true"`
 }
 
 type SyslogLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	Facility            *SyslogFacility `yaml:"facility,optional,fromdefaults"`
-	RetryInterval       time.Duration   `yaml:"retry_interval,default=10s" validate:"gt=0s"`
+	Facility            *SyslogFacility `yaml:"facility,optional" default:"local0" validate:"required"`
+	RetryInterval       time.Duration   `yaml:"retry_interval,optional" default:"10s" validate:"gt=0s"`
 }
 
 type TCPLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
 	Address             string               `yaml:"address" validate:"required,hostname_port"`
-	Net                 string               `yaml:"net,default=tcp" validate:"required"`
-	RetryInterval       time.Duration        `yaml:"retry_interval,default=10s" validate:"gt=0s"`
+	Net                 string               `yaml:"net,optional" default:"tcp" validate:"required"`
+	RetryInterval       time.Duration        `yaml:"retry_interval,optional" default:"10s" validate:"gt=0s"`
 	TLS                 *TCPLoggingOutletTLS `yaml:"tls,optional"`
 }
 
@@ -479,140 +471,13 @@ type MonitoringEnum struct {
 type PrometheusMonitoring struct {
 	Type           string `yaml:"type" validate:"required"`
 	Listen         string `yaml:"listen" validate:"required,hostname_port"`
-	ListenFreeBind bool   `yaml:"listen_freebind,default=false" validate:"required"`
+	ListenFreeBind bool   `yaml:"listen_freebind,optional"`
 }
 
 type SyslogFacility syslog.Priority
 
-func (f *SyslogFacility) SetDefault() {
-	*f = SyslogFacility(syslog.LOG_LOCAL0)
-}
-
-var _ yaml.Defaulter = (*SyslogFacility)(nil)
-
-type GlobalControl struct {
-	SockPath string `yaml:"sockpath,default=/var/run/zrepl/control" validate:"required"`
-}
-
-type GlobalServe struct {
-	StdinServer *GlobalStdinServer `yaml:"stdinserver,optional,fromdefaults"`
-}
-
-type GlobalStdinServer struct {
-	SockDir string `yaml:"sockdir,default=/var/run/zrepl/stdinserver" validate:"required"`
-}
-
-type HookList []HookEnum
-
-type HookEnum struct {
-	Ret interface{}
-}
-
-type HookCommand struct {
-	Path               string            `yaml:"path" validate:"required"`
-	Timeout            time.Duration     `yaml:"timeout,optional,default=30s" validate:"gt=0s"`
-	Filesystems        FilesystemsFilter `yaml:"filesystems,optional,default={'<': true}"`
-	HookSettingsCommon `yaml:",inline"`
-}
-
-type HookSettingsCommon struct {
-	Type       string `yaml:"type" validate:"required"`
-	ErrIsFatal bool   `yaml:"err_is_fatal,optional,default=false"`
-}
-
-func enumUnmarshal(u func(interface{}, bool) error, types map[string]interface{}) (interface{}, error) {
-	var in struct {
-		Type string
-	}
-	if err := u(&in, true); err != nil {
-		return nil, err
-	}
-	if in.Type == "" {
-		return nil, &yaml.TypeError{Errors: []string{"must specify type"}}
-	}
-
-	v, ok := types[in.Type]
-	if !ok {
-		return nil, &yaml.TypeError{Errors: []string{fmt.Sprintf("invalid type name %q", in.Type)}}
-	}
-	if err := u(v, false); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-func (t *JobEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"snap":   &SnapJob{},
-		"push":   NewPushJob(),
-		"sink":   &SinkJob{},
-		"pull":   NewPullJob(),
-		"source": &SourceJob{},
-	})
-	return
-}
-
-func (t *ConnectEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"tcp":             &TCPConnect{},
-		"tls":             &TLSConnect{},
-		"ssh+stdinserver": &SSHStdinserverConnect{},
-		"local":           &LocalConnect{},
-	})
-	return
-}
-
-func (t *ServeEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"tcp":         &TCPServe{},
-		"tls":         &TLSServe{},
-		"stdinserver": &StdinserverServer{},
-		"local":       &LocalServe{},
-	})
-	return
-}
-
-func (t *PruningEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"not_replicated": &PruneKeepNotReplicated{},
-		"last_n":         &PruneKeepLastN{},
-		"grid":           &PruneGrid{},
-		"regex":          &PruneKeepRegex{},
-	})
-	return
-}
-
-func (t *SnapshottingEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"periodic": &SnapshottingPeriodic{},
-		"manual":   &SnapshottingManual{},
-		"cron":     &SnapshottingPeriodic{},
-	})
-	return
-}
-
-func (t *LoggingOutletEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"file":   &FileLoggingOutlet{},
-		"stdout": &StdoutLoggingOutlet{},
-		"syslog": &SyslogLoggingOutlet{},
-		"tcp":    &TCPLoggingOutlet{},
-	})
-	return
-}
-
-func (t *MonitoringEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"prometheus": &PrometheusMonitoring{},
-	})
-	return
-}
-
-func (t *SyslogFacility) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	var s string
-	if err := u(&s, true); err != nil {
-		return err
-	}
+func (f *SyslogFacility) UnmarshalJSON(b []byte) error {
+	s := string(b)
 	var level syslog.Priority
 	switch s {
 	case "kern":
@@ -658,13 +523,149 @@ func (t *SyslogFacility) UnmarshalYAML(u func(interface{}, bool) error) (err err
 	default:
 		return fmt.Errorf("invalid syslog level: %q", s)
 	}
-	*t = SyslogFacility(level)
+	*f = SyslogFacility(level)
 	return nil
 }
 
-func (t *HookEnum) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
-	t.Ret, err = enumUnmarshal(u, map[string]interface{}{
-		"command": &HookCommand{},
+func (f *SyslogFacility) SetDefault() {
+	*f = SyslogFacility(syslog.LOG_LOCAL0)
+}
+
+var _ yaml.Defaulter = (*SyslogFacility)(nil)
+
+type GlobalControl struct {
+	SockPath string `yaml:"sockpath,optional" default:"/var/run/zrepl/control" validate:"required"`
+}
+
+type GlobalServe struct {
+	StdinServer *GlobalStdinServer `yaml:"stdinserver,optional" default:"{}" validate:"required"`
+}
+
+type GlobalStdinServer struct {
+	SockDir string `yaml:"sockdir,optional" default:"/var/run/zrepl/stdinserver" validate:"required"`
+}
+
+type HookList []HookEnum
+
+type HookEnum struct {
+	Ret interface{}
+}
+
+type HookCommand struct {
+	Path               string            `yaml:"path" validate:"required"`
+	Timeout            time.Duration     `yaml:"timeout,optional" default:"30s" validate:"gt=0s"`
+	Filesystems        FilesystemsFilter `yaml:"filesystems,optional" validate:"required"`
+	HookSettingsCommon `yaml:",inline"`
+}
+
+type HookSettingsCommon struct {
+	Type       string `yaml:"type" validate:"required"`
+	ErrIsFatal bool   `yaml:"err_is_fatal,optional"`
+}
+
+func enumUnmarshal(u func(any, bool) error, types map[string]any) (any, error) {
+	var in struct {
+		Type string `yaml:"type" validate:"required"`
+	}
+	if err := u(&in, true); err != nil {
+		return nil, err
+	} else if in.Type == "" {
+		return nil, &yaml.TypeError{Errors: []string{"must specify type"}}
+	}
+
+	v, ok := types[in.Type]
+	if !ok {
+		return nil, &yaml.TypeError{
+			Errors: []string{"invalid type name " + in.Type},
+		}
+	}
+
+	if err := defaults.Set(v); err != nil {
+		return nil, fmt.Errorf("set defaults for type %q: %w", in.Type, err)
+	} else if err := u(v, false); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func (t *JobEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"snap":   new(SnapJob),
+		"push":   new(PushJob),
+		"sink":   new(SinkJob),
+		"pull":   new(PullJob),
+		"source": new(SourceJob),
+	})
+	return
+}
+
+func (t *ConnectEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"tcp":             new(TCPConnect),
+		"tls":             new(TLSConnect),
+		"ssh+stdinserver": new(SSHStdinserverConnect),
+		"local":           new(LocalConnect),
+	})
+	return
+}
+
+func (t *ServeEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"tcp":         new(TCPServe),
+		"tls":         new(TLSServe),
+		"stdinserver": new(StdinserverServer),
+		"local":       new(LocalServe),
+	})
+	return
+}
+
+func (t *PruningEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"not_replicated": new(PruneKeepNotReplicated),
+		"last_n":         new(PruneKeepLastN),
+		"grid":           new(PruneGrid),
+		"regex":          new(PruneKeepRegex),
+	})
+	return
+}
+
+func (t *SnapshottingEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"periodic": new(SnapshottingPeriodic),
+		"manual":   new(SnapshottingManual),
+		"cron":     new(SnapshottingPeriodic),
+	})
+	return
+}
+
+func (t *LoggingOutletEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"file":   new(FileLoggingOutlet),
+		"stdout": new(StdoutLoggingOutlet),
+		"syslog": new(SyslogLoggingOutlet),
+		"tcp":    new(TCPLoggingOutlet),
+	})
+	return
+}
+
+func (t *MonitoringEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"prometheus": new(PrometheusMonitoring),
+	})
+	return
+}
+
+func (t *SyslogFacility) UnmarshalYAML(u func(any, bool) error) (err error) {
+	var s string
+	if err := u(&s, true); err != nil {
+		return err
+	}
+	return t.UnmarshalJSON([]byte(s))
+}
+
+func (t *HookEnum) UnmarshalYAML(u func(any, bool) error) (err error) {
+	t.Ret, err = enumUnmarshal(u, map[string]any{
+		"command": new(HookCommand),
 	})
 	return
 }
@@ -702,7 +703,9 @@ func ParseConfig(path string) (i *Config, err error) {
 
 func ParseConfigBytes(bytes []byte) (*Config, error) {
 	c := New()
-	if err := yaml.UnmarshalStrict(bytes, &c); err != nil {
+	if err := defaults.Set(c); err != nil {
+		return nil, fmt.Errorf("init config with defaults: %w", err)
+	} else if err := yaml.UnmarshalStrict(bytes, &c); err != nil {
 		return nil, fmt.Errorf("config unmarshal: %w", err)
 	}
 
@@ -716,6 +719,7 @@ func ParseConfigBytes(bytes []byte) (*Config, error) {
 			panic("the fallback to deserialize from `{}` should work")
 		}
 	}
+	c.lateInit()
 
 	if err := Validator().Struct(c); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)

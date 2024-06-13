@@ -19,13 +19,8 @@ func FromBytesInt64(i int64) Bits { return Bits{float64(i) * 8} }
 
 var datarateRegex = regexp.MustCompile(`^([-0-9\.]*)\s*(bit|(|K|Ki|M|Mi|G|Gi|T|Ti)([bB]))$`)
 
-func (r *Bits) UnmarshalYAML(u func(interface{}, bool) error) (_ error) {
-
-	var s string
-	err := u(&s, false)
-	if err != nil {
-		return err
-	}
+func (r *Bits) UnmarshalJSON(b []byte) error {
+	s := string(b)
 
 	genericErr := func(err error) error {
 		var buf strings.Builder
@@ -83,4 +78,12 @@ func (r *Bits) UnmarshalYAML(u func(interface{}, bool) error) (_ error) {
 
 	r.bits = bps * float64(factor) * float64(baseUnitFactor)
 	return nil
+}
+
+func (r *Bits) UnmarshalYAML(u func(interface{}, bool) error) error {
+	var s string
+	if err := u(&s, false); err != nil {
+		return err
+	}
+	return r.UnmarshalJSON([]byte(s))
 }

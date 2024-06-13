@@ -77,44 +77,54 @@ global:
 }
 
 func TestSyslogLoggingOutletFacility(t *testing.T) {
-	type SyslogFacilityPriority struct {
-		Facility string
-		Priority syslog.Priority
-	}
-	syslogFacilitiesPriorities := []SyslogFacilityPriority{
-		{"", syslog.LOG_LOCAL0}, // default
-		{"kern", syslog.LOG_KERN},
-		{"daemon", syslog.LOG_DAEMON},
-		{"auth", syslog.LOG_AUTH},
-		{"syslog", syslog.LOG_SYSLOG},
-		{"lpr", syslog.LOG_LPR},
-		{"news", syslog.LOG_NEWS},
-		{"uucp", syslog.LOG_UUCP},
-		{"cron", syslog.LOG_CRON},
-		{"authpriv", syslog.LOG_AUTHPRIV},
-		{"ftp", syslog.LOG_FTP},
-		{"local0", syslog.LOG_LOCAL0},
-		{"local1", syslog.LOG_LOCAL1},
-		{"local2", syslog.LOG_LOCAL2},
-		{"local3", syslog.LOG_LOCAL3},
-		{"local4", syslog.LOG_LOCAL4},
-		{"local5", syslog.LOG_LOCAL5},
-		{"local6", syslog.LOG_LOCAL6},
-		{"local7", syslog.LOG_LOCAL7},
+	tests := []struct {
+		name     string
+		facility string
+		priority syslog.Priority
+	}{
+		{name: "default", priority: syslog.LOG_LOCAL0}, // default
+		{facility: "kern", priority: syslog.LOG_KERN},
+		{facility: "daemon", priority: syslog.LOG_DAEMON},
+		{facility: "auth", priority: syslog.LOG_AUTH},
+		{facility: "syslog", priority: syslog.LOG_SYSLOG},
+		{facility: "lpr", priority: syslog.LOG_LPR},
+		{facility: "news", priority: syslog.LOG_NEWS},
+		{facility: "uucp", priority: syslog.LOG_UUCP},
+		{facility: "cron", priority: syslog.LOG_CRON},
+		{facility: "authpriv", priority: syslog.LOG_AUTHPRIV},
+		{facility: "ftp", priority: syslog.LOG_FTP},
+		{facility: "local0", priority: syslog.LOG_LOCAL0},
+		{facility: "local1", priority: syslog.LOG_LOCAL1},
+		{facility: "local2", priority: syslog.LOG_LOCAL2},
+		{facility: "local3", priority: syslog.LOG_LOCAL3},
+		{facility: "local4", priority: syslog.LOG_LOCAL4},
+		{facility: "local5", priority: syslog.LOG_LOCAL5},
+		{facility: "local6", priority: syslog.LOG_LOCAL6},
+		{facility: "local7", priority: syslog.LOG_LOCAL7},
 	}
 
-	for _, sFP := range syslogFacilitiesPriorities {
-		logcfg := fmt.Sprintf(`
+	for _, tt := range tests {
+		name := tt.name
+		if name == "" {
+			name = tt.facility
+		}
+		t.Run(name, func(t *testing.T) {
+			var s string
+			if tt.facility != "" {
+				s = "facility: " + tt.facility
+			}
+			logcfg := fmt.Sprintf(`
 global:
   logging:
-  - type: syslog
-    level: info
-    format: human
-    facility: %s
-`, sFP.Facility)
-		conf := testValidGlobalSection(t, logcfg)
-		assert.Equal(t, 1, len(*conf.Global.Logging))
-		assert.True(t, SyslogFacility(sFP.Priority) == *(*conf.Global.Logging)[0].Ret.(*SyslogLoggingOutlet).Facility)
+    - type: syslog
+      level: info
+      format: human
+      %s
+`, s)
+			conf := testValidGlobalSection(t, logcfg)
+			assert.Equal(t, 1, len(*conf.Global.Logging))
+			assert.True(t, SyslogFacility(tt.priority) == *(*conf.Global.Logging)[0].Ret.(*SyslogLoggingOutlet).Facility)
+		})
 	}
 }
 

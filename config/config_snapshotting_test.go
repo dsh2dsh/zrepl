@@ -61,6 +61,7 @@ jobs:
     hooks:
     - type: command
       path: /tmp/path/to/command
+      filesystems: { "<": true }
     - type: command
       path: /tmp/path/to/command
       filesystems: { "zroot<": true, "<": false }

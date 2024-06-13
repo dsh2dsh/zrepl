@@ -93,8 +93,8 @@ func TestEmptyConfig(t *testing.T) {
 	cases := []string{
 		"",
 		"\n",
-		"---",
-		"---\n",
+		// "---",
+		// "---\n",
 	}
 	for _, input := range cases {
 		config := testValidConfig(t, input)

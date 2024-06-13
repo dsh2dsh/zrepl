@@ -118,7 +118,7 @@ jobs:
 			Name:           "timeout",
 			IsSlow:         true,
 			ExpectHadError: true,
-			Config:         []string{`{type: command, path: {{.WorkDir}}/test/test-timeout.sh, timeout: 2s}`},
+			Config:         []string{`{type: command, path: {{.WorkDir}}/test/test-timeout.sh, timeout: 2s, filesystems: {"<": true}}`},
 			ExpectStepReports: []expectStep{
 				{
 					ExpectedEdge: hooks.Pre,
@@ -135,7 +135,7 @@ jobs:
 		},
 		{
 			Name:           "check_env",
-			Config:         []string{`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`},
+			Config:         []string{`{type: command, path: {{.WorkDir}}/test/test-report-env.sh, filesystems: {"<": true}}`},
 			ExpectHadError: false,
 			ExpectStepReports: []expectStep{
 				{
@@ -156,7 +156,7 @@ jobs:
 			Name:                  "nonfatal_pre_error_continues",
 			ExpectCallbackSkipped: false,
 			ExpectHadError:        true,
-			Config:                []string{`{type: command, path: {{.WorkDir}}/test/test-error.sh}`},
+			Config:                []string{`{type: command, path: {{.WorkDir}}/test/test-error.sh, filesystems: {"<": true}}`},
 			ExpectStepReports: []expectStep{
 				{
 					ExpectedEdge: hooks.Pre,
@@ -178,8 +178,8 @@ jobs:
 			ExpectHadFatalErr:     true,
 			ExpectHadError:        true,
 			Config: []string{
-				`{type: command, path: {{.WorkDir}}/test/test-error.sh, err_is_fatal: true}`,
-				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`,
+				`{type: command, path: {{.WorkDir}}/test/test-error.sh, err_is_fatal: true, filesystems: {"<": true}}`,
+				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh, filesystems: {"<": true}}`,
 			},
 			ExpectStepReports: []expectStep{
 				{
@@ -209,8 +209,8 @@ jobs:
 			ExpectHadFatalErr: false, // only occurs during Post, so it's not a fatal error
 			ExpectHadError:    true,
 			Config: []string{
-				`{type: command, path: {{.WorkDir}}/test/test-post-error.sh, err_is_fatal: true}`,
-				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`,
+				`{type: command, path: {{.WorkDir}}/test/test-post-error.sh, err_is_fatal: true, filesystems: {"<": true}}`,
+				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh, filesystems: {"<": true}}`,
 			},
 			ExpectStepReports: []expectStep{
 				{
@@ -242,7 +242,7 @@ jobs:
 
 		{
 			Name:   "cleanup_check_env",
-			Config: []string{`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`},
+			Config: []string{`{type: command, path: {{.WorkDir}}/test/test-report-env.sh, filesystems: {"<": true}}`},
 			ExpectStepReports: []expectStep{
 				{
 					ExpectedEdge: hooks.Pre,
@@ -260,7 +260,7 @@ jobs:
 
 		{
 			Name:              "pre_error_cancels_post",
-			Config:            []string{`{type: command, path: {{.WorkDir}}/test/test-pre-error-post-ok.sh}`},
+			Config:            []string{`{type: command, path: {{.WorkDir}}/test/test-pre-error-post-ok.sh, filesystems: {"<": true}}`},
 			ExpectHadError:    true,
 			ExpectHadFatalErr: false,
 			ExpectStepReports: []expectStep{
@@ -281,8 +281,8 @@ jobs:
 		{
 			Name: "pre_error_does_not_cancel_other_posts_but_itself",
 			Config: []string{
-				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh}`,
-				`{type: command, path: {{.WorkDir}}/test/test-pre-error-post-ok.sh}`,
+				`{type: command, path: {{.WorkDir}}/test/test-report-env.sh, filesystems: {"<": true}}`,
+				`{type: command, path: {{.WorkDir}}/test/test-pre-error-post-ok.sh, filesystems: {"<": true}}`,
 			},
 			ExpectHadError:    true,
 			ExpectHadFatalErr: false,
@@ -314,7 +314,7 @@ jobs:
 		{
 			Name:              "exceed_buffer_limit",
 			SuppressOutput:    true,
-			Config:            []string{`{type: command, path: {{.WorkDir}}/test/test-large-stdout.sh}`},
+			Config:            []string{`{type: command, path: {{.WorkDir}}/test/test-large-stdout.sh, filesystems: {"<": true}}`},
 			ExpectHadError:    false,
 			ExpectHadFatalErr: false,
 			ExpectStepReports: []expectStep{
