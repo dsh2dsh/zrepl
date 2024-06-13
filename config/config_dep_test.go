@@ -4,25 +4,25 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/creasty/defaults"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/config/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 type A struct {
-	B  *B     `yaml:"b,optional,fromdefaults"`
-	A1 string `yaml:"a1,optional"`
+	B  *B     `yaml:"b" default:"{}"`
+	A1 string `yaml:"a1"`
 }
 
 type B struct {
-	C *C     `yaml:"c,optional,fromdefaults"`
-	D string `yaml:"d,default=ddd"`
-	E string `yaml:"e,optional"`
+	C *C     `yaml:"c" default:"{}"`
+	D string `yaml:"d" default:"ddd"`
+	E string `yaml:"e"`
 }
 
 type C struct {
-	Q string `yaml:"q,optional"`
-	R string `yaml:"r,default=r"`
+	Q string `yaml:"q"`
+	R string `yaml:"r" default:"r"`
 }
 
 func TestDepFromDefaults(t *testing.T) {
@@ -80,8 +80,8 @@ b:
 			tc := tcs[tci]
 
 			var a A
-			err := yaml.UnmarshalStrict([]byte(tc.yaml), &a)
-			require.NoError(t, err)
+			require.NoError(t, defaults.Set(&a))
+			require.NoError(t, yaml.Unmarshal([]byte(tc.yaml), &a))
 			require.NoError(t, Validator().Struct(&a))
 
 			require.Equal(t, tc.expect, &a)

@@ -5,10 +5,9 @@ import (
 	"log/syslog"
 	"testing"
 
+	"github.com/creasty/defaults"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/config/yaml"
 )
 
 func testValidGlobalSection(t *testing.T, s string) *Config {
@@ -130,9 +129,9 @@ global:
 
 func TestLoggingOutletEnumList_SetDefaults(t *testing.T) {
 	e := &LoggingOutletEnumList{}
-	var i yaml.Defaulter = e
+	var i defaults.Setter = e
 	require.NotPanics(t, func() {
-		i.SetDefault()
+		i.SetDefaults()
 		assert.Equal(t, "warn", (*e)[0].Ret.(*StdoutLoggingOutlet).Level)
 	})
 }

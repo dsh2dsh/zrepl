@@ -9,9 +9,9 @@ import (
 	"path"
 
 	netssh "github.com/problame/go-netssh"
+	"gopkg.in/yaml.v3"
 
 	"github.com/dsh2dsh/zrepl/config"
-	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/transport"
 	transportconfig "github.com/dsh2dsh/zrepl/transport/fromconfig"
 )
@@ -48,7 +48,7 @@ func main() {
 
 	bytes, err := os.ReadFile(args.configPath)
 	noerror(err)
-	err = yaml.UnmarshalStrict(bytes, &conf)
+	err = yaml.Unmarshal(bytes, &conf)
 	noerror(err)
 
 	ctx, cancel := context.WithCancel(context.Background())

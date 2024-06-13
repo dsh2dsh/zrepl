@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type RetentionIntervalList []RetentionInterval
@@ -31,9 +33,11 @@ func (i *RetentionInterval) KeepCount() int {
 
 const RetentionGridKeepCountAll int = -1
 
-func (t *RetentionIntervalList) UnmarshalYAML(u func(interface{}, bool) error) (err error) {
+var _ yaml.Unmarshaler = (*RetentionIntervalList)(nil)
+
+func (t *RetentionIntervalList) UnmarshalYAML(value *yaml.Node) (err error) {
 	var in string
-	if err := u(&in, true); err != nil {
+	if err := value.Decode(&in); err != nil {
 		return err
 	}
 
@@ -50,7 +54,6 @@ func (t *RetentionIntervalList) UnmarshalYAML(u func(interface{}, bool) error) (
 var retentionStringIntervalRegex *regexp.Regexp = regexp.MustCompile(`^\s*(\d+)\s*x\s*([^\(]+)\s*(\((.*)\))?\s*$`)
 
 func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, err error) {
-
 	comps := retentionStringIntervalRegex.FindStringSubmatch(e)
 	if comps == nil {
 		err = fmt.Errorf("retention string does not match expected format")
@@ -99,11 +102,9 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 	}
 
 	return
-
 }
 
 func ParseRetentionIntervalSpec(s string) (intervals []RetentionInterval, err error) {
-
 	ges := strings.Split(s, "|")
 	intervals = make([]RetentionInterval, 0, 7*len(ges))
 

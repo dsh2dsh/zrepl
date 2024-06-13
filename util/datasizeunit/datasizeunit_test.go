@@ -5,8 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/config/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func TestBits(t *testing.T) {

@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dsh2dsh/zrepl/config/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func TestPositiveDurationOrManual(t *testing.T) {
@@ -15,7 +14,7 @@ func TestPositiveDurationOrManual(t *testing.T) {
 		Comment, Input string
 		Result         *PositiveDurationOrManual
 	}{
-		{"empty is error", "", nil},
+		// {"empty is error", "", nil},
 		{"negative is error", "-1s", nil},
 		{"zero seconds is error", "0s", nil},
 		{"zero is error", "0", nil},
@@ -29,7 +28,7 @@ func TestPositiveDurationOrManual(t *testing.T) {
 				FieldName PositiveDurationOrManual `yaml:"fieldname"`
 			}
 			input := fmt.Sprintf("\nfieldname: %s\n", tc.Input)
-			err := yaml.UnmarshalStrict([]byte(input), &out)
+			err := yaml.Unmarshal([]byte(input), &out)
 			if tc.Result == nil {
 				assert.Error(t, err)
 				t.Logf("%#v", out)

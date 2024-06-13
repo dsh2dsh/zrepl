@@ -8,19 +8,18 @@ import (
 	"time"
 
 	"github.com/kr/pretty"
-
-	"github.com/dsh2dsh/zrepl/config/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 type Duration struct{ d time.Duration }
 
 func (d Duration) Duration() time.Duration { return d.d }
 
-var _ yaml.Unmarshaler = &Duration{}
+var _ yaml.Unmarshaler = (*Duration)(nil)
 
-func (d *Duration) UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) error) error {
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	var s string
-	err := unmarshal(&s, false)
+	err := value.Decode(&s)
 	if err != nil {
 		return err
 	}
@@ -34,12 +33,12 @@ func (d *Duration) UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) 
 
 type PositiveDuration struct{ d Duration }
 
-var _ yaml.Unmarshaler = &PositiveDuration{}
-
 func (d PositiveDuration) Duration() time.Duration { return d.d.Duration() }
 
-func (d *PositiveDuration) UnmarshalYAML(unmarshal func(v interface{}, not_strict bool) error) error {
-	err := d.d.UnmarshalYAML(unmarshal)
+var _ yaml.Unmarshaler = (*PositiveDuration)(nil)
+
+func (d *PositiveDuration) UnmarshalYAML(value *yaml.Node) error {
+	err := d.d.UnmarshalYAML(value)
 	if err != nil {
 		return err
 	}

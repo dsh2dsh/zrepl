@@ -8,10 +8,10 @@ import (
 
 	"github.com/kr/pretty"
 	"github.com/spf13/pflag"
+	"gopkg.in/yaml.v3"
 
 	"github.com/dsh2dsh/zrepl/cli"
 	"github.com/dsh2dsh/zrepl/config"
-	"github.com/dsh2dsh/zrepl/config/yaml"
 	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/logger"

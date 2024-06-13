@@ -116,8 +116,8 @@ jobs:
 	})
 
 	t.Run("recv_properties_empty", func(t *testing.T) {
-		c := testValidConfig(t, fill(recv_properties_empty))
-		assert.NotNil(t, c)
+		_, err := testConfig(t, fill(recv_properties_empty))
+		require.Error(t, err)
 	})
 
 	t.Run("recv_empty", func(t *testing.T) {

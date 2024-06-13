@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Bits struct {
@@ -80,9 +82,11 @@ func (r *Bits) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (r *Bits) UnmarshalYAML(u func(interface{}, bool) error) error {
+var _ yaml.Unmarshaler = (*Bits)(nil)
+
+func (r *Bits) UnmarshalYAML(value *yaml.Node) error {
 	var s string
-	if err := u(&s, false); err != nil {
+	if err := value.Decode(&s); err != nil {
 		return err
 	}
 	return r.UnmarshalJSON([]byte(s))
