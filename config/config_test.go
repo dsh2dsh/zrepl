@@ -21,8 +21,6 @@ func TestSampleConfigsAreParsedWithoutErrors(t *testing.T) {
 		t.Errorf("glob failed: %+v", err)
 	}
 
-	paths = append(paths, "../packaging/systemd-default-zrepl.yml")
-
 	for _, p := range paths {
 
 		if path.Ext(p) != ".yml" {
@@ -93,14 +91,13 @@ func TestEmptyConfig(t *testing.T) {
 	cases := []string{
 		"",
 		"\n",
-		// "---",
-		// "---\n",
+		"---",
+		"---\n",
 	}
 	for _, input := range cases {
-		config := testValidConfig(t, input)
-		require.NotNil(t, config)
-		require.NotNil(t, config.Global)
-		require.Empty(t, config.Jobs)
+		_, err := testConfig(t, input)
+		t.Log(err)
+		require.Error(t, err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/syslog"
 	"os"
@@ -28,7 +29,7 @@ func New() *Config {
 }
 
 type Config struct {
-	Jobs   []JobEnum `yaml:"jobs" validate:"dive"`
+	Jobs   []JobEnum `yaml:"jobs" validate:"min=1,dive"`
 	Global Global    `yaml:"global"`
 }
 
@@ -118,7 +119,7 @@ type SnapJob struct {
 	Name             string            `yaml:"name" validate:"required"`
 	Pruning          PruningLocal      `yaml:"pruning"`
 	Snapshotting     SnapshottingEnum  `yaml:"snapshotting"`
-	Filesystems      FilesystemsFilter `yaml:"filesystems" validate:"required"`
+	Filesystems      FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
 	MonitorSnapshots MonitorSnapshots  `yaml:"monitor"`
 }
 
@@ -183,7 +184,7 @@ type PlaceholderRecvOptions struct {
 type PushJob struct {
 	ActiveJob    `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
-	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required"`
+	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
 	Send         SendOptions       `yaml:"send"`
 }
 
@@ -241,7 +242,7 @@ func (j *SinkJob) GetRecvOptions() *RecvOptions  { return &j.Recv }
 type SourceJob struct {
 	PassiveJob   `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
-	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required"`
+	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
 	Send         SendOptions       `yaml:"send"`
 }
 
@@ -309,7 +310,7 @@ type Global struct {
 	RpcTimeout time.Duration `yaml:"rpc_timeout" default:"1m" validate:"gt=0s"`
 	ZfsBin     string        `yaml:"zfs_bin" default:"zfs" validate:"required"`
 
-	Logging    LoggingOutletEnumList `yaml:"logging" validate:"required"`
+	Logging    LoggingOutletEnumList `yaml:"logging" validate:"min=1"`
 	Monitoring []MonitoringEnum      `yaml:"monitoring"`
 	Control    GlobalControl         `yaml:"control"`
 	Serve      GlobalServe           `yaml:"serve"`
@@ -547,7 +548,7 @@ type HookEnum struct {
 type HookCommand struct {
 	Path               string            `yaml:"path" validate:"required"`
 	Timeout            time.Duration     `yaml:"timeout" default:"30s" validate:"gt=0s"`
-	Filesystems        FilesystemsFilter `yaml:"filesystems" validate:"required"`
+	Filesystems        FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
 	HookSettingsCommon `yaml:",inline"`
 }
 
@@ -718,17 +719,8 @@ func ParseConfigBytes(bytes []byte) (*Config, error) {
 		return nil, fmt.Errorf("init config with defaults: %w", err)
 	} else if err := yaml.Unmarshal(bytes, &c); err != nil {
 		return nil, fmt.Errorf("config unmarshal: %w", err)
-	}
-
-	if c == nil {
-		// There was no yaml document in the file, deserialize from default.
-		// => See TestFromdefaultsEmptyDoc in yaml-config package.
-		if err := yaml.Unmarshal([]byte("{}"), &c); err != nil {
-			return nil, fmt.Errorf("empty config unmarshal: %w", err)
-		}
-		if c == nil {
-			panic("the fallback to deserialize from `{}` should work")
-		}
+	} else if c == nil {
+		return nil, errors.New("There was no yaml document in the file")
 	}
 	c.lateInit()
 
