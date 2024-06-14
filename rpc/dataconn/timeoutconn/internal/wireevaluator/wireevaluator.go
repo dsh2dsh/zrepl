@@ -55,7 +55,7 @@ func main() {
 	defer cancel()
 
 	global := &config.Global{
-		Serve: &config.GlobalServe{
+		Serve: config.GlobalServe{
 			StdinServer: &config.GlobalStdinServer{
 				SockDir: "/tmp/wireevaluator_stdinserver",
 			},

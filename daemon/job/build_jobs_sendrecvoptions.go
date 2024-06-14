@@ -22,7 +22,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}
 	sendOpts := in.GetSendOptions()
-	bwlim, err := buildBandwidthLimitConfig(sendOpts.BandwidthLimit)
+	bwlim, err := buildBandwidthLimitConfig(&sendOpts.BandwidthLimit)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build bandwith limit config: %w", err)
 	}
@@ -68,7 +68,7 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 
 	recvOpts := in.GetRecvOptions()
 
-	bwlim, err := buildBandwidthLimitConfig(recvOpts.BandwidthLimit)
+	bwlim, err := buildBandwidthLimitConfig(&recvOpts.BandwidthLimit)
 	if err != nil {
 		return rc, fmt.Errorf("cannot build bandwith limit config: %w", err)
 	}

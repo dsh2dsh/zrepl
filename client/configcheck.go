@@ -78,7 +78,7 @@ var ConfigcheckCmd = &cli.Subcommand{
 		}
 
 		// further: try to build logging outlets
-		outlets, err := logging.OutletsFromConfig(*subcommand.Config().Global.Logging)
+		outlets, err := logging.OutletsFromConfig(subcommand.Config().Global.Logging)
 		if err != nil {
 			err := fmt.Errorf("cannot build logging from config: %w", err)
 			if configcheckArgs.what == "logging" {

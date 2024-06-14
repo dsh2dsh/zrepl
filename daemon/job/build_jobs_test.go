@@ -292,7 +292,12 @@ jobs:
 			cstr := fill(ts.input)
 			t.Logf("testing config:\n%s", cstr)
 			c, err := config.ParseConfigBytes([]byte(cstr))
+			if ts.expectError {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
+
 			jobs, err := JobsFromConfig(c, config.ParseFlagsNone)
 			if ts.expectOk != nil {
 				require.NoError(t, err)

@@ -37,7 +37,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		cancel()
 	}()
 
-	outlets, err := logging.OutletsFromConfig(*conf.Global.Logging)
+	outlets, err := logging.OutletsFromConfig(conf.Global.Logging)
 	if err != nil {
 		return fmt.Errorf("cannot build logging from config: %w", err)
 	}

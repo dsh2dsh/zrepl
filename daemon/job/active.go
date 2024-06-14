@@ -185,12 +185,12 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 		return nil, fmt.Errorf("sender config: %w", err)
 	}
 
-	replicationConfig, err := logic.ReplicationConfigFromConfig(in.Replication)
+	replicationConfig, err := logic.ReplicationConfigFromConfig(&in.Replication)
 	if err != nil {
 		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
 
-	conflictResolution, err := logic.ConflictResolutionFromConfig(in.ConflictResolution)
+	conflictResolution, err := logic.ConflictResolutionFromConfig(&in.ConflictResolution)
 	if err != nil {
 		return nil, fmt.Errorf("field `conflict_resolution`: %w", err)
 	}
@@ -280,12 +280,12 @@ func modePullFromConfig(g *config.Global, in *config.PullJob, jobID endpoint.Job
 		m.cronSpec = cronSpec
 	}
 
-	replicationConfig, err := logic.ReplicationConfigFromConfig(in.Replication)
+	replicationConfig, err := logic.ReplicationConfigFromConfig(&in.Replication)
 	if err != nil {
 		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
 
-	conflictResolution, err := logic.ConflictResolutionFromConfig(in.ConflictResolution)
+	conflictResolution, err := logic.ConflictResolutionFromConfig(&in.ConflictResolution)
 	if err != nil {
 		return nil, fmt.Errorf("field `conflict_resolution`: %w", err)
 	}
@@ -385,7 +385,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 		return nil, err
 	}
 
-	j.replicationDriverConfig, err = replicationDriverConfigFromConfig(in.Replication)
+	j.replicationDriverConfig, err = replicationDriverConfigFromConfig(&in.Replication)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build replication driver config: %w", err)
 	}

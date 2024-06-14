@@ -53,14 +53,14 @@ global:
       cert: /etc/zrepl/log/key.pem
       key: /etc/zrepl/log/cert.pem
 `)
-	assert.Equal(t, 4, len(*conf.Global.Logging))
-	assert.NotNil(t, (*conf.Global.Logging)[3].Ret.(*TCPLoggingOutlet).TLS)
+	assert.Equal(t, 4, len(conf.Global.Logging))
+	assert.NotNil(t, (conf.Global.Logging)[3].Ret.(*TCPLoggingOutlet).TLS)
 }
 
 func TestDefaultLoggingOutlet(t *testing.T) {
 	conf := testValidGlobalSection(t, "")
-	assert.Equal(t, 1, len(*conf.Global.Logging))
-	o := (*conf.Global.Logging)[0].Ret.(*StdoutLoggingOutlet)
+	assert.Equal(t, 1, len(conf.Global.Logging))
+	o := (conf.Global.Logging)[0].Ret.(*StdoutLoggingOutlet)
 	assert.Equal(t, "warn", o.Level)
 	assert.Equal(t, "human", o.Format)
 }
@@ -121,8 +121,8 @@ global:
       %s
 `, s)
 			conf := testValidGlobalSection(t, logcfg)
-			assert.Equal(t, 1, len(*conf.Global.Logging))
-			assert.True(t, SyslogFacility(tt.priority) == *(*conf.Global.Logging)[0].Ret.(*SyslogLoggingOutlet).Facility)
+			assert.Equal(t, 1, len(conf.Global.Logging))
+			assert.True(t, SyslogFacility(tt.priority) == (conf.Global.Logging)[0].Ret.(*SyslogLoggingOutlet).Facility)
 		})
 	}
 }

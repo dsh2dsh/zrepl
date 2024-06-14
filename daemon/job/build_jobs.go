@@ -12,7 +12,7 @@ import (
 func JobsFromConfig(c *config.Config, parseFlags config.ParseFlags) ([]Job, error) {
 	js := make([]Job, len(c.Jobs))
 	for i := range c.Jobs {
-		j, err := buildJob(c.Global, c.Jobs[i], parseFlags)
+		j, err := buildJob(&c.Global, c.Jobs[i], parseFlags)
 		if err != nil {
 			return nil, err
 		}
