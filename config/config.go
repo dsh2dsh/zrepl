@@ -290,13 +290,14 @@ type PruningLocal struct {
 type LoggingOutletEnumList []LoggingOutletEnum
 
 func (l *LoggingOutletEnumList) SetDefaults() {
-	s := new(StdoutLoggingOutlet)
+	s := new(FileLoggingOutlet)
 	defaults.MustSet(s)
 	err := yaml.Unmarshal([]byte(`
-type: "stdout"
-time: true
+type: "file"
+format: "text"
+hide_fields:
+  - "span"
 level: "warn"
-format: "human"
 `), s)
 	if err != nil {
 		panic(err)

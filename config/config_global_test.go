@@ -52,17 +52,31 @@ global:
       ca: /etc/zrepl/log/ca.crt
       cert: /etc/zrepl/log/key.pem
       key: /etc/zrepl/log/cert.pem
+  - type: "file"
+    format: "text"
+    hide_fields:
+      - "span"
+    level: "warn"
 `)
-	assert.Equal(t, 4, len(conf.Global.Logging))
+	assert.Equal(t, 5, len(conf.Global.Logging))
 	assert.NotNil(t, (conf.Global.Logging)[3].Ret.(*TCPLoggingOutlet).TLS)
 }
 
 func TestDefaultLoggingOutlet(t *testing.T) {
 	conf := testValidGlobalSection(t, "")
 	assert.Equal(t, 1, len(conf.Global.Logging))
-	o := (conf.Global.Logging)[0].Ret.(*StdoutLoggingOutlet)
+	defLogger := conf.Global.Logging[0].Ret
+	require.IsType(t, new(FileLoggingOutlet), defLogger)
+	o := defLogger.(*FileLoggingOutlet)
 	assert.Equal(t, "warn", o.Level)
-	assert.Equal(t, "human", o.Format)
+	assert.Equal(t, "text", o.Format)
+
+	conf = testValidGlobalSection(t, `
+global:
+  logging:
+`)
+	assert.Equal(t, 1, len(conf.Global.Logging))
+	assert.Equal(t, defLogger, conf.Global.Logging[0].Ret)
 }
 
 func TestPrometheusMonitoring(t *testing.T) {
@@ -128,10 +142,13 @@ global:
 }
 
 func TestLoggingOutletEnumList_SetDefaults(t *testing.T) {
-	e := &LoggingOutletEnumList{}
-	var i defaults.Setter = e
+	e := LoggingOutletEnumList{}
+	var i defaults.Setter = &e
 	require.NotPanics(t, func() {
 		i.SetDefaults()
-		assert.Equal(t, "warn", (*e)[0].Ret.(*StdoutLoggingOutlet).Level)
+		defLogger := e[0].Ret
+		require.IsType(t, new(FileLoggingOutlet), defLogger)
+		o := defLogger.(*FileLoggingOutlet)
+		assert.Equal(t, "warn", o.Level)
 	})
 }
