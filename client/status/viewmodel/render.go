@@ -22,7 +22,6 @@ type M struct {
 	jobs            map[string]*Job
 	jobsList        []*Job
 	selectedJob     *Job
-	dateString      string
 	bottomBarStatus string
 }
 
@@ -102,8 +101,6 @@ func (m *M) Update(p Params) {
 			m.selectedJob = j
 		}
 	}
-
-	m.dateString = time.Now().Format(time.RFC3339)
 }
 
 func (m *M) BottomBarStatus() string { return m.bottomBarStatus }
@@ -112,8 +109,6 @@ func (m *M) Jobs() []*Job { return m.jobsList }
 
 // may be nil
 func (m *M) SelectedJob() *Job { return m.selectedJob }
-
-func (m *M) DateString() string { return m.dateString }
 
 func (j *Job) updateFullDescription(p Params) {
 	width := p.DetailViewWidth

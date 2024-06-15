@@ -51,12 +51,9 @@ func interactive(c Client, flag statusFlags) error {
 
 	bottombar := tview.NewFlex()
 	bottombar.SetDirection(tview.FlexColumn)
-	bottombarDateView := tview.NewTextView()
-	bottombar.AddItem(bottombarDateView, len(time.Now().String()), 0, false)
 	bottomBarStatus := tview.NewTextView()
 	bottomBarStatus.SetDynamicColors(true)
-	bottomBarStatus.SetTextAlign(tview.AlignRight)
-	bottombar.AddItem(bottomBarStatus, 0, 10, false)
+	bottombar.AddItem(bottomBarStatus, 0, 1, false)
 	toolbarSplit.AddItem(bottombar, 1, 0, false)
 
 	tabbableWithJobMenu := []tview.Primitive{jobMenu, jobTextDetail, fsFilterInput}
@@ -200,10 +197,6 @@ func interactive(c Client, flag statusFlags) error {
 		} else {
 			jobTextDetail.SetText("please select a job")
 		}
-
-		bottombardatestring := m.DateString()
-		bottombarDateView.SetText(bottombardatestring)
-		bottombar.ResizeItem(bottombarDateView, len(bottombardatestring), 0)
 
 		bottomBarStatus.SetText(m.BottomBarStatus())
 
