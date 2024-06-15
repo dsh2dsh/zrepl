@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"time"
 
-	"github.com/fatih/color"
 	"github.com/go-logfmt/logfmt"
 
 	"github.com/dsh2dsh/zrepl/logger"
@@ -58,83 +56,6 @@ func writeFormatEntry(w io.Writer, e *logger.Entry, f EntryFormatter) error {
 
 func (f NoFormatter) Format(e *logger.Entry) ([]byte, error) {
 	return []byte(e.Message), nil
-}
-
-// --------------------------------------------------
-
-type HumanFormatter struct {
-	metadataFlags MetadataFlags
-	ignoreFields  map[string]bool
-}
-
-const HumanFormatterDateFormat = time.RFC3339
-
-func (f *HumanFormatter) SetMetadataFlags(flags MetadataFlags) {
-	f.metadataFlags = flags
-}
-
-func (f *HumanFormatter) SetIgnoreFields(ignore []string) {
-	if ignore == nil {
-		f.ignoreFields = nil
-		return
-	}
-	f.ignoreFields = make(map[string]bool, len(ignore))
-
-	for _, field := range ignore {
-		f.ignoreFields[field] = true
-	}
-}
-
-func (f *HumanFormatter) ignored(field string) bool {
-	return f.ignoreFields != nil && f.ignoreFields[field]
-}
-
-func (f *HumanFormatter) Format(e *logger.Entry) (out []byte, err error) {
-	var line bytes.Buffer
-	col := color.New()
-	if f.metadataFlags&MetadataColor != 0 {
-		col = e.Color()
-	}
-
-	if f.metadataFlags&MetadataTime != 0 {
-		fmt.Fprintf(&line, "%s ", e.Time.Format(HumanFormatterDateFormat))
-	}
-	if f.metadataFlags&MetadataLevel != 0 {
-		fmt.Fprintf(&line, "[%s]", col.Sprint(e.Level.Short()))
-	}
-
-	prefixFields := []string{JobField, SubsysField, SpanField}
-	prefixed := make(map[string]bool, len(prefixFields)+2)
-	for _, field := range prefixFields {
-		val, ok := e.Fields[field]
-		if !ok {
-			continue
-		}
-		if !f.ignored(field) {
-			fmt.Fprintf(&line, "[%s]", col.Sprint(val))
-			prefixed[field] = true
-		}
-	}
-
-	if line.Len() > 0 {
-		fmt.Fprint(&line, ": ")
-	}
-	fmt.Fprint(&line, e.Message)
-
-	if len(e.Fields)-len(prefixed) > 0 {
-		for field, value := range e.Fields {
-			if prefixed[field] || f.ignored(field) {
-				continue
-			}
-			fmt.Fprintf(&line, " %s=%q", col.Sprint(field), fmt.Sprint(value))
-		}
-	}
-
-	return line.Bytes(), nil
-}
-
-func (f *HumanFormatter) Write(w io.Writer, e *logger.Entry) error {
-	return writeFormatEntry(w, e, f)
 }
 
 // --------------------------------------------------

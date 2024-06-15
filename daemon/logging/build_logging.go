@@ -9,8 +9,6 @@ import (
 	"log/syslog"
 	"os"
 
-	"github.com/mattn/go-isatty"
-
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/logger"
@@ -22,7 +20,7 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 
 	if len(in) == 0 {
 		// Default config
-		out := WriterOutlet{&HumanFormatter{}, os.Stdout}
+		out := WriterOutlet{NewSlogFormatter(), os.Stdout}
 		outlets.Add(out, logger.Warn)
 		return outlets, nil
 	}
@@ -178,7 +176,7 @@ func parseLogFormat(common config.LoggingOutletCommon,
 ) (f EntryFormatter, err error) {
 	switch common.Format {
 	case "human":
-		return &HumanFormatter{}, nil
+		return parseSlogFormatter(&common).WithTextHandler(), nil
 	case "logfmt":
 		return &LogfmtFormatter{}, nil
 	case "json":
@@ -190,12 +188,13 @@ func parseLogFormat(common config.LoggingOutletCommon,
 	}
 }
 
-func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Level, err error) {
-	parseCommon := func(common config.LoggingOutletCommon) (logger.Level, EntryFormatter, error) {
+func ParseOutlet(in config.LoggingOutletEnum,
+) (o logger.Outlet, level logger.Level, err error) {
+	parseCommon := func(common config.LoggingOutletCommon,
+	) (logger.Level, EntryFormatter, error) {
 		if common.Level == "" || common.Format == "" {
 			return 0, nil, errors.New("must specify 'level' and 'format' field")
 		}
-
 		minLevel, err := logger.ParseLevel(common.Level)
 		if err != nil {
 			return 0, nil, fmt.Errorf("cannot parse 'level' field: %w", err)
@@ -210,12 +209,6 @@ func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Lev
 	var f EntryFormatter
 
 	switch v := in.Ret.(type) {
-	case *config.StdoutLoggingOutlet:
-		level, f, err = parseCommon(v.LoggingOutletCommon)
-		if err != nil {
-			break
-		}
-		o, err = parseStdoutOutlet(v, f)
 	case *config.TCPLoggingOutlet:
 		level, f, err = parseCommon(v.LoggingOutletCommon)
 		if err != nil {
@@ -238,23 +231,6 @@ func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet, level logger.Lev
 		panic(v)
 	}
 	return o, level, err
-}
-
-func parseStdoutOutlet(in *config.StdoutLoggingOutlet, formatter EntryFormatter) (WriterOutlet, error) {
-	flags := MetadataAll
-	writer := os.Stdout
-	if !isatty.IsTerminal(writer.Fd()) && !in.Time {
-		flags &= ^MetadataTime
-	}
-	if isatty.IsTerminal(writer.Fd()) && !in.Color {
-		flags &= ^MetadataColor
-	}
-
-	formatter.SetMetadataFlags(flags)
-	return WriterOutlet{
-		formatter,
-		os.Stdout,
-	}, nil
 }
 
 func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter) (out *TCPOutlet, err error) {

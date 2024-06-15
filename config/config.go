@@ -434,11 +434,6 @@ type FileLoggingOutlet struct {
 	FileName            string `yaml:"filename"`
 }
 
-type StdoutLoggingOutlet struct {
-	LoggingOutletCommon `yaml:",inline"`
-	Color               bool `yaml:"color" default:"true"`
-}
-
 type SyslogLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
 	Facility            SyslogFacility `yaml:"facility" default:"local0" validate:"required"`
@@ -648,7 +643,7 @@ var _ yaml.Unmarshaler = (*LoggingOutletEnum)(nil)
 func (t *LoggingOutletEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 	t.Ret, err = enumUnmarshal(value, map[string]any{
 		"file":   new(FileLoggingOutlet),
-		"stdout": new(StdoutLoggingOutlet),
+		"stdout": new(FileLoggingOutlet),
 		"syslog": new(SyslogLoggingOutlet),
 		"tcp":    new(TCPLoggingOutlet),
 	})

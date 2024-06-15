@@ -93,10 +93,10 @@ func HarnessRun(args HarnessArgs) error {
 	runRE := regexp.MustCompile(args.Run)
 
 	outlets := logger.NewOutlets()
-	outlet, level, err := logging.ParseOutlet(config.LoggingOutletEnum{Ret: &config.StdoutLoggingOutlet{
+	outlet, level, err := logging.ParseOutlet(config.LoggingOutletEnum{Ret: &config.FileLoggingOutlet{
 		LoggingOutletCommon: config.LoggingOutletCommon{
 			Level:  "debug",
-			Format: "human",
+			Format: "text",
 		},
 	}})
 	if err != nil {

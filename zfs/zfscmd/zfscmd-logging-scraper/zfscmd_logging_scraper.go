@@ -12,8 +12,6 @@ import (
 
 	"github.com/go-logfmt/logfmt"
 	"github.com/spf13/pflag"
-
-	"github.com/dsh2dsh/zrepl/daemon/logging"
 )
 
 type RuntimeLine struct {
@@ -92,12 +90,12 @@ var (
 	verbose      bool
 	dateRegexArg string
 	dateRegex    = regexp.MustCompile(`^([^\[]+)(.*)`)
-	dateFormat   = logging.HumanFormatterDateFormat
+	dateFormat   = time.RFC3339
 )
 
 func main() {
 	pflag.StringVarP(&dateRegexArg, "dateRE", "d", "", "date regex")
-	pflag.StringVar(&dateFormat, "dateFormat", logging.HumanFormatterDateFormat, "go date format")
+	pflag.StringVar(&dateFormat, "dateFormat", time.RFC3339, "go date format")
 	pflag.BoolVarP(&verbose, "verbose", "v", false, "verbose")
 	pflag.Parse()
 

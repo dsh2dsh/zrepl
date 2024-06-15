@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/daemon/logging"
 )
 
 func TestParseHumanFormatter(t *testing.T) {
@@ -23,7 +21,7 @@ func TestParseHumanFormatter(t *testing.T) {
 		return d
 	}
 
-	logTime, err := time.Parse(logging.HumanFormatterDateFormat, "2020-04-04T00:00:05+02:00")
+	logTime, err := time.Parse(time.RFC3339, "2020-04-04T00:00:05+02:00")
 	require.NoError(t, err)
 
 	tcs := []testCase{
