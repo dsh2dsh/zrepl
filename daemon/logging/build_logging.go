@@ -178,7 +178,7 @@ func parseLogFormat(common config.LoggingOutletCommon,
 	case "human":
 		return parseSlogFormatter(&common).WithTextHandler(), nil
 	case "logfmt":
-		return &LogfmtFormatter{}, nil
+		return parseSlogFormatter(&common).WithTextHandler(), nil
 	case "json":
 		return parseSlogFormatter(&common).WithJsonHandler(), nil
 	case "text":
