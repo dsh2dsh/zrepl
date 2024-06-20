@@ -18,6 +18,7 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/version"
 	"github.com/dsh2dsh/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 const snapshotsOkMsg = "job %q: %s snapshot: %v"
@@ -367,8 +368,8 @@ func newMonitorAlive() *monitorAlive {
 }
 
 type monitorAlive struct {
-	h    http.Client
-	resp *monitoringplugin.Response
+	controlClient http.Client
+	resp          *monitoringplugin.Response
 
 	warnRunning time.Duration
 	critRunning time.Duration
@@ -381,6 +382,10 @@ func (self *monitorAlive) applyOptions() *monitorAlive {
 	return self
 }
 
+func (self *monitorAlive) client() http.Client {
+	return self.controlClient
+}
+
 func (self *monitorAlive) run(
 	ctx context.Context, subcmd *cli.Subcommand, args []string,
 ) error {
@@ -389,7 +394,7 @@ func (self *monitorAlive) run(
 	if !self.checkVersions(subcmd.Config().Global.Control.SockPath) {
 		return nil
 	}
-	self.checkJobs()
+	self.checkStatus()
 	return nil
 }
 
@@ -403,25 +408,25 @@ func (self *monitorAlive) checkVersions(sockPath string) bool {
 	if clientVer != daemonVer {
 		self.resp.UpdateStatus(monitoringplugin.WARNING,
 			"client version != daemon version")
-		self.resp.UpdateStatus(monitoringplugin.WARNING, "client version: "+clientVer)
+		self.resp.UpdateStatus(monitoringplugin.WARNING,
+			"client version: "+clientVer)
 		return false
 	}
 	return true
 }
 
 func (self *monitorAlive) daemonVersion(sockPath string) string {
-	httpc, err := controlHttpClient(sockPath)
+	control, err := controlHttpClient(sockPath)
 	if err != nil {
 		self.resp.UpdateStatusOnError(
-			fmt.Errorf("failed http client for %q: %w", sockPath, err),
+			fmt.Errorf("control http client %q: %w", sockPath, err),
 			monitoringplugin.UNKNOWN, "", true)
 		return ""
 	}
-	self.h = httpc
+	self.controlClient = control
 
 	var ver version.ZreplVersionInformation
-	err = self.jsonRequestResponse(daemon.ControlJobEndpointVersion,
-		struct{}{}, &ver)
+	err = self.json(daemon.ControlJobEndpointVersion, struct{}{}, &ver)
 	if err != nil {
 		self.resp.UpdateStatusOnError(
 			fmt.Errorf("failed version request: %w", err),
@@ -433,21 +438,42 @@ func (self *monitorAlive) daemonVersion(sockPath string) string {
 	return ver.String()
 }
 
-func (self *monitorAlive) jsonRequestResponse(endpoint string, req, resp any,
-) error {
-	if err := jsonRequestResponse(self.h, endpoint, req, resp); err != nil {
-		return fmt.Errorf("json req to %q: %w", endpoint, err)
+func (self *monitorAlive) json(path string, req, resp any) error {
+	if err := jsonRequestResponse(self.client(), path, req, resp); err != nil {
+		return fmt.Errorf("json req to %q: %w", path, err)
 	}
 	return nil
 }
 
-func (self *monitorAlive) checkJobs() bool {
-	jobs, err := self.jobs()
+func (self *monitorAlive) checkStatus() bool {
+	jobs, activeZFS, err := self.status()
 	if err != nil {
-		self.resp.UpdateStatusOnError(fmt.Errorf("job reports: %w", err),
+		self.resp.UpdateStatusOnError(fmt.Errorf("status: %w", err),
 			monitoringplugin.CRITICAL, "", true)
 		return false
 	}
+	return self.checkJobs(jobs) && self.checkActiveZFS(activeZFS)
+}
+
+func (self *monitorAlive) status() (map[string]*job.Status,
+	[]zfscmd.ActiveCommand, error,
+) {
+	var s daemon.Status
+	err := self.json(daemon.ControlJobEndpointStatus, struct{}{}, &s)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed status request: %w", err)
+	}
+
+	m := make(map[string]*job.Status, len(s.Jobs))
+	for jname, jstatus := range s.Jobs {
+		if !daemon.IsInternalJobName(jname) {
+			m[jname] = jstatus
+		}
+	}
+	return m, s.Global.ZFSCmds.Active, nil
+}
+
+func (self *monitorAlive) checkJobs(jobs map[string]*job.Status) bool {
 	self.resp.WithDefaultOkMessage(strconv.Itoa(len(jobs)) + " jobs")
 
 	lasting := struct {
@@ -469,23 +495,6 @@ func (self *monitorAlive) checkJobs() bool {
 	return self.checkLongestJob(lasting.name, lasting.d)
 }
 
-func (self *monitorAlive) jobs() (map[string]*job.Status, error) {
-	var s daemon.Status
-	err := self.jsonRequestResponse(daemon.ControlJobEndpointStatus,
-		struct{}{}, &s)
-	if err != nil {
-		return nil, fmt.Errorf("failed status request: %w", err)
-	}
-
-	m := make(map[string]*job.Status, len(s.Jobs))
-	for jname, jstatus := range s.Jobs {
-		if !daemon.IsInternalJobName(jname) {
-			m[jname] = jstatus
-		}
-	}
-	return m, nil
-}
-
 func (self *monitorAlive) checkLongestJob(name string, lasting time.Duration,
 ) bool {
 	point := monitoringplugin.NewPerformanceDataPoint(
@@ -498,6 +507,35 @@ func (self *monitorAlive) checkLongestJob(name string, lasting time.Duration,
 		self.resp.UpdateStatus(monitoringplugin.OK, "longest job: "+name)
 		self.resp.UpdateStatus(monitoringplugin.OK,
 			"running: "+lasting.Truncate(time.Second).String())
+	}
+	return self.resp.GetStatusCode() == monitoringplugin.OK
+}
+
+func (self *monitorAlive) checkActiveZFS(active []zfscmd.ActiveCommand) bool {
+	var oldest *zfscmd.ActiveCommand
+	for i := range active {
+		cmd := &active[i]
+		if oldest == nil || cmd.StartedAt.Before(oldest.StartedAt) {
+			oldest = cmd
+		}
+	}
+
+	var d time.Duration
+	if oldest != nil {
+		d = time.Since(oldest.StartedAt).Truncate(time.Second)
+		self.resp.UpdateStatus(monitoringplugin.OK,
+			strconv.Itoa(len(active))+" active ZFS commands")
+		self.resp.UpdateStatus(monitoringplugin.OK,
+			"oldest: "+oldest.Path+" "+strings.Join(oldest.Args, " "))
+		self.resp.UpdateStatus(monitoringplugin.OK, "running: "+d.String())
+	}
+
+	point := monitoringplugin.NewPerformanceDataPoint("zfs", d.Seconds()).
+		SetUnit("s")
+	point.NewThresholds(0, self.warnRunning.Seconds(), 0,
+		self.critRunning.Seconds())
+	if err := self.resp.AddPerformanceDataPoint(point); err != nil {
+		self.resp.UpdateStatusOnError(err, monitoringplugin.UNKNOWN, "", true)
 	}
 	return self.resp.GetStatusCode() == monitoringplugin.OK
 }
