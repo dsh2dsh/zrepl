@@ -526,7 +526,7 @@ func (self *monitorAlive) checkActiveZFS(active []zfscmd.ActiveCommand) bool {
 		self.resp.UpdateStatus(monitoringplugin.OK,
 			strconv.Itoa(len(active))+" active ZFS commands")
 		self.resp.UpdateStatus(monitoringplugin.OK,
-			"oldest: "+oldest.Path+" "+strings.Join(oldest.Args, " "))
+			"oldest: "+strings.Join(oldest.Args, " "))
 		self.resp.UpdateStatus(monitoringplugin.OK, "running: "+d.String())
 	}
 
