@@ -19,3 +19,5 @@ func (s *manual) Run(ctx context.Context, wakeUpCommon chan<- struct{},
 func (s *manual) Report() Report {
 	return Report{Type: TypeManual, Manual: &struct{}{}}
 }
+
+func (s *manual) Shutdown() {}

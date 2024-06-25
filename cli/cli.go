@@ -22,6 +22,12 @@ var rootArgs struct {
 var rootCmd = &cobra.Command{
 	Use:   "zrepl",
 	Short: "One-stop ZFS replication solution",
+
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Don't show usage on app errors.
+		// https://github.com/spf13/cobra/issues/340#issuecomment-378726225
+		cmd.SilenceUsage = true
+	},
 }
 
 func init() {
@@ -77,6 +83,7 @@ func init() {
 type Subcommand struct {
 	Use              string
 	Short            string
+	Long             string
 	Example          string
 	NoRequireConfig  bool
 	Run              func(ctx context.Context, subcommand *Subcommand, args []string) error
@@ -137,6 +144,7 @@ func addSubcommandToCobraCmd(c *cobra.Command, s *Subcommand) {
 	cmd := cobra.Command{
 		Use:     s.Use,
 		Short:   s.Short,
+		Long:    s.Long,
 		Example: s.Example,
 	}
 	if s.SetupSubcommands == nil {

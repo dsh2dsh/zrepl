@@ -85,6 +85,8 @@ func (j *prometheusJob) Run(ctx context.Context, cron *cron.Cron) {
 	}
 }
 
+func (j *prometheusJob) Shutdown() {}
+
 type prometheusJobOutlet struct{}
 
 var _ logger.Outlet = prometheusJobOutlet{}

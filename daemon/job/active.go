@@ -97,6 +97,7 @@ type activeMode interface {
 	Cron() string
 	SnapperReport() *snapper.Report
 	ResetConnectBackoff()
+	Shutdown()
 }
 
 type modePush struct {

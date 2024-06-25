@@ -28,8 +28,8 @@ import (
 
 func Run(ctx context.Context, conf *config.Config) error {
 	ctx, cancel := context.WithCancel(ctx)
-
 	defer cancel()
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -68,7 +68,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		}
 	}
 
-	jobs := newJobs(logging.GetLogger(ctx, logging.SubsysCron))
+	jobs := newJobs(ctx, log, cancel)
 
 	// start control socket
 	controlJob, err := newControlJob(conf.Global.Control.SockPath, jobs)
@@ -121,21 +121,34 @@ func Run(ctx context.Context, conf *config.Config) error {
 type jobs struct {
 	wg   sync.WaitGroup
 	cron *cron.Cron
+	log  logger.Logger
 
 	// m protects all fields below it
 	m       sync.RWMutex
 	wakeups map[string]wakeup.Func // by Job.Name
 	resets  map[string]reset.Func  // by Job.Name
 	jobs    map[string]job.Job
+
+	cancel context.CancelFunc
 }
 
-func newJobs(log logger.Logger) *jobs {
+func newJobs(ctx context.Context, log logger.Logger,
+	cancel context.CancelFunc,
+) *jobs {
 	return &jobs{
-		cron:    newCron(log, true),
+		log:     log,
+		cron:    newCron(logging.GetLogger(ctx, logging.SubsysCron), true),
 		wakeups: make(map[string]wakeup.Func),
 		resets:  make(map[string]reset.Func),
 		jobs:    make(map[string]job.Job),
+
+		cancel: cancel,
 	}
+}
+
+func (s *jobs) Cancel() {
+	s.log.Info("cancel all jobs")
+	s.cancel()
 }
 
 func (s *jobs) wait() context.Context {
@@ -146,6 +159,14 @@ func (s *jobs) wait() context.Context {
 		cancel()
 	}()
 	return ctx
+}
+
+func (s *jobs) Shutdown() {
+	s.log.Info("shutdown all jobs")
+	s.cron.Stop()
+	for _, j := range s.jobs {
+		j.Shutdown()
+	}
 }
 
 type Status struct {
@@ -163,24 +184,9 @@ func (s *jobs) status() map[string]*job.Status {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
-	type res struct {
-		name   string
-		status *job.Status
-	}
-	var wg sync.WaitGroup
-	c := make(chan res, len(s.jobs))
-	for name, j := range s.jobs {
-		wg.Add(1)
-		go func(name string, j job.Job) {
-			defer wg.Done()
-			c <- res{name: name, status: j.Status()}
-		}(name, j)
-	}
-	wg.Wait()
-	close(c)
 	ret := make(map[string]*job.Status, len(s.jobs))
-	for res := range c {
-		ret[res.name] = res.status
+	for name, j := range s.jobs {
+		ret[name] = j.Status()
 	}
 	return ret
 }
@@ -229,22 +235,21 @@ func (s *jobs) start(ctx context.Context, j job.Job, internal bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	ctx = logging.WithInjectedField(ctx, logging.JobField, j.Name())
-
 	jobName := j.Name()
 	if !internal && IsInternalJobName(jobName) {
-		panic(fmt.Sprintf("internal job name used for non-internal job %s", jobName))
-	}
-	if internal && !IsInternalJobName(jobName) {
-		panic(fmt.Sprintf("internal job does not use internal job name %s", jobName))
-	}
-	if _, ok := s.jobs[jobName]; ok {
+		panic(fmt.Sprintf(
+			"internal job name used for non-internal job %s", jobName))
+	} else if internal && !IsInternalJobName(jobName) {
+		panic(fmt.Sprintf(
+			"internal job does not use internal job name %s", jobName))
+	} else if _, ok := s.jobs[jobName]; ok {
 		panic(fmt.Sprintf("duplicate job name %s", jobName))
 	}
 
 	j.RegisterMetrics(prometheus.DefaultRegisterer)
-
 	s.jobs[jobName] = j
+
+	ctx = logging.WithInjectedField(ctx, logging.JobField, j.Name())
 	ctx = zfscmd.WithJobID(ctx, j.Name())
 	ctx, wakeup := wakeup.Context(ctx)
 	ctx, resetFunc := reset.Context(ctx)

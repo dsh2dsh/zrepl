@@ -30,6 +30,7 @@ type passiveMode interface {
 	RunPeriodic(ctx context.Context, cron *cron.Cron)
 	SnapperReport() *snapper.Report // may be nil
 	Type() Type
+	Shutdown()
 }
 
 type modeSink struct {

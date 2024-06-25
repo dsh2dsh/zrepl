@@ -133,29 +133,43 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 			return s, nil
 		}})
 
-	mux.Handle(ControlJobEndpointSignal,
-		requestLogger{log: log, handler: jsonRequestResponder{log, func(decoder jsonDecoder) (interface{}, error) {
-			type reqT struct {
-				Name string
-				Op   string
-			}
-			var req reqT
-			if decoder(&req) != nil {
-				return nil, errors.New("decode failed")
-			}
+	mux.Handle(ControlJobEndpointSignal, requestLogger{
+		log: log,
+		handler: jsonRequestResponder{
+			log: log,
+			producer: func(decoder jsonDecoder) (any, error) {
+				req := struct {
+					Op   string
+					Name string
+				}{}
+				if decoder(&req) != nil {
+					return nil, errors.New("decode failed")
+				}
 
-			var err error
-			switch req.Op {
-			case "wakeup":
-				err = j.jobs.wakeup(req.Name)
-			case "reset":
-				err = j.jobs.reset(req.Name)
-			default:
-				err = fmt.Errorf("operation %q is invalid", req.Op)
-			}
+				l := log.WithField("op", req.Op)
+				if req.Name != "" {
+					l.WithField("name", req.Name)
+				}
+				l.Info("got signal")
 
-			return struct{}{}, err
-		}}})
+				var err error
+				switch req.Op {
+				case "wakeup":
+					err = j.jobs.wakeup(req.Name)
+				case "reset":
+					err = j.jobs.reset(req.Name)
+				case "stop":
+					j.jobs.Cancel()
+				case "shutdown":
+					j.jobs.Shutdown()
+				default:
+					err = fmt.Errorf("operation %q is invalid", req.Op)
+				}
+				return struct{}{}, err
+			},
+		},
+	})
+
 	server := http.Server{
 		Handler: mux,
 		// control socket is local, 1s timeout should be more than sufficient, even on a loaded system
@@ -250,6 +264,7 @@ func (j jsonRequestResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		logIoErr(err)
 		return
 	}
+
 	if producerErr != nil {
 		j.log.WithError(producerErr).Error("control handler error")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -259,15 +274,15 @@ func (j jsonRequestResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var buf bytes.Buffer
-	encodeErr := json.NewEncoder(&buf).Encode(res)
-	if encodeErr != nil {
+	if encodeErr := json.NewEncoder(&buf).Encode(res); encodeErr != nil {
 		j.log.WithError(producerErr).Error("control handler json marshal error")
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := io.WriteString(w, encodeErr.Error())
 		logIoErr(err)
-	} else {
-		_, err := io.Copy(w, &buf)
+	} else if _, err := io.Copy(w, &buf); err != nil {
 		logIoErr(err)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
 	}
 }
 
@@ -291,3 +306,5 @@ func (l requestLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Debug("finish")
 }
+
+func (j *controlJob) Shutdown() {}
