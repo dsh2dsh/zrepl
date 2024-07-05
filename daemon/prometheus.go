@@ -22,13 +22,14 @@ import (
 type prometheusJob struct {
 	listen   string
 	freeBind bool
+	shutdown context.CancelFunc
 }
 
 func newPrometheusJobFromConfig(in *config.PrometheusMonitoring) (*prometheusJob, error) {
 	if _, _, err := net.SplitHostPort(in.Listen); err != nil {
 		return nil, err
 	}
-	return &prometheusJob{in.Listen, in.ListenFreeBind}, nil
+	return &prometheusJob{listen: in.Listen, freeBind: in.ListenFreeBind}, nil
 }
 
 var prom struct {
@@ -56,6 +57,9 @@ func (j *prometheusJob) SenderConfig() *endpoint.SenderConfig { return nil }
 func (j *prometheusJob) RegisterMetrics(registerer prometheus.Registerer) {}
 
 func (j *prometheusJob) Run(ctx context.Context, cron *cron.Cron) {
+	ctx, j.shutdown = context.WithCancel(ctx)
+	defer j.shutdown()
+
 	if err := zfs.PrometheusRegister(prometheus.DefaultRegisterer); err != nil {
 		panic(err)
 	}
@@ -85,7 +89,7 @@ func (j *prometheusJob) Run(ctx context.Context, cron *cron.Cron) {
 	}
 }
 
-func (j *prometheusJob) Shutdown() {}
+func (j *prometheusJob) Shutdown() { j.shutdown() }
 
 type prometheusJobOutlet struct{}
 

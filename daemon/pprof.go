@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"net/http"
+	"sync"
+
 	// FIXME: importing this package has the side-effect of poisoning the http.DefaultServeMux
 	// FIXME: with the /debug/pprof endpoints
 	"context"
@@ -18,6 +20,7 @@ import (
 type pprofServer struct {
 	cc       chan PprofServerControlMsg
 	listener net.Listener
+	wg       sync.WaitGroup
 }
 
 type PprofServerControlMsg struct {
@@ -32,11 +35,18 @@ func NewPProfServer(ctx context.Context) *pprofServer {
 		cc: make(chan PprofServerControlMsg),
 	}
 
-	go s.controlLoop(ctx)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.controlLoop(ctx)
+	}()
 	return s
 }
 
 func (s *pprofServer) controlLoop(ctx context.Context) {
+	log := job.GetLogger(ctx)
+	defer log.Info("pprof server exiting")
+
 outer:
 	for {
 
@@ -74,7 +84,7 @@ outer:
 				if ctx.Err() != nil {
 					return
 				} else if err != nil {
-					job.GetLogger(ctx).WithError(err).Error("pprof server serve error")
+					log.WithError(err).Error("pprof server serve error")
 				}
 			}()
 			continue
@@ -91,3 +101,5 @@ outer:
 func (s *pprofServer) Control(msg PprofServerControlMsg) {
 	s.cc <- msg
 }
+
+func (s *pprofServer) Wait() { s.wg.Wait() }

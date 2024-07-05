@@ -28,6 +28,7 @@ import (
 type controlJob struct {
 	sockaddr *net.UnixAddr
 	jobs     *jobs
+	shutdown context.CancelFunc
 }
 
 func newControlJob(sockpath string, jobs *jobs) (j *controlJob, err error) {
@@ -82,6 +83,9 @@ const (
 )
 
 func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
+	ctx, j.shutdown = context.WithCancel(ctx)
+	defer j.shutdown()
+
 	log := job.GetLogger(ctx)
 	defer log.Info("control job finished")
 
@@ -179,7 +183,6 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 
 outer:
 	for {
-
 		served := make(chan error)
 		go func() {
 			served <- server.Serve(l)
@@ -200,8 +203,10 @@ outer:
 				break outer
 			}
 		}
-
 	}
+
+	log.Info("waiting for pprof server exit")
+	pprofServer.Wait()
 }
 
 type jsonResponder struct {
@@ -307,4 +312,4 @@ func (l requestLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Debug("finish")
 }
 
-func (j *controlJob) Shutdown() {}
+func (j *controlJob) Shutdown() { j.shutdown() }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/util/bandwidthlimit"
 	"github.com/dsh2dsh/zrepl/util/nodefault"
@@ -27,6 +29,8 @@ type SnapJob struct {
 	name     endpoint.JobID
 	fsfilter zfs.DatasetFilter
 	snapper  snapper.Snapper
+	shutdown context.CancelFunc
+	wg       sync.WaitGroup
 
 	prunerFactory *pruner.LocalPrunerFactory
 
@@ -127,35 +131,69 @@ func (j *SnapJob) SenderConfig() *endpoint.SenderConfig { return nil }
 func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "snap-job", j.Name())
 	defer endTask()
-	log := GetLogger(ctx)
 
+	log := GetLogger(ctx)
 	defer log.Info("job exiting")
 
-	periodicDone := make(chan struct{})
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	periodicCtx, endTask := trace.WithTask(ctx, "snapshotting")
-	defer endTask()
-	go j.snapper.Run(periodicCtx, periodicDone, cron)
+	running, shutdown := context.WithCancel(context.Background())
+	defer shutdown()
+	j.shutdown = shutdown
+	snapshots := j.goSnap(ctx, cron)
 
-	invocationCount := 0
-outer:
+	cnt := 0
+forLoop:
 	for {
 		log.Info("wait for wakeups")
 		select {
 		case <-ctx.Done():
 			log.WithError(ctx.Err()).Info("context")
-			break outer
-
+			break forLoop
 		case <-wakeup.Wait(ctx):
-		case <-periodicDone:
+		case <-snapshots:
+		case <-running.Done():
+			log.Info("shutdown")
+			break forLoop
 		}
-		invocationCount++
 
-		invocationCtx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", invocationCount))
-		j.doPrune(invocationCtx)
-		endSpan()
+		cnt++
+		j.prune(ctx, cnt)
 	}
+	j.wait(log)
+}
+
+func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
+	snapshots := make(chan struct{})
+	if j.snapper.RunPeriodic() {
+		j.wg.Add(1)
+		go func() {
+			defer j.wg.Done()
+			ctx, endTask := trace.WithTask(ctx, "snapshotting")
+			j.snapper.Run(ctx, snapshots, cron)
+			endTask()
+		}()
+	}
+	return snapshots
+}
+
+func (j *SnapJob) prune(ctx context.Context, cnt int) {
+	ctx, endSpan := trace.WithSpan(ctx, "invocation-"+strconv.Itoa(cnt))
+	j.doPrune(ctx)
+	endSpan()
+}
+
+func (j *SnapJob) wait(l logger.Logger) {
+	if j.snapper.RunPeriodic() {
+		l.Info("waiting for snapper job exit")
+		defer l.Info("snapper job exited")
+	}
+	j.wg.Wait()
+}
+
+func (j *SnapJob) Shutdown() {
+	if j.snapper.RunPeriodic() {
+		j.snapper.Shutdown()
+	}
+	j.shutdown()
 }
 
 // Adaptor that implements pruner.History around a pruner.Target.

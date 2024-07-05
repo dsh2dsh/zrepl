@@ -16,6 +16,7 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/replication"
 	"github.com/dsh2dsh/zrepl/replication/driver"
 	"github.com/dsh2dsh/zrepl/replication/logic"
@@ -48,6 +49,9 @@ type ActiveSide struct {
 	cron       *cron.Cron
 	cronId     cron.EntryID
 	wakeupBusy int
+
+	running  context.Context
+	shutdown context.CancelFunc
 }
 
 //go:generate enumer -type=ActiveSideState
@@ -98,6 +102,7 @@ type activeMode interface {
 	SnapperReport() *snapper.Report
 	ResetConnectBackoff()
 	Shutdown()
+	Wait()
 }
 
 type modePush struct {
@@ -108,6 +113,8 @@ type modePush struct {
 	plannerPolicy *logic.PlannerPolicy
 	snapper       snapper.Snapper
 	cronSpec      string
+
+	wg sync.WaitGroup
 }
 
 func (m *modePush) ConnectEndpoints(ctx context.Context, connecter transport.Connecter) {
@@ -144,9 +151,14 @@ func (m *modePush) RunPeriodic(ctx context.Context,
 	wakeUpCommon chan<- struct{}, cron *cron.Cron,
 ) <-chan struct{} {
 	if m.snapper.RunPeriodic() {
-		go m.snapper.Run(ctx, wakeUpCommon, cron)
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.snapper.Run(ctx, wakeUpCommon, cron)
+		}()
 		return make(chan struct{}) // snapper will handle wakeup signal
 	}
+
 	GetLogger(ctx).Info("periodic snapshotting disabled")
 	return wakeup.Wait(ctx) // caller will handle wakeup signal
 }
@@ -162,6 +174,16 @@ func (m *modePush) ResetConnectBackoff() {
 	if m.receiver != nil {
 		m.receiver.ResetConnectBackoff()
 	}
+}
+
+func (m *modePush) Shutdown() {
+	if m.snapper.RunPeriodic() {
+		m.snapper.Shutdown()
+	}
+}
+
+func (m *modePush) Wait() {
+	m.wg.Wait()
 }
 
 func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.JobID) (*modePush, error) {
@@ -270,7 +292,13 @@ func (m *modePull) ResetConnectBackoff() {
 	}
 }
 
-func modePullFromConfig(g *config.Global, in *config.PullJob, jobID endpoint.JobID) (m *modePull, err error) {
+func (m *modePull) Shutdown() {}
+
+func (m *modePull) Wait() {}
+
+func modePullFromConfig(_ *config.Global, in *config.PullJob,
+	jobID endpoint.JobID,
+) (m *modePull, err error) {
 	m = &modePull{}
 
 	cronSpec := in.CronSpec()
@@ -528,50 +556,50 @@ func FakeActiveSideDirectMethodInvocationClientIdentity(jobId endpoint.JobID) st
 func (j *ActiveSide) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "active-side-job", j.Name())
 	defer endTask()
-
 	ctx = context.WithValue(ctx, endpoint.ClientIdentityKey,
 		FakeActiveSideDirectMethodInvocationClientIdentity(j.name))
 
 	log := GetLogger(ctx)
-
 	defer log.Info("job exiting")
 
-	periodicDone := make(chan struct{})
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	periodicCtx, endTask := trace.WithTask(ctx, "periodic")
 	defer endTask()
+	periodicDone := make(chan struct{})
 	wakeupSig := j.runPeriodic(periodicCtx, periodicDone, cron)
 
-	invocationCount := 0
+	j.running, j.shutdown = context.WithCancel(context.Background())
+	defer j.shutdown()
+
+	cnt := 0
+forLoop:
 	for {
 		log.Info("wait for wakeups")
 		select {
 		case <-ctx.Done():
+			log.WithError(ctx.Err()).Info("context")
+			break forLoop
 		case <-wakeupSig:
 			j.mode.ResetConnectBackoff()
 		case <-periodicDone:
+		case <-j.running.Done():
+			log.Info("shutdown")
+			break forLoop
 		}
-		if ctx.Err() != nil {
-			log.WithError(ctx.Err()).Info("context")
-			return
-		}
-		invocationCount++
-		invocationCtx, endSpan := trace.WithSpan(ctx,
-			fmt.Sprintf("invocation-%d", invocationCount))
-		j.do(invocationCtx)
-		endSpan()
+
+		cnt++
+		j.doWithSpan(ctx, cnt)
 	}
+	j.wait(log)
 }
 
 func (j *ActiveSide) runPeriodic(ctx context.Context,
 	wakeUpCommon chan<- struct{}, cron *cron.Cron,
 ) <-chan struct{} {
-	cronSpec := j.mode.Cron()
-	if cronSpec == "" {
+	if j.periodicMode() {
 		return j.mode.RunPeriodic(ctx, wakeUpCommon, cron)
 	}
 
+	cronSpec := j.mode.Cron()
 	log := GetLogger(ctx).WithField("cron", cronSpec)
 	id, err := cron.AddFunc(cronSpec, func() {
 		select {
@@ -590,6 +618,14 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 		log.WithField("id", id).Info("add cron job")
 	}
 	return wakeup.Wait(ctx) // caller will handle wakeup signal
+}
+
+func (j *ActiveSide) periodicMode() bool { return j.mode.Cron() == "" }
+
+func (j *ActiveSide) doWithSpan(ctx context.Context, cnt int) {
+	ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", cnt))
+	j.do(ctx)
+	endSpan()
 }
 
 func (j *ActiveSide) do(ctx context.Context) {
@@ -614,6 +650,8 @@ func (j *ActiveSide) do(ctx context.Context) {
 	{
 		select {
 		case <-ctx.Done():
+			return
+		case <-j.running.Done():
 			return
 		default:
 		}
@@ -647,6 +685,8 @@ func (j *ActiveSide) do(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-j.running.Done():
+			return
 		default:
 		}
 		ctx, endSpan := trace.WithSpan(ctx, "prune_sender")
@@ -665,6 +705,8 @@ func (j *ActiveSide) do(ctx context.Context) {
 	{
 		select {
 		case <-ctx.Done():
+			return
+		case <-j.running.Done():
 			return
 		default:
 		}
@@ -685,4 +727,20 @@ func (j *ActiveSide) do(ctx context.Context) {
 	j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.state = ActiveSideDone
 	})
+}
+
+func (j *ActiveSide) Shutdown() {
+	if j.periodicMode() {
+		j.mode.Shutdown()
+	}
+	j.shutdown()
+}
+
+func (j *ActiveSide) wait(l logger.Logger) {
+	if j.periodicMode() {
+		l = l.WithField("mode", j.mode.Type())
+		l.Info("waiting for mode job exit")
+		defer l.Info("mode job exited")
+	}
+	j.mode.Wait()
 }

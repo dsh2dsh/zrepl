@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dsh2dsh/cron/v3"
@@ -13,6 +14,7 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/endpoint"
+	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/rpc"
 	"github.com/dsh2dsh/zrepl/transport"
 	"github.com/dsh2dsh/zrepl/transport/fromconfig"
@@ -23,10 +25,14 @@ type PassiveSide struct {
 	mode   passiveMode
 	name   endpoint.JobID
 	listen transport.AuthenticatedListenerFactory
+
+	wg       sync.WaitGroup
+	shutdown context.CancelFunc
 }
 
 type passiveMode interface {
 	Handler() rpc.Handler
+	Periodic() bool
 	RunPeriodic(ctx context.Context, cron *cron.Cron)
 	SnapperReport() *snapper.Report // may be nil
 	Type() Type
@@ -43,10 +49,17 @@ func (m *modeSink) Handler() rpc.Handler {
 	return endpoint.NewReceiver(m.receiverConfig)
 }
 
-func (m *modeSink) RunPeriodic(_ context.Context, cron *cron.Cron) {}
-func (m *modeSink) SnapperReport() *snapper.Report                 { return nil }
+func (m *modeSink) Periodic() bool { return false }
 
-func modeSinkFromConfig(g *config.Global, in *config.SinkJob, jobID endpoint.JobID) (m *modeSink, err error) {
+func (m *modeSink) RunPeriodic(_ context.Context, cron *cron.Cron) {}
+
+func (m *modeSink) SnapperReport() *snapper.Report { return nil }
+
+func (m *modeSink) Shutdown() {}
+
+func modeSinkFromConfig(_ *config.Global, in *config.SinkJob,
+	jobID endpoint.JobID,
+) (m *modeSink, err error) {
 	m = &modeSink{}
 
 	m.receiverConfig, err = buildReceiverConfig(in, jobID)
@@ -84,13 +97,19 @@ func (m *modeSource) Handler() rpc.Handler {
 	return endpoint.NewSender(*m.senderConfig)
 }
 
+func (m *modeSource) Periodic() bool { return true }
+
 func (m *modeSource) RunPeriodic(ctx context.Context, cron *cron.Cron) {
-	go m.snapper.Run(ctx, nil, cron)
+	m.snapper.Run(ctx, nil, cron)
 }
 
 func (m *modeSource) SnapperReport() *snapper.Report {
 	r := m.snapper.Report()
 	return &r
+}
+
+func (m *modeSource) Shutdown() {
+	m.snapper.Shutdown()
 }
 
 func passiveSideFromConfig(g *config.Global, in *config.PassiveJob, configJob interface{}, parseFlags config.ParseFlags) (s *PassiveSide, err error) {
@@ -170,33 +189,20 @@ func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}
 func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "passive-side-job", j.Name())
 	defer endTask()
+
 	log := GetLogger(ctx)
 	defer log.Info("job exiting")
-	{
-		ctx, endTask := trace.WithTask(ctx, "periodic") // shadowing
-		defer endTask()
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		j.mode.RunPeriodic(ctx, cron)
-	}
+
+	j.goModePeriodic(ctx, cron)
 
 	handler := j.mode.Handler()
 	if handler == nil {
-		panic(fmt.Sprintf("implementation error: j.mode.Handler() returned nil: %#v", j))
-	}
-
-	ctxInterceptor := func(handlerCtx context.Context, info rpc.HandlerContextInterceptorData, handler func(ctx context.Context)) {
-		// the handlerCtx is clean => need to inherit logging and tracing config from job context
-		handlerCtx = logging.WithInherit(handlerCtx, ctx)
-		handlerCtx = trace.WithInherit(handlerCtx, ctx)
-
-		handlerCtx, endTask := trace.WithTaskAndSpan(handlerCtx, "handler", fmt.Sprintf("job=%q client=%q method=%q", j.Name(), info.ClientIdentity(), info.FullMethod()))
-		defer endTask()
-		handler(handlerCtx)
+		panic(fmt.Sprintf(
+			"implementation error: j.mode.Handler() returned nil: %#v", j))
 	}
 
 	rpcLoggers := rpc.GetLoggersOrPanic(ctx) // WithSubsystemLoggers above
-	server := rpc.NewServer(handler, rpcLoggers, ctxInterceptor)
+	server := rpc.NewServer(handler, rpcLoggers, j.ctxInterceptor(ctx))
 
 	listener, err := j.listen()
 	if err != nil {
@@ -204,5 +210,53 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 		return
 	}
 
+	ctx, j.shutdown = context.WithCancel(ctx)
+	defer j.shutdown()
 	server.Serve(ctx, listener)
+	j.wait(log)
+}
+
+func (j *PassiveSide) goModePeriodic(ctx context.Context, cron *cron.Cron) {
+	if !j.mode.Periodic() {
+		return
+	}
+
+	j.wg.Add(1)
+	go func() {
+		defer j.wg.Done()
+		ctx, endTask := trace.WithTask(ctx, "periodic")
+		j.mode.RunPeriodic(ctx, cron)
+		endTask()
+	}()
+}
+
+func (j *PassiveSide) ctxInterceptor(ctx context.Context,
+) rpc.HandlerContextInterceptor {
+	return func(handlerCtx context.Context,
+		info rpc.HandlerContextInterceptorData, handler func(ctx context.Context),
+	) {
+		// the handlerCtx is clean => need to inherit logging and tracing config
+		// from job context
+		handlerCtx = logging.WithInherit(handlerCtx, ctx)
+		handlerCtx = trace.WithInherit(handlerCtx, ctx)
+		handlerCtx, endTask := trace.WithTaskAndSpan(handlerCtx, "handler",
+			fmt.Sprintf("job=%q client=%q method=%q", j.Name(),
+				info.ClientIdentity(), info.FullMethod()))
+		handler(handlerCtx)
+		endTask()
+	}
+}
+
+func (j *PassiveSide) wait(l logger.Logger) {
+	l = l.WithField("mode", j.mode.Type())
+	l.Info("waiting for mode job exit")
+	defer l.Info("mode job exited")
+	if j.mode.Periodic() {
+	}
+	j.wg.Wait()
+}
+
+func (j *PassiveSide) Shutdown() {
+	j.mode.Shutdown()
+	j.shutdown()
 }

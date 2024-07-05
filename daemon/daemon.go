@@ -108,9 +108,8 @@ func Run(ctx context.Context, conf *config.Config) error {
 	wait := jobs.wait()
 	select {
 	case <-wait.Done():
-		log.Info("all jobs finished")
 	case <-ctx.Done():
-		log.WithError(ctx.Err()).Info("context finished")
+		log.WithError(ctx.Err()).Info("context canceled")
 	}
 	log.Info("waiting for jobs to finish")
 	<-wait.Done()
@@ -155,7 +154,10 @@ func (s *jobs) wait() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		s.wg.Wait()
+		s.log.Info("all jobs finished")
+		s.log.Info("waiting for cron exit")
 		<-s.cron.Stop().Done()
+		s.log.Info("cron exited")
 		cancel()
 	}()
 	return ctx
@@ -220,6 +222,7 @@ func (s *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job,
 	for _, j := range confJobs {
 		s.start(ctx, j, internal)
 	}
+	s.log.WithField("count", len(s.jobs)).Info("started jobs")
 }
 
 const (
