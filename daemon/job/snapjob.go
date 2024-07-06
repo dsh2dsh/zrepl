@@ -138,7 +138,7 @@ func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) {
 	running, shutdown := context.WithCancel(context.Background())
 	defer shutdown()
 	j.shutdown = shutdown
-	snapshots := j.goSnap(ctx, cron)
+	wakeUp := j.goSnap(ctx, cron)
 
 	cnt := 0
 forLoop:
@@ -148,8 +148,7 @@ forLoop:
 		case <-ctx.Done():
 			log.WithError(ctx.Err()).Info("context")
 			break forLoop
-		case <-wakeup.Wait(ctx):
-		case <-snapshots:
+		case <-wakeUp:
 		case <-running.Done():
 			log.Info("shutdown")
 			break forLoop
@@ -162,16 +161,18 @@ forLoop:
 }
 
 func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
-	snapshots := make(chan struct{})
-	if j.snapper.RunPeriodic() {
-		j.wg.Add(1)
-		go func() {
-			defer j.wg.Done()
-			ctx, endTask := trace.WithTask(ctx, "snapshotting")
-			j.snapper.Run(ctx, snapshots, cron)
-			endTask()
-		}()
+	if !j.snapper.RunPeriodic() {
+		return wakeup.Wait(ctx)
 	}
+
+	snapshots := make(chan struct{})
+	j.wg.Add(1)
+	go func() {
+		defer j.wg.Done()
+		ctx, endTask := trace.WithTask(ctx, "snapshotting")
+		j.snapper.Run(ctx, snapshots, cron)
+		endTask()
+	}()
 	return snapshots
 }
 
