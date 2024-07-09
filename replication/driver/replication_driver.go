@@ -198,7 +198,9 @@ func (c Config) Validate() error {
 }
 
 // caller must ensure config.Validate() == nil
-func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFunc) {
+func Do(ctx context.Context, config Config, planner Planner,
+	running context.Context,
+) (ReportFunc, WaitFunc) {
 	if err := config.Validate(); err != nil {
 		panic(err)
 	}
@@ -213,10 +215,11 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-
 		defer run.l.Lock().Unlock()
+
 		log.Debug("begin run")
 		defer log.Debug("run ended")
+
 		var prev *attempt
 		mainLog := log
 		for ano := 0; ano < int(config.MaxAttempts); ano++ {
@@ -235,11 +238,14 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 			}
 			run.attempts = append(run.attempts, cur)
 			run.l.DropWhile(func() {
-				cur.do(ctx, prev)
+				cur.do(ctx, prev, running)
 			})
 			prev = cur
 			if ctx.Err() != nil {
 				log.WithError(ctx.Err()).Info("context error")
+				return
+			} else if running.Err() != nil {
+				log.WithError(running.Err()).Info("shutdown")
 				return
 			}
 
@@ -257,18 +263,24 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 			}
 
 			mostRecentErr, mostRecentErrClass := errRep.MostRecent()
-			log.WithField("most_recent_err", mostRecentErr).WithField("most_recent_err_class", mostRecentErrClass).Debug("most recent error used for re-connect decision")
+			log.WithField("most_recent_err", mostRecentErr).
+				WithField("most_recent_err_class", mostRecentErrClass).
+				Debug("most recent error used for re-connect decision")
 			if mostRecentErr == nil {
 				// inconsistent reporting, let's bail out
-				log.WithField("attempt_state", rep.State).Warn("attempt does not report done but error report does not report errors, aborting run")
+				log.WithField("attempt_state", rep.State).Warn(
+					"attempt does not report done but error report does not report errors, aborting run")
 				break
 			}
-			log.WithError(mostRecentErr.Err).Error("most recent error in this attempt")
+			log.WithError(mostRecentErr.Err).Error(
+				"most recent error in this attempt")
 			shouldReconnect := mostRecentErrClass == errorClassTemporaryConnectivityRelated
-			log.WithField("reconnect_decision", shouldReconnect).Debug("reconnect decision made")
+			log.WithField("reconnect_decision", shouldReconnect).Debug(
+				"reconnect decision made")
 			if shouldReconnect {
 				run.waitReconnect.Set(time.Now(), config.ReconnectHardFailTimeout)
-				log.WithField("deadline", run.waitReconnect.End()).Error("temporary connectivity-related error identified, start waiting for reconnect")
+				log.WithField("deadline", run.waitReconnect.End()).Error(
+					"temporary connectivity-related error identified, start waiting for reconnect")
 				var connectErr error
 				var connectErrTime time.Time
 				run.l.DropWhile(func() {
@@ -278,7 +290,8 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 					connectErrTime = time.Now()
 				})
 				if connectErr == nil {
-					log.Error("reconnect successful") // same level as 'begin with reconnect' message above
+					// same level as 'begin with reconnect' message above
+					log.Error("reconnect successful")
 					continue
 				} else {
 					run.waitReconnectError = newTimedError(connectErr, connectErrTime)
@@ -286,10 +299,10 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 					break
 				}
 			} else {
-				log.Error("most recent error cannot be solved by reconnecting, aborting run")
+				log.Error(
+					"most recent error cannot be solved by reconnecting, aborting run")
 				return
 			}
-
 		}
 	}()
 
@@ -311,18 +324,24 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc, WaitFu
 	return report, wait
 }
 
-func (a *attempt) do(ctx context.Context, prev *attempt) {
-	prevs := a.doGlobalPlanning(ctx, prev)
+func (a *attempt) do(ctx context.Context, prev *attempt,
+	running context.Context,
+) {
+	prevs := a.doGlobalPlanning(ctx, prev, running)
 	if prevs == nil {
 		return
 	}
-	a.doFilesystems(ctx, prevs)
+	a.doFilesystems(ctx, prevs, running)
 }
 
-// if no error occurs, returns a map that maps this attempt's a.fss to `prev`'s a.fss
-func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt) map[*fs]*fs {
+// if no error occurs, returns a map that maps this attempt's a.fss to `prev`'s
+// a.fss
+func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
+	running context.Context,
+) map[*fs]*fs {
 	ctx, endSpan := trace.WithSpan(ctx, "plan")
 	defer endSpan()
+
 	pfss, err := a.planner.Plan(ctx)
 	errTime := time.Now()
 	defer a.l.Lock().Unlock()
@@ -331,11 +350,15 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt) map[*fs]*
 		a.fss = nil
 		a.finishedAt = time.Now()
 		return nil
+	} else if running.Err() != nil {
+		a.planErr = newTimedError(context.Cause(running), errTime)
+		a.fss = nil
+		a.finishedAt = time.Now()
+		return nil
 	}
 
 	// a.fss != nil indicates that there was no planning error (see doc comment)
 	a.fss = make([]*fs, 0)
-
 	for _, pfs := range pfss {
 		fs := &fs{
 			fs:        pfs,
@@ -376,7 +399,8 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt) map[*fs]*
 		})
 		if len(inconsistencies) > 0 {
 			var msg strings.Builder
-			msg.WriteString("cannot determine filesystem correspondences between different attempts:\n")
+			msg.WriteString(
+				"cannot determine filesystem correspondences between different attempts:\n")
 			var inconsistencyLines []string
 			for _, i := range inconsistencies {
 				var prevNames []string
@@ -401,7 +425,8 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt) map[*fs]*
 	}
 	// invariant: prevs contains an entry for each unambiguous correspondence
 
-	// build up parent-child relationship (FIXME (O(n^2), but who's going to have that many filesystems...))
+	// build up parent-child relationship (FIXME (O(n^2), but who's going to have
+	// that many filesystems...))
 	mustDatasetPathOrPlanFail := func(fs string) *zfs.DatasetPath {
 		dp, err := zfs.NewDatasetPath(fs)
 		if err != nil {
@@ -433,23 +458,26 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt) map[*fs]*
 	return prevs
 }
 
-func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs) {
+func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
+	running context.Context,
+) {
 	ctx, endSpan := trace.WithSpan(ctx, "do-repl")
 	defer endSpan()
-
 	defer a.l.Lock().Unlock()
 
 	stepQueue := newStepQueue()
 	defer stepQueue.Start(a.config.StepQueueConcurrency)()
+
 	var fssesDone sync.WaitGroup
 	for _, f := range a.fss {
 		fssesDone.Add(1)
 		go func(f *fs) {
 			defer fssesDone.Done()
 			// avoid explosion of tasks with name f.report().Info.Name
-			ctx, endTask := trace.WithTaskAndSpan(ctx, "repl-fs", f.report().Info.Name)
+			ctx, endTask := trace.WithTaskAndSpan(ctx, "repl-fs",
+				f.report().Info.Name)
 			defer endTask()
-			f.do(ctx, stepQueue, prevs[f], a.config.OneStep)
+			f.do(ctx, stepQueue, prevs[f], a.config.OneStep, running)
 			f.l.HoldWhile(func() {
 				// every return from f means it's unblocked...
 				f.blockedOn = report.FsBlockedOnNothing
@@ -483,7 +511,9 @@ func (f *fs) initialRepOrdWakeupChildren() {
 	}
 }
 
-func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
+func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
+	running context.Context,
+) {
 	defer f.l.Lock().Unlock()
 	defer f.initialRepOrdWakeupChildren()
 
@@ -494,20 +524,31 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 	f.blockedOn = report.FsBlockedOnPlanningStepQueue
 	f.l.DropWhile(func() {
 		// TODO hacky
-		// choose target time that is earlier than any snapshot, so fs planning is always prioritized
+		// choose target time that is earlier than any snapshot, so fs planning is
+		// always prioritized
 		targetDate := time.Unix(0, 0)
 		defer pq.WaitReady(ctx, f, targetDate)()
 		f.l.HoldWhile(func() {
 			// transition before we call PlanFS
 			f.blockedOn = report.FsBlockedOnNothing
 		})
-		psteps, err = f.fs.PlanFS(ctx, oneStep) // no shadow
-		errTime = time.Now()                    // no shadow
+		if ctx.Err() == nil && running.Err() == nil {
+			psteps, err = f.fs.PlanFS(ctx, oneStep) // no shadow
+		}
+		errTime = time.Now() // no shadow
 	})
-	if err != nil {
+	switch {
+	case err != nil:
 		f.planning.err = newTimedError(err, errTime)
 		return
+	case ctx.Err() != nil:
+		f.planning.err = newTimedError(context.Cause(ctx), errTime)
+		return
+	case running.Err() != nil:
+		f.planning.err = newTimedError(context.Cause(running), errTime)
+		return
 	}
+
 	for _, pstep := range psteps {
 		step := &step{
 			l:    f.l,
@@ -515,16 +556,17 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 		}
 		f.planned.steps = append(f.planned.steps, step)
 	}
-	// we're not done planning yet, f.planned.steps might still be changed by next block
-	// => don't set f.planning.done just yet
+	// we're not done planning yet, f.planned.steps might still be changed by next
+	// block => don't set f.planning.done just yet
 	f.debug("initial len(fs.planned.steps) = %d", len(f.planned.steps))
 
-	// for not-first attempts that succeeded in planning, only allow fs.planned.steps
-	// up to and including the originally planned target snapshot
+	// for not-first attempts that succeeded in planning, only allow
+	// fs.planned.steps up to and including the originally planned target snapshot
 	if prev != nil && prev.planning.done && prev.planning.err == nil {
-		f.debug("attempting to correlate plan with previous attempt to find out what is left to do")
-		// find the highest of the previously uncompleted steps for which we can also find a step
-		// in our current plan
+		f.debug(
+			"attempting to correlate plan with previous attempt to find out what is left to do")
+		// find the highest of the previously uncompleted steps for which we can
+		// also find a step in our current plan
 		prevUncompleted := prev.planned.steps[prev.planned.step:]
 		var target struct{ prev, cur int }
 		target.prev = -1
@@ -540,15 +582,20 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 			}
 		}
 		if target.prev == -1 || target.cur == -1 {
-			f.debug("no correlation possible between previous attempt and this attempt's plan")
-			f.planning.err = newTimedError(fmt.Errorf("cannot correlate previously failed attempt to current plan"), time.Now())
+			f.debug(
+				"no correlation possible between previous attempt and this attempt's plan")
+			f.planning.err = newTimedError(errors.New(
+				"cannot correlate previously failed attempt to current plan"),
+				time.Now())
 			return
 		}
 
 		f.planned.steps = f.planned.steps[0:target.cur]
-		f.debug("found correlation, new steps are len(fs.planned.steps) = %d", len(f.planned.steps))
+		f.debug("found correlation, new steps are len(fs.planned.steps) = %d",
+			len(f.planned.steps))
 	} else {
-		f.debug("previous attempt does not exist or did not finish planning, no correlation possible, taking this attempt's plan as is")
+		f.debug(
+			"previous attempt does not exist or did not finish planning, no correlation possible, taking this attempt's plan as is")
 	}
 
 	// now we are done planning (f.planned.steps won't change from now on)
@@ -560,6 +607,7 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 	for _, p := range f.initialRepOrd.parents {
 		parents = append(parents, p.fs.ReportInfo().Name)
 	}
+
 	f.debug("wait for parents %s", parents)
 	for {
 		var initialReplicatingParentsWithErrors []string
@@ -570,46 +618,61 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 					// (get the preconditions that allow us to inspect p.planned)
 					parentHasPlanningDone := p.planning.done && p.planning.err == nil
 					if !parentHasPlanningDone {
-						// if the parent couldn't be planned, we cannot know whether it needs initial replication
-						// or incremental replication => be conservative and assume it was initial replication
+						// if the parent couldn't be planned, we cannot know whether it
+						// needs initial replication or incremental replication => be
+						// conservative and assume it was initial replication
 						allParentsPresentOnReceiver = false
 						if p.planning.err != nil {
-							initialReplicatingParentsWithErrors = append(initialReplicatingParentsWithErrors, p.fs.ReportInfo().Name)
+							initialReplicatingParentsWithErrors = append(
+								initialReplicatingParentsWithErrors, p.fs.ReportInfo().Name)
 						}
 						return
 					}
 					// now allowed to inspect p.planned
 
-					// if there are no steps to be done, the filesystem must exist on the receiving side
-					// (otherwise we'd replicate it, and there would be a step for that)
-					// (FIXME hardcoded initial replication policy, assuming the policy will always do _some_ initial replication)
+					// if there are no steps to be done, the filesystem must exist on the
+					// receiving side (otherwise we'd replicate it, and there would be a
+					// step for that) (FIXME hardcoded initial replication policy,
+					// assuming the policy will always do _some_ initial replication)
 					parentHasNoSteps := len(p.planned.steps) == 0
 
 					// OR if it has completed at least one step
 					// (remember that .step points to the next step to be done)
-					// (TODO technically, we could make this step ready in the moment the recv-side
-					//  dataset exists, i.e. after the first few megabytes of transferred data, but we'd have to ask the receiver for that -> poll ListFilesystems RPC)
-					parentHasTakenAtLeastOneSuccessfulStep := !parentHasNoSteps && p.planned.step >= 1
+					// (TODO technically, we could make this step ready in the moment the
+					//  recv-side dataset exists, i.e. after the first few megabytes of
+					//  transferred data, but we'd have to ask the receiver for that ->
+					//  poll ListFilesystems RPC)
+					parentHasTakenAtLeastOneSuccessfulStep := !parentHasNoSteps &&
+						p.planned.step >= 1
 
-					parentFirstStepIsIncremental := // no need to lock for .report() because step.l == it's fs.l
-						len(p.planned.steps) > 0 && p.planned.steps[0].report().IsIncremental()
+						// no need to lock for .report() because step.l == it's fs.l
+					parentFirstStepIsIncremental := len(p.planned.steps) > 0 &&
+						p.planned.steps[0].report().IsIncremental()
 
-					f.debug("parentHasNoSteps=%v parentFirstStepIsIncremental=%v parentHasTakenAtLeastOneSuccessfulStep=%v",
-						parentHasNoSteps, parentFirstStepIsIncremental, parentHasTakenAtLeastOneSuccessfulStep)
+					f.debug(
+						"parentHasNoSteps=%v parentFirstStepIsIncremental=%v parentHasTakenAtLeastOneSuccessfulStep=%v",
+						parentHasNoSteps, parentFirstStepIsIncremental,
+						parentHasTakenAtLeastOneSuccessfulStep)
 
-					parentPresentOnReceiver := parentHasNoSteps || parentFirstStepIsIncremental || parentHasTakenAtLeastOneSuccessfulStep
+					parentPresentOnReceiver := parentHasNoSteps ||
+						parentFirstStepIsIncremental ||
+						parentHasTakenAtLeastOneSuccessfulStep
 
-					allParentsPresentOnReceiver = allParentsPresentOnReceiver && parentPresentOnReceiver // no shadow
+					allParentsPresentOnReceiver = allParentsPresentOnReceiver &&
+						parentPresentOnReceiver // no shadow
 
 					if !parentPresentOnReceiver && p.planned.stepErr != nil {
-						initialReplicatingParentsWithErrors = append(initialReplicatingParentsWithErrors, p.fs.ReportInfo().Name)
+						initialReplicatingParentsWithErrors = append(
+							initialReplicatingParentsWithErrors, p.fs.ReportInfo().Name)
 					}
 				})
 			}
 		})
 
 		if len(initialReplicatingParentsWithErrors) > 0 {
-			f.planned.stepErr = newTimedError(fmt.Errorf("parent(s) failed during initial replication: %s", initialReplicatingParentsWithErrors), time.Now())
+			f.planned.stepErr = newTimedError(fmt.Errorf(
+				"parent(s) failed during initial replication: %s",
+				initialReplicatingParentsWithErrors), time.Now())
 			return
 		}
 
@@ -623,6 +686,8 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 			select {
 			case <-ctx.Done():
 				f.planned.stepErr = newTimedError(ctx.Err(), time.Now())
+			case <-running.Done():
+				f.planned.stepErr = newTimedError(context.Cause(running), time.Now())
 			case <-f.initialRepOrd.parentDidUpdate:
 				// loop
 			}
@@ -644,17 +709,37 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 			defer pq.WaitReady(ctx, f, targetDate)()
 			f.l.HoldWhile(func() { f.blockedOn = report.FsBlockedOnNothing })
 			// do the step
-			ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("%#v", s.step.ReportInfo()))
-			defer endSpan()
-			err, errTime = s.step.Step(ctx), time.Now() // no shadow
+			if ctx.Err() == nil && running.Err() == nil {
+				ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("%#v",
+					s.step.ReportInfo()))
+				defer endSpan()
+				err = s.step.Step(ctx) // no shadow
+			}
+			errTime = time.Now()
 		})
 
-		if err != nil {
+		switch {
+		case err != nil:
 			f.planned.stepErr = newTimedError(err, errTime)
-			break
+			return
+		case ctx.Err() != nil:
+			f.planned.stepErr = newTimedError(
+				fmt.Errorf(
+					"fs %q: planned step=%v: %w", f.fs.ReportInfo().Name, i,
+					context.Cause(ctx)),
+				errTime)
+			return
+		case running.Err() != nil:
+			f.planned.stepErr = newTimedError(
+				fmt.Errorf(
+					"fs %q: planned step=%v: running: %w", f.fs.ReportInfo().Name, i,
+					context.Cause(running)),
+				errTime)
+			return
 		}
-		f.planned.step = i + 1 // fs.planned.step must be == len(fs.planned.steps) if all went OK
 
+		// fs.planned.step must be == len(fs.planned.steps) if all went OK
+		f.planned.step = i + 1
 		f.initialRepOrdWakeupChildren()
 	}
 }

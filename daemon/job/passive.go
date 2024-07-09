@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -27,7 +28,7 @@ type PassiveSide struct {
 	listen transport.AuthenticatedListenerFactory
 
 	wg       sync.WaitGroup
-	shutdown context.CancelFunc
+	shutdown context.CancelCauseFunc
 }
 
 type passiveMode interface {
@@ -201,6 +202,9 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 			"implementation error: j.mode.Handler() returned nil: %#v", j))
 	}
 
+	ctx, j.shutdown = context.WithCancelCause(ctx)
+	defer j.shutdown(nil)
+
 	rpcLoggers := rpc.GetLoggersOrPanic(ctx) // WithSubsystemLoggers above
 	server := rpc.NewServer(handler, rpcLoggers, j.ctxInterceptor(ctx))
 
@@ -210,8 +214,6 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 		return
 	}
 
-	ctx, j.shutdown = context.WithCancel(ctx)
-	defer j.shutdown()
 	server.Serve(ctx, listener)
 	j.wait(log)
 }
@@ -248,15 +250,15 @@ func (j *PassiveSide) ctxInterceptor(ctx context.Context,
 }
 
 func (j *PassiveSide) wait(l logger.Logger) {
-	l = l.WithField("mode", j.mode.Type())
-	l.Info("waiting for mode job exit")
-	defer l.Info("mode job exited")
 	if j.mode.Periodic() {
+		l = l.WithField("mode", j.mode.Type())
+		l.Info("waiting for mode job exit")
+		defer l.Info("mode job exited")
 	}
 	j.wg.Wait()
 }
 
 func (j *PassiveSide) Shutdown() {
 	j.mode.Shutdown()
-	j.shutdown()
+	j.shutdown(errors.New("shutdown received"))
 }

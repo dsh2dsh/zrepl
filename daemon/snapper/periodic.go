@@ -66,9 +66,6 @@ type periodicArgs struct {
 	snapshotsTaken chan<- struct{}
 	dryRun         bool
 
-	running  context.Context
-	shutdown context.CancelFunc
-
 	cron     *cron.Cron
 	cronSpec string
 	wakeUp   chan struct{}
@@ -76,7 +73,8 @@ type periodicArgs struct {
 }
 
 type Periodic struct {
-	args periodicArgs
+	args     periodicArgs
+	shutdown context.CancelCauseFunc
 
 	mtx   sync.Mutex
 	state State
@@ -132,12 +130,13 @@ func (s *Periodic) RunPeriodic() bool { return true }
 func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 	cron *cron.Cron,
 ) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	s.shutdown = cancel
+
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	getLogger(ctx).Debug("start")
 	defer getLogger(ctx).Debug("stop")
-
-	s.args.running, s.args.shutdown = context.WithCancel(context.Background())
-	defer s.args.shutdown()
 
 	s.args.snapshotsTaken = snapshotsTaken
 	s.args.ctx = ctx
@@ -241,13 +240,9 @@ func periodicStateSyncUp(a periodicArgs, u updater) state {
 			t.Stop()
 		case <-a.ctx.Done():
 			t.Stop()
-		case <-a.running.Done():
-			t.Stop()
 		}
 		if a.ctx.Err() != nil {
 			return onMainCtxDone(a.ctx, u)
-		} else if a.running.Err() != nil {
-			return onMainCtxDone(a.running, u)
 		}
 	}
 
@@ -314,12 +309,9 @@ func periodicStateWait(a periodicArgs, u updater) state {
 	case <-a.wakeUp:
 	case <-a.wakeSig:
 	case <-a.ctx.Done():
-	case <-a.running.Done():
 	}
 	if a.ctx.Err() != nil {
 		return onMainCtxDone(a.ctx, u)
-	} else if a.running.Err() != nil {
-		return onMainCtxDone(a.running, u)
 	}
 	return u(func(snapper *Periodic) { snapper.state = Planning }).sf()
 }
@@ -503,5 +495,5 @@ func (self *PeriodicReport) Running() time.Duration {
 }
 
 func (s *Periodic) Shutdown() {
-	s.args.shutdown()
+	s.shutdown(errors.New("shutdown received"))
 }

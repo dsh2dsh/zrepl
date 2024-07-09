@@ -117,7 +117,7 @@ func (i replicationInvocation) Do(ctx *platformtest.Context) *report.Report {
 			ReconnectHardFailTimeout: 1 * time.Second,
 		},
 		logic.NewPlanner(nil, nil, sender, receiver, plannerPolicy),
-	)
+		context.Background())
 	wait(true)
 	return report()
 }

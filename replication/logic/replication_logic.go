@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/logger"
@@ -277,26 +278,44 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	log := getLogger(ctx)
 
 	log.Info("start planning")
+	var sfss, rfss []*pdu.Filesystem
+	g, ctx := errgroup.WithContext(ctx)
 
-	slfssres, err := p.sender.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
-	if err != nil {
-		log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).Error("error listing sender filesystems")
+	g.Go(func() error {
+		ctx, endTask := trace.WithTask(ctx, "list sender filesystems")
+		defer endTask()
+		slfssres, err := p.sender.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
+		if err != nil {
+			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
+				Error("error listing sender filesystems")
+			return err
+		}
+		sfss = slfssres.GetFilesystems()
+		return nil
+	})
+
+	g.Go(func() error {
+		ctx, endTask := trace.WithTask(ctx, "list receiver filesystems")
+		defer endTask()
+		rlfssres, err := p.receiver.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
+		if err != nil {
+			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
+				Error("error listing receiver filesystems")
+			return err
+		}
+		rfss = rlfssres.GetFilesystems()
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	sfss := slfssres.GetFilesystems()
 
-	rlfssres, err := p.receiver.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
-	if err != nil {
-		log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).Error("error listing receiver filesystems")
-		return nil, err
-	}
-	rfss := rlfssres.GetFilesystems()
-
-	sizeEstimateRequestSem := semaphore.New(int64(p.policy.SizeEstimationConcurrency))
+	sizeEstimateRequestSem := semaphore.New(int64(
+		p.policy.SizeEstimationConcurrency))
 
 	q := make([]*Filesystem, 0, len(sfss))
 	for _, fs := range sfss {
-
 		var receiverFS *pdu.Filesystem
 		for _, rfs := range rfss {
 			if rfs.Path == fs.Path {

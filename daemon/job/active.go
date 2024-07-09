@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -67,9 +68,9 @@ const (
 type activeSideTasks struct {
 	state ActiveSideState
 
-	// valid for state ActiveSideReplicating, ActiveSidePruneSender, ActiveSidePruneReceiver, ActiveSideDone
+	// valid for state ActiveSideReplicating, ActiveSidePruneSender,
+	// ActiveSidePruneReceiver, ActiveSideDone
 	replicationReport driver.ReportFunc
-	replicationCancel context.CancelFunc
 
 	// valid for state ActiveSidePruneSender, ActiveSidePruneReceiver, ActiveSideDone
 	prunerSender, prunerReceiver *pruner.Pruner
@@ -582,12 +583,12 @@ forLoop:
 			j.mode.ResetConnectBackoff()
 		case <-periodicDone:
 		case <-j.running.Done():
-			log.Info("shutdown")
+			log.Info("shutdown received")
 			break forLoop
 		}
 
 		cnt++
-		j.doWithSpan(ctx, cnt)
+		j.do(ctx, cnt)
 	}
 	j.wait(log)
 }
@@ -622,15 +623,13 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 
 func (j *ActiveSide) periodicMode() bool { return j.mode.Cron() == "" }
 
-func (j *ActiveSide) doWithSpan(ctx context.Context, cnt int) {
+func (j *ActiveSide) do(ctx context.Context, cnt int) {
 	ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", cnt))
-	j.do(ctx)
-	endSpan()
-}
+	defer endSpan()
 
-func (j *ActiveSide) do(ctx context.Context) {
 	j.mode.ConnectEndpoints(ctx, j.connecter)
 	defer j.mode.DisconnectEndpoints()
+	log := GetLogger(ctx)
 
 	// allow cancellation of an invocation (this function)
 	ctx, cancelThisRun := context.WithCancel(ctx)
@@ -638,38 +637,39 @@ func (j *ActiveSide) do(ctx context.Context) {
 	go func() {
 		select {
 		case <-reset.Wait(ctx):
-			log := GetLogger(ctx)
 			log.Info("reset received, cancelling current invocation")
 			cancelThisRun()
 		case <-ctx.Done():
 		}
 	}()
 
+	running, shutdown := context.WithCancelCause(ctx)
+	stopShutdown := context.AfterFunc(j.running, func() {
+		log.Info("shutdown received, gracefully stop current invocation")
+		shutdown(errors.New("shutdown recevived"))
+	})
+	defer func() {
+		stopShutdown()
+		shutdown(nil)
+	}()
+
 	sender, receiver := j.mode.SenderReceiver()
 
-	{
-		select {
-		case <-ctx.Done():
-			return
-		case <-j.running.Done():
-			return
-		default:
-		}
+	if running.Err() == nil {
 		ctx, endSpan := trace.WithSpan(ctx, "replication")
-		ctx, repCancel := context.WithCancel(ctx)
 		var repWait driver.WaitFunc
 		j.updateTasks(func(tasks *activeSideTasks) {
 			// reset it
 			*tasks = activeSideTasks{}
-			tasks.replicationCancel = func() { repCancel(); endSpan() }
 			tasks.replicationReport, repWait = replication.Do(
-				ctx, j.replicationDriverConfig, logic.NewPlanner(j.promRepStateSecs, j.promBytesReplicated, sender, receiver, j.mode.PlannerPolicy()),
-			)
+				ctx, j.replicationDriverConfig, logic.NewPlanner(
+					j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
+					j.mode.PlannerPolicy()),
+				j.running)
 			tasks.state = ActiveSideReplicating
 		})
-		GetLogger(ctx).Info("start replication")
+		log.Info("start replication")
 		repWait(true) // wait blocking
-		repCancel()   // always cancel to free up context resources
 
 		replicationReport := j.tasks.replicationReport()
 		numErrors := replicationReport.GetFailedFilesystemsCountInLatestAttempt()
@@ -677,51 +677,51 @@ func (j *ActiveSide) do(ctx context.Context) {
 		if numErrors == 0 {
 			j.promLastSuccessful.SetToCurrentTime()
 		}
-
 		endSpan()
+	} else {
+		return
 	}
 
-	{
-		select {
-		case <-ctx.Done():
-			return
-		case <-j.running.Done():
-			return
-		default:
-		}
-		ctx, endSpan := trace.WithSpan(ctx, "prune_sender")
+	if running.Err() == nil {
+		ctx, endSpan := trace.WithSpan(running, "prune_sender")
 		ctx, senderCancel := context.WithCancel(ctx)
 		tasks := j.updateTasks(func(tasks *activeSideTasks) {
-			tasks.prunerSender = j.prunerFactory.BuildSenderPruner(ctx, sender, sender)
-			tasks.prunerSenderCancel = func() { senderCancel(); endSpan() }
+			tasks.prunerSender = j.prunerFactory.BuildSenderPruner(
+				ctx, sender, sender)
+			tasks.prunerSenderCancel = func() {
+				senderCancel()
+				endSpan()
+			}
 			tasks.state = ActiveSidePruneSender
 		})
-		GetLogger(ctx).Info("start pruning sender")
+		log.Info("start pruning sender")
 		tasks.prunerSender.Prune()
-		GetLogger(ctx).Info("finished pruning sender")
+		log.Info("finished pruning sender")
 		senderCancel()
 		endSpan()
+	} else {
+		return
 	}
-	{
-		select {
-		case <-ctx.Done():
-			return
-		case <-j.running.Done():
-			return
-		default:
-		}
-		ctx, endSpan := trace.WithSpan(ctx, "prune_recever")
+
+	if running.Err() == nil {
+		ctx, endSpan := trace.WithSpan(running, "prune_recever")
 		ctx, receiverCancel := context.WithCancel(ctx)
 		tasks := j.updateTasks(func(tasks *activeSideTasks) {
-			tasks.prunerReceiver = j.prunerFactory.BuildReceiverPruner(ctx, receiver, sender)
-			tasks.prunerReceiverCancel = func() { receiverCancel(); endSpan() }
+			tasks.prunerReceiver = j.prunerFactory.BuildReceiverPruner(
+				ctx, receiver, sender)
+			tasks.prunerReceiverCancel = func() {
+				receiverCancel()
+				endSpan()
+			}
 			tasks.state = ActiveSidePruneReceiver
 		})
-		GetLogger(ctx).Info("start pruning receiver")
+		log.Info("start pruning receiver")
 		tasks.prunerReceiver.Prune()
-		GetLogger(ctx).Info("finished pruning receiver")
+		log.Info("finished pruning receiver")
 		receiverCancel()
 		endSpan()
+	} else {
+		return
 	}
 
 	j.updateTasks(func(tasks *activeSideTasks) {

@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -29,7 +30,7 @@ type SnapJob struct {
 	name     endpoint.JobID
 	fsfilter zfs.DatasetFilter
 	snapper  snapper.Snapper
-	shutdown context.CancelFunc
+	shutdown context.CancelCauseFunc
 	wg       sync.WaitGroup
 
 	prunerFactory *pruner.LocalPrunerFactory
@@ -134,11 +135,11 @@ func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) {
 
 	log := GetLogger(ctx)
 	defer log.Info("job exiting")
-
-	running, shutdown := context.WithCancel(context.Background())
-	defer shutdown()
-	j.shutdown = shutdown
 	wakeUp := j.goSnap(ctx, cron)
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	j.shutdown = cancel
 
 	cnt := 0
 forLoop:
@@ -146,12 +147,9 @@ forLoop:
 		log.Info("wait for wakeups")
 		select {
 		case <-ctx.Done():
-			log.WithError(ctx.Err()).Info("context")
+			log.WithError(context.Cause(ctx)).Info("context")
 			break forLoop
 		case <-wakeUp:
-		case <-running.Done():
-			log.Info("shutdown")
-			break forLoop
 		}
 
 		cnt++
@@ -194,7 +192,7 @@ func (j *SnapJob) Shutdown() {
 	if j.snapper.RunPeriodic() {
 		j.snapper.Shutdown()
 	}
-	j.shutdown()
+	j.shutdown(errors.New("shutdown received"))
 }
 
 // Adaptor that implements pruner.History around a pruner.Target.

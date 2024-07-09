@@ -8,6 +8,8 @@ import (
 	"github.com/dsh2dsh/zrepl/replication/driver"
 )
 
-func Do(ctx context.Context, driverConfig driver.Config, planner driver.Planner) (driver.ReportFunc, driver.WaitFunc) {
-	return driver.Do(ctx, driverConfig, planner)
+func Do(ctx context.Context, driverConfig driver.Config,
+	planner driver.Planner, running context.Context,
+) (driver.ReportFunc, driver.WaitFunc) {
+	return driver.Do(ctx, driverConfig, planner, running)
 }
