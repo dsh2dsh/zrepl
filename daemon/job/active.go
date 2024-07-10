@@ -74,9 +74,6 @@ type activeSideTasks struct {
 
 	// valid for state ActiveSidePruneSender, ActiveSidePruneReceiver, ActiveSideDone
 	prunerSender, prunerReceiver *pruner.Pruner
-
-	// valid for state ActiveSidePruneReceiver, ActiveSideDone
-	prunerSenderCancel, prunerReceiverCancel context.CancelFunc
 }
 
 func (a *ActiveSide) updateTasks(u func(*activeSideTasks)) activeSideTasks {
@@ -684,20 +681,14 @@ func (j *ActiveSide) do(ctx context.Context, cnt int) {
 
 	if running.Err() == nil {
 		ctx, endSpan := trace.WithSpan(running, "prune_sender")
-		ctx, senderCancel := context.WithCancel(ctx)
 		tasks := j.updateTasks(func(tasks *activeSideTasks) {
 			tasks.prunerSender = j.prunerFactory.BuildSenderPruner(
 				ctx, sender, sender)
-			tasks.prunerSenderCancel = func() {
-				senderCancel()
-				endSpan()
-			}
 			tasks.state = ActiveSidePruneSender
 		})
 		log.Info("start pruning sender")
 		tasks.prunerSender.Prune()
 		log.Info("finished pruning sender")
-		senderCancel()
 		endSpan()
 	} else {
 		return
@@ -705,20 +696,14 @@ func (j *ActiveSide) do(ctx context.Context, cnt int) {
 
 	if running.Err() == nil {
 		ctx, endSpan := trace.WithSpan(running, "prune_recever")
-		ctx, receiverCancel := context.WithCancel(ctx)
 		tasks := j.updateTasks(func(tasks *activeSideTasks) {
 			tasks.prunerReceiver = j.prunerFactory.BuildReceiverPruner(
 				ctx, receiver, sender)
-			tasks.prunerReceiverCancel = func() {
-				receiverCancel()
-				endSpan()
-			}
 			tasks.state = ActiveSidePruneReceiver
 		})
 		log.Info("start pruning receiver")
 		tasks.prunerReceiver.Prune()
 		log.Info("finished pruning receiver")
-		receiverCancel()
 		endSpan()
 	} else {
 		return
