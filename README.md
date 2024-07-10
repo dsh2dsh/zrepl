@@ -255,6 +255,17 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
         size_estimates: 4
     ```
 
+  * New command `zrepl signal stop`
+
+    Stop the daemon right now. Actually it's the same like sending `SIGTERM` or
+    `SIGINT` to the daemon.
+
+  * New command `zrepl signal shutdown`
+
+    Stop the daemon gracefully. After this signal, zrepl daemon will exit as
+    soon as it'll be safe. It interrupts any operation, except replication
+    steps. The daemon will wait for all replication steps completed and exit.
+
   * Small cosmetic changes
 
 ## User Documentation
