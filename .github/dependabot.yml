@@ -13,3 +13,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  # Docs use Python only for static site generation.
+  - package-ecosystem: "pip"
+    directory: /docs
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "*"
