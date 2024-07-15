@@ -525,6 +525,7 @@ var _ defaults.Setter = (*SyslogFacility)(nil)
 
 type GlobalControl struct {
 	SockPath string `yaml:"sockpath" default:"/var/run/zrepl/control" validate:"required"`
+	SockMode uint32 `yaml:"sockmode" validate:"lte=0o777"`
 }
 
 type GlobalServe struct {

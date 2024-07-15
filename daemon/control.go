@@ -27,20 +27,24 @@ import (
 
 type controlJob struct {
 	sockaddr *net.UnixAddr
+	sockmode os.FileMode
 	jobs     *jobs
 	shutdown context.CancelFunc
 }
 
-func newControlJob(sockpath string, jobs *jobs) (j *controlJob, err error) {
-	j = &controlJob{jobs: jobs}
-
-	j.sockaddr, err = net.ResolveUnixAddr("unix", sockpath)
-	if err != nil {
-		err = fmt.Errorf("cannot resolve unix address: %w", err)
-		return
+func newControlJob(sockpath string, jobs *jobs, mode uint32,
+) (*controlJob, error) {
+	j := &controlJob{
+		sockmode: os.FileMode(mode),
+		jobs:     jobs,
 	}
 
-	return
+	sockaddr, err := net.ResolveUnixAddr("unix", sockpath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot resolve unix address %q: %w", sockaddr, err)
+	}
+	j.sockaddr = sockaddr
+	return j, nil
 }
 
 func (j *controlJob) Name() string { return jobNameControl }
@@ -93,6 +97,15 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 	if err != nil {
 		log.WithError(err).Error("error listening")
 		return
+	}
+
+	if j.sockmode != 0 {
+		if err := os.Chmod(j.sockaddr.String(), j.sockmode); err != nil {
+			err = fmt.Errorf("controlJob: change socket mode to %O: %w",
+				j.sockmode, err)
+			log.WithError(err).Error("error run control job")
+			return
+		}
 	}
 
 	pprofServer := NewPProfServer(ctx)

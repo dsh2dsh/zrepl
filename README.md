@@ -266,6 +266,17 @@ This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
     soon as it'll be safe. It interrupts any operation, except replication
     steps. The daemon will wait for all replication steps completed and exit.
 
+  * Added a configuration of file permissions for control socket. Example:
+
+    ``` yaml
+    global:
+      control:
+        # sockpath: "/var/run/zrepl/control"
+        sockmode: 0o660             # write perm for group
+    ```
+
+    This configuration allows using of `zrepl status` for the group.
+
   * Small cosmetic changes
 
 ## User Documentation

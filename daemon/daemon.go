@@ -71,9 +71,10 @@ func Run(ctx context.Context, conf *config.Config) error {
 	jobs := newJobs(ctx, log, cancel)
 
 	// start control socket
-	controlJob, err := newControlJob(conf.Global.Control.SockPath, jobs)
+	controlJob, err := newControlJob(conf.Global.Control.SockPath, jobs,
+		conf.Global.Control.SockMode)
 	if err != nil {
-		panic(err) // FIXME
+		return fmt.Errorf("starting control job: %w", err)
 	}
 	jobs.start(ctx, controlJob, true)
 
