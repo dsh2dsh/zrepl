@@ -81,11 +81,8 @@ func (w *B) Write(s string) {
 	}
 }
 
-func Times(str string, n int) (out string) {
-	for i := 0; i < n; i++ {
-		out += str
-	}
-	return
+func Times(str string, n int) string {
+	return strings.Repeat(str, n)
 }
 
 func RightPad(str string, length int, pad string) string {
