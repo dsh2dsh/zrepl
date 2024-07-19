@@ -3,6 +3,8 @@ zrepl is a one-stop ZFS backup & replication solution.
 
 This project is a fork of [zrepl](https://github.com/zrepl/zrepl).
 
+FreeBSD port is [here](https://github.com/dsh2dsh/freebsd-ports/tree/master/sysutils/zrepl-dsh2dsh).
+
 ## Changes from [upstream](https://github.com/zrepl/zrepl):
 
   * Go 1.22 and updated dependencies
