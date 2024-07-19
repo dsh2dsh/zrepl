@@ -115,7 +115,7 @@ func TestSigpipe(t *testing.T) {
 	require.True(t, strings.Contains(err.Error(), "broken pipe"))
 
 	err = cmd.Wait()
-	require.EqualError(t, err, "exit status 23")
+	require.ErrorContains(t, err, "exit status 23")
 }
 
 func TestCmd_Pipe(t *testing.T) {
@@ -123,9 +123,9 @@ func TestCmd_Pipe(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		cmd          *Cmd
-		pipeCmds     [][]string
-		pipeLeft     bool
+		cmd          []string
+		pipe         [][]string
+		pipeFrom     bool
 		wantCmdStr   string
 		startErr     bool
 		waitErr      bool
@@ -133,46 +133,46 @@ func TestCmd_Pipe(t *testing.T) {
 	}{
 		{
 			name:       "no error",
-			cmd:        CommandContext(ctx, "echo", "foobar"),
-			pipeCmds:   [][]string{{"tr", "a-z", "A-Z"}},
+			cmd:        []string{"echo", "foobar"},
+			pipe:       [][]string{{"tr", "a-z", "A-Z"}},
 			wantCmdStr: "echo foobar | tr a-z A-Z",
 			assertStdout: func(t *testing.T, b []byte) {
 				assert.Equal(t, "FOOBAR", strings.TrimSpace(string(b)))
 			},
 		},
 		{
-			name:       "pipe on the left side",
-			cmd:        CommandContext(ctx, "cat"),
-			pipeCmds:   [][]string{{"echo", "foobar"}},
-			pipeLeft:   true,
+			name:       "from pipe",
+			cmd:        []string{"cat"},
+			pipe:       [][]string{{"echo", "foobar"}},
+			pipeFrom:   true,
 			wantCmdStr: "echo foobar | cat",
 		},
 		{
 			name:       "cmd error",
-			cmd:        CommandContext(ctx, "false"),
-			pipeCmds:   [][]string{{"tr", "a-z", "A-Z"}},
+			cmd:        []string{"false"},
+			pipe:       [][]string{{"tr", "a-z", "A-Z"}},
 			wantCmdStr: "false | tr a-z A-Z",
 			waitErr:    true,
 		},
 		{
 			name:       "pipe error",
-			cmd:        CommandContext(ctx, "echo", "foobar"),
-			pipeCmds:   [][]string{{"false"}},
+			cmd:        []string{"echo", "foobar"},
+			pipe:       [][]string{{"false"}},
 			wantCmdStr: "echo foobar | false",
 			waitErr:    true,
 		},
 		{
 			name:       "cmd not found",
-			cmd:        CommandContext(ctx, "this-command-doesnt-exists"),
-			pipeCmds:   [][]string{{"true"}},
-			wantCmdStr: "this-command-doesnt-exists | true",
+			cmd:        []string{"/this-command-doesnt-exists"},
+			pipe:       [][]string{{"true"}},
+			wantCmdStr: "/this-command-doesnt-exists | true",
 			startErr:   true,
 		},
 		{
 			name:       "pipe not found",
-			cmd:        CommandContext(ctx, "echo", "foobar"),
-			pipeCmds:   [][]string{{"this-command-doesnt-exists"}},
-			wantCmdStr: "echo foobar | this-command-doesnt-exists",
+			cmd:        []string{"echo", "foobar"},
+			pipe:       [][]string{{"/this-command-doesnt-exists"}},
+			wantCmdStr: "echo foobar | /this-command-doesnt-exists",
 			startErr:   true,
 		},
 	}
@@ -181,40 +181,40 @@ func TestCmd_Pipe(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r, w, err := os.Pipe()
 			require.NoError(t, err)
+			t.Cleanup(func() { w.Close(); r.Close() })
 
-			var stderr strings.Builder
-			tt.cmd.SetStdio(Stdio{
-				Stdout: w,
-				Stderr: &stderr,
-			})
+			cmd := New(ctx).WithPipeLen(len(tt.pipe)).
+				WithCommand(tt.cmd[0], tt.cmd[1:])
 
-			if tt.pipeLeft {
-				assert.Same(t, tt.cmd, tt.cmd.WithLeftPipe())
-			}
-
-			stdout, err := tt.cmd.Pipe(r, &stderr, tt.pipeCmds...)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantCmdStr, tt.cmd.String())
-
-			if tt.startErr {
-				require.Error(t, tt.cmd.startPipe())
+			var stdout io.ReadCloser
+			var stderr bytes.Buffer
+			if tt.pipeFrom {
+				var b bytes.Buffer
+				require.NoError(t, cmd.PipeFrom(r, &b, &stderr, tt.pipe))
+				stdout = io.NopCloser(&b)
 			} else {
-				require.NoError(t, tt.cmd.startPipe())
+				stdout, err = cmd.Pipe(r, w, &stderr, tt.pipe)
+				require.NoError(t, err)
 			}
-			require.NoError(t, w.Close())
+			assert.Equal(t, tt.wantCmdStr, cmd.String())
 
 			if tt.startErr {
+				require.Error(t, cmd.startPipe())
+				require.NoError(t, cmd.WaitPipe())
 				return
 			}
+
+			require.NoError(t, cmd.startPipe())
+			require.NoError(t, w.Close())
 
 			b, err := io.ReadAll(stdout)
 			require.NoError(t, err)
 			require.NoError(t, r.Close())
 
 			if tt.waitErr {
-				require.Error(t, tt.cmd.WaitPipe())
+				require.Error(t, cmd.WaitPipe())
 			} else {
-				require.NoError(t, tt.cmd.WaitPipe())
+				require.NoError(t, cmd.WaitPipe())
 			}
 			assert.Empty(t, stderr.String())
 

@@ -960,14 +960,8 @@ func ZFSSend(
 	}
 	stderrBuf := circlog.MustNewCircularLog(zfsSendStderrCaptureMaxSize)
 
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
-	cmd.SetStdio(zfscmd.Stdio{
-		Stdin:  nil,
-		Stdout: stdoutWriter,
-		Stderr: stderrBuf,
-	})
-
-	pipeReader, err := cmd.Pipe(stdoutReader, stderrBuf, pipeCmds...)
+	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).WithCommand(ZfsBin, args)
+	pipeReader, err := cmd.Pipe(stdoutReader, stdoutWriter, stderrBuf, pipeCmds)
 	if err != nil {
 		cancel()
 		stdoutWriter.Close()
@@ -979,7 +973,6 @@ func ZFSSend(
 		cancel()
 		stdoutWriter.Close()
 		stdoutReader.Close()
-		_ = cmd.WaitPipe()
 		return nil, fmt.Errorf("cannot start zfs send command: %w", err)
 	}
 	// close our writing-end of the pipe so that we don't wait for ourselves when reading from the reading  end
@@ -1260,7 +1253,7 @@ func ZFSRecv(
 
 	ctx, cancelCmd := context.WithCancel(ctx)
 	defer cancelCmd()
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
+	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).WithCommand(ZfsBin, args)
 
 	// TODO report bug upstream
 	// Setup an unused stdout buffer.
@@ -1275,23 +1268,15 @@ func ZFSRecv(
 		return err
 	}
 
-	pipeReader, err := cmd.WithLeftPipe().Pipe(stdin, stderr, pipeCmds...)
-	if err != nil {
+	if err := cmd.PipeFrom(stdin, stdout, stderr, pipeCmds); err != nil {
 		stdinWriter.Close()
 		stdin.Close()
 		return err
 	}
 
-	cmd.SetStdio(zfscmd.Stdio{
-		Stdin:  pipeReader,
-		Stdout: stdout,
-		Stderr: stderr,
-	})
-
 	if err = cmd.Start(); err != nil {
 		stdinWriter.Close()
 		stdin.Close()
-		_ = cmd.WaitPipe()
 		return err
 	}
 	stdin.Close()

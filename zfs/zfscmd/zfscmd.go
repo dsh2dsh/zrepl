@@ -20,28 +20,40 @@ import (
 	"github.com/dsh2dsh/zrepl/util/circlog"
 )
 
+func CommandContext(ctx context.Context, name string, args ...string) *Cmd {
+	return New(ctx).WithCommand(name, args)
+}
+
+func New(ctx context.Context) *Cmd {
+	return &Cmd{ctx: ctx, logError: true}
+}
+
 type Cmd struct {
 	cmd                                      *exec.Cmd
+	cmds                                     []*exec.Cmd
 	ctx                                      context.Context
 	mtx                                      sync.RWMutex
 	startedAt, waitStartedAt, waitReturnedAt time.Time
 	waitReturnEndSpanCb                      trace.DoneFunc
-
-	pipeCmds []*exec.Cmd
-	pipeLeft bool
 
 	usage        usage
 	stdoutStderr []byte
 	logError     bool
 }
 
-func CommandContext(ctx context.Context, name string, arg ...string) *Cmd {
-	cmd := exec.CommandContext(ctx, name, arg...)
-	return &Cmd{cmd: cmd, ctx: ctx, logError: true}
+func (c *Cmd) WithCommand(name string, args []string) *Cmd {
+	c.cmd = exec.CommandContext(c.ctx, name, args...)
+	c.cmds = append(c.cmds, c.cmd)
+	return c
 }
 
 func (c *Cmd) WithLogError(v bool) *Cmd {
 	c.logError = v
+	return c
+}
+
+func (c *Cmd) WithPipeLen(n int) *Cmd {
+	c.cmds = make([]*exec.Cmd, 0, n+1)
 	return c
 }
 
@@ -87,25 +99,13 @@ func (c *Cmd) SetStdio(stdio Stdio) {
 }
 
 func (c *Cmd) String() string {
-	if len(c.pipeCmds) == 0 {
-		return strings.Join(c.cmd.Args, " ") // includes argv[0] if initialized with CommandContext, that's the only way we o it
-	}
-
 	var s strings.Builder
-	if c.pipeLeft {
-		for _, cmd := range c.pipeCmds {
-			s.WriteString(strings.Join(cmd.Args, " "))
+	for i, cmd := range c.cmds {
+		s.WriteString(strings.Join(cmd.Args, " "))
+		if i+1 < len(c.cmds) {
 			s.WriteString(" | ")
-		}
-		s.WriteString(strings.Join(c.cmd.Args, " "))
-	} else {
-		s.WriteString(strings.Join(c.cmd.Args, " "))
-		for _, cmd := range c.pipeCmds {
-			s.WriteString(" | ")
-			s.WriteString(strings.Join(cmd.Args, " "))
 		}
 	}
-
 	return s.String()
 }
 
@@ -115,14 +115,19 @@ func (c *Cmd) log() Logger {
 
 // Start the command.
 //
-// This creates a new trace.WithTask as a child task of the ctx passed to CommandContext.
-// If the process is successfully started (err == nil), it is the CALLER'S RESPONSIBILITY to ensure that
-// the spawned process does not outlive the ctx's trace.Task.
+// This creates a new trace.WithTask as a child task of the ctx passed to
+// CommandContext. If the process is successfully started (err == nil), it is
+// the CALLER'S RESPONSIBILITY to ensure that the spawned process does not
+// outlive the ctx's trace.Task.
 //
-// If this method returns an error, the Cmd instance is invalid. Start must not be called repeatedly.
-func (c *Cmd) Start() (err error) {
+// If this method returns an error, the Cmd instance is invalid. Start must not
+// be called repeatedly.
+func (c *Cmd) Start() error {
 	c.startPre(true)
-	err = c.startPipe()
+	err := c.startPipe()
+	if err != nil {
+		_ = c.WaitPipe()
+	}
 	c.startPost(err)
 	return err
 }
@@ -257,66 +262,79 @@ func (c *Cmd) TestOnly_ExecCmd() *exec.Cmd {
 }
 
 func (c *Cmd) Pipe(
-	stdin io.ReadCloser, stderr io.Writer, cmds ...[]string,
+	stdin io.ReadCloser, stdout, stderr io.Writer, cmds [][]string,
 ) (io.ReadCloser, error) {
-	for _, pipeCmd := range c.buildPipeCmds(cmds) {
+	if len(c.cmds) > 0 && c.cmds[0] == c.cmd {
+		c.SetStdio(Stdio{
+			Stdin:  nil,
+			Stdout: stdout,
+			Stderr: stderr,
+		})
+	}
+
+	for _, pipeCmd := range c.buildPipe(cmds) {
 		r, err := pipeCmd.StdoutPipe()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed create stdout pipe for %q: %w", pipeCmd.String(), err)
+				"create stdout pipe from %q: %w", pipeCmd.String(), err)
 		}
 		pipeCmd.Stdin = stdin
 		pipeCmd.Stderr = stderr
-		c.pipeCmds = append(c.pipeCmds, pipeCmd)
+		c.cmds = append(c.cmds, pipeCmd)
 		stdin = r
 	}
 	return stdin, nil
 }
 
-func (c *Cmd) buildPipeCmds(cmds [][]string) []*exec.Cmd {
-	pipeCmds := make([]*exec.Cmd, len(cmds))
-	for i := range cmds {
-		name := cmds[i][0]
+func (c *Cmd) buildPipe(cmds [][]string) []*exec.Cmd {
+	pipeCmds := make([]*exec.Cmd, 0, len(cmds))
+	for _, cmd := range cmds {
+		name := cmd[0]
 		var args []string
-		if len(cmds[i]) > 1 {
-			args = cmds[i][1:]
+		if len(cmd) > 1 {
+			args = cmd[1:]
 		}
-		pipeCmds[i] = exec.CommandContext(c.ctx, name, args...)
+		pipeCmds = append(pipeCmds, exec.CommandContext(c.ctx, name, args...))
 	}
 	return pipeCmds
 }
 
-func (c *Cmd) startPipe() error {
-	if err := c.cmd.Start(); err != nil {
+func (c *Cmd) PipeFrom(stdin io.ReadCloser, stdout, stderr io.Writer,
+	cmds [][]string,
+) error {
+	c.cmds = c.cmds[:0]
+	stdin, err := c.Pipe(stdin, stdout, stderr, cmds)
+	if err != nil {
 		return err
 	}
-	for _, cmd := range c.pipeCmds {
+
+	c.cmds = append(c.cmds, c.cmd)
+	c.SetStdio(Stdio{
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+	})
+	return nil
+}
+
+func (c *Cmd) startPipe() error {
+	for _, cmd := range c.cmds {
 		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("failed start %q: %w", cmd.String(), err)
+			return fmt.Errorf("start %q: %w", cmd.String(), err)
 		}
 	}
 	return nil
 }
 
 func (c *Cmd) WaitPipe() error {
-	var firstErr error
-	if c.cmd.Process != nil {
-		if err := c.cmd.Wait(); err != nil {
-			firstErr = err
-		}
-	}
-	for _, cmd := range c.pipeCmds {
+	var pipeErr error
+	for _, cmd := range c.cmds {
 		if cmd.Process == nil {
 			break
 		}
-		if err := cmd.Wait(); err != nil && firstErr == nil {
-			firstErr = fmt.Errorf("failed wait %q: %w", cmd.String(), err)
+		if err := cmd.Wait(); err != nil {
+			pipeErr = errors.Join(fmt.Errorf("wait %q: %w", cmd.String(), err))
 		}
 	}
-	return firstErr
-}
-
-func (c *Cmd) WithLeftPipe() *Cmd {
-	c.pipeLeft = true
-	return c
+	return pipeErr
 }
