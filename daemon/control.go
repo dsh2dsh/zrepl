@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -224,83 +223,69 @@ outer:
 
 type jsonResponder struct {
 	log      Logger
-	producer func() (interface{}, error)
+	producer func() (any, error)
 }
 
 func (j jsonResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	logIoErr := func(err error) {
-		if err != nil {
-			j.log.WithError(err).Error("control handler io error")
-		}
-	}
 	res, err := j.producer()
 	if err != nil {
-		j.log.WithError(err).Error("control handler error")
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err = io.WriteString(w, err.Error())
-		logIoErr(err)
+		j.writeError(err, w, "control handler error")
 		return
 	}
-	var buf bytes.Buffer
-	err = json.NewEncoder(&buf).Encode(res)
-	if err != nil {
-		j.log.WithError(err).Error("control handler json marshal error")
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err = io.WriteString(w, err.Error())
-	} else {
-		_, err = io.Copy(w, &buf)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		j.writeError(err, w, "control handler json marshal error")
 	}
-	logIoErr(err)
 }
 
-type jsonDecoder = func(interface{}) error
+func (j jsonResponder) writeError(err error, w http.ResponseWriter, msg string) {
+	j.log.WithError(err).Error(msg)
+	w.WriteHeader(http.StatusInternalServerError)
+	if _, err = io.WriteString(w, err.Error()); err != nil {
+		j.log.WithError(err).Error("control handler io error")
+	}
+}
+
+type jsonDecoder = func(any) error
 
 type jsonRequestResponder struct {
 	log      Logger
-	producer func(decoder jsonDecoder) (interface{}, error)
+	producer func(decoder jsonDecoder) (any, error)
 }
 
 func (j jsonRequestResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	logIoErr := func(err error) {
-		if err != nil {
-			j.log.WithError(err).Error("control handler io error")
-		}
-	}
-
-	var decodeError error
-	decoder := func(i interface{}) error {
-		err := json.NewDecoder(r.Body).Decode(&i)
-		decodeError = err
-		return err
-	}
-	res, producerErr := j.producer(decoder)
+	var decodeErr error
+	resp, err := j.producer(func(req any) error {
+		decodeErr = json.NewDecoder(r.Body).Decode(&req)
+		return decodeErr
+	})
 
 	// If we had a decode error ignore output of producer and return error
-	if decodeError != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, err := io.WriteString(w, decodeError.Error())
-		logIoErr(err)
+	if decodeErr != nil {
+		j.writeError(decodeErr, w, "control handler json unmarshal error",
+			http.StatusBadRequest)
+		return
+	} else if err != nil {
+		j.writeError(err, w, "control handler error",
+			http.StatusInternalServerError)
 		return
 	}
 
-	if producerErr != nil {
-		j.log.WithError(producerErr).Error("control handler error")
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := io.WriteString(w, producerErr.Error())
-		logIoErr(err)
-		return
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		j.writeError(err, w, "control handler json marshal error",
+			http.StatusInternalServerError)
 	}
+}
 
-	var buf bytes.Buffer
-	if encodeErr := json.NewEncoder(&buf).Encode(res); encodeErr != nil {
-		j.log.WithError(producerErr).Error("control handler json marshal error")
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := io.WriteString(w, encodeErr.Error())
-		logIoErr(err)
-	} else if _, err := io.Copy(w, &buf); err != nil {
-		logIoErr(err)
-	} else {
-		w.Header().Set("Content-Type", "application/json")
+func (j jsonRequestResponder) writeError(err error, w http.ResponseWriter,
+	msg string, statusCode int,
+) {
+	j.log.WithError(err).Error(msg)
+	w.WriteHeader(statusCode)
+	if _, err = io.WriteString(w, err.Error()); err != nil {
+		j.log.WithError(err).Error("control handler io error")
 	}
 }
 
@@ -312,9 +297,13 @@ type requestLogger struct {
 
 func (l requestLogger) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log := l.log.WithField("method", r.Method).WithField("url", r.URL)
-	log.Debug("start")
+	log.Info("http request")
+
 	promControl.requestBegin.WithLabelValues(r.URL.Path).Inc()
-	defer prometheus.NewTimer(promControl.requestFinished.WithLabelValues(r.URL.Path)).ObserveDuration()
+	defer prometheus.
+		NewTimer(promControl.requestFinished.WithLabelValues(r.URL.Path)).
+		ObserveDuration()
+
 	if l.handlerFunc != nil {
 		l.handlerFunc(w, r)
 	} else if l.handler != nil {
