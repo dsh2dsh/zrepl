@@ -1,48 +1,27 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
-	"io"
-	"net"
-	"net/http"
+	"fmt"
+
+	"github.com/dsh2dsh/zrepl/client/jsonclient"
 )
 
-func controlHttpClient(sockpath string) (client http.Client, err error) {
-	return http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", sockpath)
-			},
-		},
-	}, nil
-}
-
-func jsonRequestResponse(c http.Client, endpoint string, req interface{}, res interface{}) error {
-	var buf bytes.Buffer
-	encodeErr := json.NewEncoder(&buf).Encode(req)
-	if encodeErr != nil {
-		return encodeErr
-	}
-
-	resp, err := c.Post("http://unix"+endpoint, "application/json", &buf)
+func jsonRequestResponse(sockPath, endpoint string, in, out any) error {
+	jc, err := jsonclient.NewUnix(sockPath)
 	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		var msg bytes.Buffer
-		_, _ = io.CopyN(&msg, resp.Body, 4096) // ignore error, just display what we got
-		return errors.New(msg.String())
+		return fmt.Errorf("new jsonclient: %w", err)
 	}
 
-	decodeError := json.NewDecoder(resp.Body).Decode(&res)
-	if decodeError != nil {
-		return decodeError
+	if in == nil || in == struct{}{} {
+		if err := jc.Get(context.Background(), endpoint, out); err != nil {
+			return fmt.Errorf("jsonclient get: %w", err)
+		}
+		return nil
 	}
 
+	if err := jc.Post(context.Background(), endpoint, in, out); err != nil {
+		return fmt.Errorf("jsonclient post: %w", err)
+	}
 	return nil
 }

@@ -3,94 +3,52 @@ package status
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/mattn/go-isatty"
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/zrepl/cli"
-	"github.com/dsh2dsh/zrepl/client/status/client"
-	"github.com/dsh2dsh/zrepl/config"
-	"github.com/dsh2dsh/zrepl/daemon"
-	"github.com/dsh2dsh/zrepl/util/choices"
 )
 
-type Client interface {
-	Status() (daemon.Status, error)
-	StatusRaw() ([]byte, error)
-	SignalWakeup(job string) error
-	SignalReset(job string) error
-}
-
-type statusFlags struct {
-	Mode  choices.Choices
-	Job   string
-	Delay time.Duration
-}
-
-var statusv2Flags statusFlags
-
-type statusv2Mode int
-
-const (
-	StatusV2ModeInteractive statusv2Mode = 1 + iota
-	StatusV2ModeDump
-	StatusV2ModeRaw
-	StatusV2ModeLegacy
+var (
+	selectedJob     string
+	refreshInterval time.Duration
 )
 
 var Subcommand = &cli.Subcommand{
 	Use:   "status",
-	Short: "retrieve & display daemon status information",
-	SetupFlags: func(f *pflag.FlagSet) {
-		statusv2Flags.Mode.Init(
-			"interactive", StatusV2ModeInteractive,
-			"dump", StatusV2ModeDump,
-			"raw", StatusV2ModeRaw,
-			"legacy", StatusV2ModeLegacy,
-		)
-		statusv2Flags.Mode.SetTypeString("mode")
-		statusv2Flags.Mode.SetDefaultValue(StatusV2ModeInteractive)
-		f.Var(&statusv2Flags.Mode, "mode", statusv2Flags.Mode.Usage())
-		f.StringVar(&statusv2Flags.Job, "job", "", "only show specified job (works in \"dump\" and \"interactive\" mode)")
-		f.DurationVarP(&statusv2Flags.Delay, "delay", "d", 1*time.Second, "use -d 3s for 3 seconds delay (minimum delay is 1s)")
+	Short: "display daemon status information",
+
+	SetupCobra: func(cmd *cobra.Command) {
+		cmd.Args = cobra.ExactArgs(0)
+		addSelectedJob(cmd)
+		cmd.Flags().DurationVarP(&refreshInterval, "delay", "d", 1*time.Second,
+			"refresh interval")
 	},
-	Run: func(ctx context.Context, subcommand *cli.Subcommand, args []string) error {
-		return runStatusV2Command(ctx, subcommand.Config(), args)
+
+	SetupSubcommands: func() []*cli.Subcommand {
+		return []*cli.Subcommand{dumpCmd, rawCmd}
+	},
+
+	Run: func(ctx context.Context, subcommand *cli.Subcommand, args []string,
+	) error {
+		return withStatusClient(subcommand, func(c *Client) error {
+			return interactive(c, refreshInterval, selectedJob)
+		})
 	},
 }
 
-func runStatusV2Command(ctx context.Context, config *config.Config, args []string) error {
-	c, err := client.New("unix", config.Global.Control.SockPath)
+func addSelectedJob(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&selectedJob, "job", "j", "",
+		"only show specified job")
+}
+
+func withStatusClient(subcommand *cli.Subcommand, fn func(c *Client) error,
+) error {
+	sockPath := subcommand.Config().Global.Control.SockPath
+	statusClient, err := NewClient("unix", sockPath)
 	if err != nil {
-		return fmt.Errorf("connect to daemon socket at %q: %w", config.Global.Control.SockPath, err)
+		return fmt.Errorf("connect to daemon socket at %q: %w", sockPath, err)
 	}
-
-	mode := statusv2Flags.Mode.Value().(statusv2Mode)
-
-	if !isatty.IsTerminal(os.Stdout.Fd()) && mode != StatusV2ModeDump && mode != StatusV2ModeRaw {
-		dumpmode, err := statusv2Flags.Mode.InputForChoice(StatusV2ModeDump)
-		if err != nil {
-			panic(err)
-		}
-		rawmode, err := statusv2Flags.Mode.InputForChoice(StatusV2ModeRaw)
-		if err != nil {
-			panic(err)
-		}
-		return fmt.Errorf("error: stdout is not a tty, please use --mode %s or --mode %s", dumpmode, rawmode)
-	}
-
-	switch mode {
-	case StatusV2ModeInteractive:
-		return interactive(c, statusv2Flags)
-	case StatusV2ModeDump:
-		return dump(c, statusv2Flags.Job)
-	case StatusV2ModeRaw:
-		return raw(c)
-	case StatusV2ModeLegacy:
-		return legacy(c, statusv2Flags)
-	default:
-		panic("unreachable")
-	}
+	return fn(statusClient)
 }

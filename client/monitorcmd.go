@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/zrepl/cli"
+	"github.com/dsh2dsh/zrepl/client/jsonclient"
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon"
 	"github.com/dsh2dsh/zrepl/daemon/filters"
@@ -368,7 +368,7 @@ func newMonitorAlive() *monitorAlive {
 }
 
 type monitorAlive struct {
-	controlClient http.Client
+	controlClient *jsonclient.Client
 	resp          *monitoringplugin.Response
 
 	warnRunning time.Duration
@@ -382,7 +382,7 @@ func (self *monitorAlive) applyOptions() *monitorAlive {
 	return self
 }
 
-func (self *monitorAlive) client() http.Client {
+func (self *monitorAlive) client() *jsonclient.Client {
 	return self.controlClient
 }
 
@@ -416,17 +416,17 @@ func (self *monitorAlive) checkVersions(sockPath string) bool {
 }
 
 func (self *monitorAlive) daemonVersion(sockPath string) string {
-	control, err := controlHttpClient(sockPath)
+	control, err := jsonclient.NewUnix(sockPath)
 	if err != nil {
-		self.resp.UpdateStatusOnError(
-			fmt.Errorf("control http client %q: %w", sockPath, err),
+		self.resp.UpdateStatusOnError(fmt.Errorf("new jsonclient: %w", err),
 			monitoringplugin.UNKNOWN, "", true)
 		return ""
 	}
 	self.controlClient = control
 
 	var ver version.ZreplVersionInformation
-	err = self.json(daemon.ControlJobEndpointVersion, struct{}{}, &ver)
+	err = self.client().Post(context.Background(),
+		daemon.ControlJobEndpointVersion, nil, &ver)
 	if err != nil {
 		self.resp.UpdateStatusOnError(
 			fmt.Errorf("failed version request: %w", err),
@@ -436,13 +436,6 @@ func (self *monitorAlive) daemonVersion(sockPath string) string {
 
 	self.resp.UpdateStatus(monitoringplugin.OK, "daemon version: "+ver.String())
 	return ver.String()
-}
-
-func (self *monitorAlive) json(path string, req, resp any) error {
-	if err := jsonRequestResponse(self.client(), path, req, resp); err != nil {
-		return fmt.Errorf("json req to %q: %w", path, err)
-	}
-	return nil
 }
 
 func (self *monitorAlive) checkStatus() bool {
@@ -459,7 +452,8 @@ func (self *monitorAlive) status() (map[string]*job.Status,
 	[]zfscmd.ActiveCommand, error,
 ) {
 	var s daemon.Status
-	err := self.json(daemon.ControlJobEndpointStatus, struct{}{}, &s)
+	err := self.client().Post(context.Background(),
+		daemon.ControlJobEndpointStatus, nil, &s)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed status request: %w", err)
 	}

@@ -35,7 +35,6 @@ var VersionCmd = &cli.Subcommand{
 
 func runVersionCmd() error {
 	args := versionArgs
-
 	if args.Show != "daemon" && args.Show != "client" && args.Show != "" {
 		return fmt.Errorf("show flag must be 'client' or 'server' or be left empty")
 	}
@@ -46,18 +45,13 @@ func runVersionCmd() error {
 		fmt.Printf("client: %s\n", clientVersion.String())
 	}
 	if args.Show == "daemon" || args.Show == "" {
-
 		if args.ConfigErr != nil {
 			return fmt.Errorf("config parsing error: %s", args.ConfigErr)
 		}
 
-		httpc, err := controlHttpClient(args.Config.Global.Control.SockPath)
-		if err != nil {
-			return fmt.Errorf("server: error: %s\n", err)
-		}
-
 		var info version.ZreplVersionInformation
-		err = jsonRequestResponse(httpc, daemon.ControlJobEndpointVersion, "", &info)
+		err := jsonRequestResponse(args.Config.Global.Control.SockPath,
+			daemon.ControlJobEndpointVersion, nil, &info)
 		if err != nil {
 			return fmt.Errorf("server: error: %s\n", err)
 		}

@@ -53,12 +53,8 @@ func RunPProf(conf *config.Config) {
 
 	log.Printf("connecting to zrepl daemon")
 
-	httpc, err := controlHttpClient(conf.Global.Control.SockPath)
-	if err != nil {
-		log.Printf("error creating http client: %s", err)
-		die()
-	}
-	err = jsonRequestResponse(httpc, daemon.ControlJobEndpointPProf, pprofListenCmd.PprofServerControlMsg, struct{}{})
+	err := jsonRequestResponse(conf.Global.Control.SockPath,
+		daemon.ControlJobEndpointPProf, pprofListenCmd.PprofServerControlMsg, nil)
 	if err != nil {
 		log.Printf("error sending control message: %s", err)
 		die()

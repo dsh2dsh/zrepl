@@ -13,7 +13,8 @@ import (
 	"github.com/dsh2dsh/zrepl/client/status/viewmodel"
 )
 
-func interactive(c Client, flag statusFlags) error {
+func interactive(c *Client, refreshInterval time.Duration, selectJob string,
+) error {
 	// Set this so we don't overwrite the default terminal colors
 	// See https://github.com/rivo/tview/blob/master/styles.go
 	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
@@ -137,10 +138,10 @@ func interactive(c Client, flag statusFlags) error {
 	}
 	redraw = func() {
 		jobs := m.Jobs()
-		if flag.Job != "" {
+		if selectedJob != "" {
 			job_found := false
 			for _, job := range jobs {
-				if strings.Compare(flag.Job, job.Name()) == 0 {
+				if strings.Compare(selectedJob, job.Name()) == 0 {
 					jobs = []*viewmodel.Job{job}
 					job_found = true
 					break
@@ -219,7 +220,7 @@ func interactive(c Client, flag statusFlags) error {
 			})
 			app.QueueUpdateDraw(redraw)
 
-			time.Sleep(flag.Delay)
+			time.Sleep(refreshInterval)
 		}
 	}()
 

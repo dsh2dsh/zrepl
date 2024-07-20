@@ -147,9 +147,10 @@ func addSubcommandToCobraCmd(c *cobra.Command, s *Subcommand) {
 		Long:    s.Long,
 		Example: s.Example,
 	}
-	if s.SetupSubcommands == nil {
+	if s.Run != nil {
 		cmd.Run = s.run
-	} else {
+	}
+	if s.SetupSubcommands != nil {
 		for _, sub := range s.SetupSubcommands() {
 			addSubcommandToCobraCmd(&cmd, sub)
 		}

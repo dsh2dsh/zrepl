@@ -1,17 +1,34 @@
 package status
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/gdamore/tcell/v2"
-	"github.com/mattn/go-isatty"
+	"github.com/spf13/cobra"
 
+	"github.com/dsh2dsh/zrepl/cli"
 	"github.com/dsh2dsh/zrepl/client/status/viewmodel"
 )
 
-func dump(c Client, job string) error {
+var dumpCmd = &cli.Subcommand{
+	Use:   "dump",
+	Short: "output daemon status information as plain text",
+
+	SetupCobra: func(cmd *cobra.Command) {
+		cmd.Args = cobra.ExactArgs(0)
+		addSelectedJob(cmd)
+	},
+
+	Run: func(ctx context.Context, subcommand *cli.Subcommand, args []string,
+	) error {
+		return withStatusClient(subcommand, func(c *Client) error {
+			return dump(c, selectedJob)
+		})
+	},
+}
+
+func dump(c *Client, job string) error {
 	s, err := c.Status()
 	if err != nil {
 		return err
@@ -23,22 +40,7 @@ func dump(c Client, job string) error {
 		}
 	}
 
-	width := (1 << 31) - 1
-	wrap := false
 	hline := strings.Repeat("-", 80)
-	if isatty.IsTerminal(os.Stdout.Fd()) {
-		wrap = true
-		screen, err := tcell.NewScreen()
-		if err != nil {
-			return fmt.Errorf("get terminal dimensions: %w", err)
-		}
-		if err := screen.Init(); err != nil {
-			return fmt.Errorf("init screen: %w", err)
-		}
-		width, _ = screen.Size()
-		screen.Fini()
-		hline = strings.Repeat("-", width)
-	}
 
 	m := viewmodel.New()
 	params := viewmodel.Params{
@@ -46,8 +48,7 @@ func dump(c Client, job string) error {
 		ReportFetchError:        nil,
 		SelectedJob:             nil,
 		FSFilter:                func(s string) bool { return true },
-		DetailViewWidth:         width,
-		DetailViewWrap:          wrap,
+		DetailViewWidth:         (1 << 31) - 1,
 		ShortKeybindingOverview: "",
 	}
 	m.Update(params)

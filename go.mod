@@ -15,7 +15,6 @@ require (
 	github.com/jinzhu/copier v0.4.0
 	github.com/juju/ratelimit v1.0.2
 	github.com/kr/pretty v0.3.1
-	github.com/mattn/go-isatty v0.0.20
 	github.com/montanaflynn/stats v0.7.1
 	github.com/pkg/profile v1.7.0
 	github.com/problame/go-netssh v0.0.0-20201229122201-330ad6c9cc6f
@@ -37,6 +36,7 @@ require (
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	golang.org/x/mod v0.19.0 // indirect

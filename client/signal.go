@@ -44,21 +44,15 @@ Expected signals:
 }
 
 func runSignalCmd(config *config.Config, args []string) error {
-	controlClient, err := controlHttpClient(config.Global.Control.SockPath)
-	if err != nil {
-		return err
-	}
-
 	req := struct {
 		Op   string
 		Name string
-	}{
-		Op: args[0],
-	}
+	}{Op: args[0]}
+
 	if len(args) > 1 {
 		req.Name = args[1]
 	}
 
-	return jsonRequestResponse(controlClient, daemon.ControlJobEndpointSignal,
-		&req, struct{}{})
+	return jsonRequestResponse(config.Global.Control.SockPath,
+		daemon.ControlJobEndpointSignal, &req, nil)
 }
