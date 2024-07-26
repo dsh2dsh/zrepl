@@ -13,7 +13,7 @@ import (
 	"github.com/dsh2dsh/zrepl/client/status/viewmodel"
 )
 
-func interactive(c *Client, refreshInterval time.Duration, selectJob string,
+func interactive(c *Client, refreshInterval time.Duration, selectedJob string,
 ) error {
 	// Set this so we don't overwrite the default terminal colors
 	// See https://github.com/rivo/tview/blob/master/styles.go
