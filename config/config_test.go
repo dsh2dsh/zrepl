@@ -200,3 +200,35 @@ jobs:
 	require.NotNil(t, pullJob)
 	assert.False(t, pullJob.Replication.OneStep)
 }
+
+func TestSnapshottingPeriodic_TimestampLocal_defaultTrue(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "push"
+    connect:
+      type: "local"
+      listener_name: "foo"
+      client_identity: "bar"
+    filesystems:
+      "<": true
+    snapshotting:
+      type: "periodic"
+      prefix: "zrepl_"
+    replication:
+      one_step: false
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+`)
+
+	require.NotEmpty(t, c.Jobs)
+	require.IsType(t, new(PushJob), c.Jobs[0].Ret)
+	pushJob := c.Jobs[0].Ret.(*PushJob)
+	require.NotNil(t, pushJob)
+
+	require.IsType(t, new(SnapshottingPeriodic), pushJob.Snapshotting.Ret)
+	snap := pushJob.Snapshotting.Ret.(*SnapshottingPeriodic)
+	require.NotNil(t, snap)
+	assert.True(t, snap.TimestampLocal)
+}

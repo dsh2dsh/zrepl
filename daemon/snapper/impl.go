@@ -68,7 +68,7 @@ func (plan *plan) formatNow(format string, localTime bool) string {
 	}
 	switch strings.ToLower(format) {
 	case "dense":
-		format = "20060102_150405_000"
+		format = "20060102_150405_MST"
 	case "human":
 		format = "2006-01-02_15:04:05"
 	case "iso-8601":

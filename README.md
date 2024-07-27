@@ -190,22 +190,23 @@ FreeBSD port is
     pruning configured to keep all snapshots, but anyway it spends some time
     executing zfs commands.
 
-  * Snapshots can be named using local time in timestamps, instead of UTC.
-    Configuration example:
+  * Snapshots are named using local time for timestamps, instead of UTC.
+
+    So instead of snapshot names like `zrepl_20240508_140000_000` it's
+    `zrepl_20240508_160000_CEST`. `timestamp_local` defines time zone of
+    timestamps. By default it's local time, but with `timestamp_local: false`
+    it's UTC. Configuration like:
 
     ``` yaml
     snapshotting:
       type: "periodic"
       cron: "*/15 * * * *"
-      prefix: "zrepl_frequently_"
-      timestamp_format: "20060102_150405_MST"
-      timestamp_local: true
+      prefix: "zrepl_"
+      timestamp_format: "20060102_150405_000"
+      timestamp_local: false
     ```
 
-    `timestamp_local` defines time zone of timestamps. By default it's `UTC`,
-    but with `timestamp_local: true` it's local time zone. So instead of
-    snapshot names like `zrepl_frequently_20240508_140000_000` it'll be
-    something like `zrepl_frequently_20240508_160000_CEST`.
+    returns original naming like `zrepl_20240508_140000_000` with UTC time.
 
   * Configurable RPC timeout (1 minute by default). Configuration example:
 
