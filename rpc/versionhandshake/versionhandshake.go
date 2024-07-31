@@ -106,10 +106,10 @@ const MaxProtocolVersion = 9999
 // Only returns *HandshakeError as error.
 func (m *HandshakeMessage) Encode() ([]byte, error) {
 	if m.ProtocolVersion <= 0 || m.ProtocolVersion > MaxProtocolVersion {
-		return nil, hsErr(fmt.Sprintf("protocol version must be in [1, %d]", MaxProtocolVersion))
+		return nil, hsErr("protocol version must be in [1, %d]", MaxProtocolVersion)
 	}
 	if len(m.Extensions) >= MaxProtocolVersion {
-		return nil, hsErr(fmt.Sprintf("protocol only supports [0, %d] extensions", MaxProtocolVersion))
+		return nil, hsErr("protocol only supports [0, %d] extensions", MaxProtocolVersion)
 	}
 	// EXTENSIONS is a count of subsequent \n separated lines that contain protocol extensions
 	var extensions strings.Builder
@@ -153,9 +153,7 @@ func (m *HandshakeMessage) DecodeReader(r io.Reader, maxLen int) error {
 		return hsIOErr(err, "error reading protocol banner body: %s", err)
 	}
 
-	var (
-		protoVersion, extensionCount int
-	)
+	var protoVersion, extensionCount int
 	n, err = fmt.Fscanf(&buf, "ZREPL_ZFS_REPLICATION PROTOVERSION=%04d EXTENSIONS=%4d\n",
 		&protoVersion, &extensionCount)
 	if n != 2 || err != nil {

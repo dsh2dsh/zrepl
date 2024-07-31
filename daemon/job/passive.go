@@ -160,11 +160,25 @@ func (self *PassiveStatus) Error() string {
 	return ""
 }
 
-func (self *PassiveStatus) Running() time.Duration {
+func (self *PassiveStatus) Running() (time.Duration, bool) {
 	if snap := self.Snapper; snap != nil {
 		return snap.Running()
 	}
-	return 0
+	return 0, false
+}
+
+func (self *PassiveStatus) Cron() string {
+	if snap := self.Snapper; snap != nil {
+		return snap.Cron()
+	}
+	return ""
+}
+
+func (self *PassiveStatus) SleepingUntil() time.Time {
+	if snap := self.Snapper; snap != nil {
+		return snap.SleepingUntil()
+	}
+	return time.Time{}
 }
 
 func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

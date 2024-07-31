@@ -1,7 +1,9 @@
 package report
 
 import (
+	"cmp"
 	"encoding/json"
+	"slices"
 	"time"
 )
 
@@ -104,48 +106,74 @@ type StepInfo struct {
 	BytesReplicated uint64
 }
 
-func (a *AttemptReport) BytesSum() (expected, replicated uint64, containsInvalidSizeEstimates bool) {
-	for _, fs := range a.Filesystems {
+func (self *AttemptReport) BytesSum() (expected, replicated uint64,
+	invalidSizeEstimates bool,
+) {
+	for _, fs := range self.Filesystems {
 		e, r, fsContainsInvalidEstimate := fs.BytesSum()
-		containsInvalidSizeEstimates = containsInvalidSizeEstimates || fsContainsInvalidEstimate
+		invalidSizeEstimates = invalidSizeEstimates || fsContainsInvalidEstimate
 		expected += e
 		replicated += r
-	}
-	return expected, replicated, containsInvalidSizeEstimates
-}
-
-func (f *FilesystemReport) BytesSum() (expected, replicated uint64, containsInvalidSizeEstimates bool) {
-	for _, step := range f.Steps {
-		expected += step.Info.BytesExpected
-		replicated += step.Info.BytesReplicated
-		containsInvalidSizeEstimates = containsInvalidSizeEstimates || step.Info.BytesExpected == 0
 	}
 	return
 }
 
-func (f *AttemptReport) FilesystemsByState() map[FilesystemState][]*FilesystemReport {
+func (self *AttemptReport) FilesystemsProgress() (expected, replicated int) {
+	expected = len(self.Filesystems)
+	for _, fs := range self.Filesystems {
+		if fs.State == FilesystemDone {
+			replicated++
+		}
+	}
+	return
+}
+
+func (self *AttemptReport) FilesystemsByState() map[FilesystemState][]*FilesystemReport {
 	r := make(map[FilesystemState][]*FilesystemReport, 4)
-	for _, fs := range f.Filesystems {
+	for _, fs := range self.Filesystems {
 		l := r[fs.State]
-		l = append(l, fs)
-		r[fs.State] = l
+		r[fs.State] = append(l, fs)
 	}
 	return r
 }
 
-func (f *FilesystemReport) Error() *TimedError {
-	switch f.State {
+func (self *AttemptReport) SortFilesystems() []*FilesystemReport {
+	slices.SortFunc(self.Filesystems, func(a, b *FilesystemReport) int {
+		if a.Running() && !b.Running() {
+			return -1
+		} else if !a.Running() && b.Running() {
+			return 1
+		}
+		return cmp.Compare(a.Info.Name, b.Info.Name)
+	})
+	return self.Filesystems
+}
+
+func (self *FilesystemReport) BytesSum() (expected, replicated uint64,
+	containsInvalidSizeEstimates bool,
+) {
+	for _, step := range self.Steps {
+		expected += step.Info.BytesExpected
+		replicated += step.Info.BytesReplicated
+		containsInvalidSizeEstimates = containsInvalidSizeEstimates ||
+			step.Info.BytesExpected == 0
+	}
+	return
+}
+
+func (self *FilesystemReport) Error() *TimedError {
+	switch self.State {
 	case FilesystemPlanningErrored:
-		return f.PlanError
+		return self.PlanError
 	case FilesystemSteppingErrored:
-		return f.StepError
+		return self.StepError
 	}
 	return nil
 }
 
 // may return nil
-func (f *FilesystemReport) NextStep() *StepReport {
-	switch f.State {
+func (self *FilesystemReport) NextStep() *StepReport {
+	switch self.State {
 	case FilesystemDone:
 		return nil
 	case FilesystemPlanningErrored:
@@ -157,9 +185,21 @@ func (f *FilesystemReport) NextStep() *StepReport {
 	case FilesystemStepping:
 		// invariant is that this is always correct
 		// TODO what about 0-length Steps but short intermediary state?
-		return f.Steps[f.CurrentStep]
+		return self.Steps[self.CurrentStep]
 	}
 	panic("unreachable")
+}
+
+func (self *FilesystemReport) Running() bool {
+	return self.BlockedOn == FsBlockedOnNothing &&
+		(self.State == FilesystemPlanning || self.State == FilesystemStepping)
+}
+
+func (self *FilesystemReport) Step() *StepReport {
+	if self.CurrentStep < len(self.Steps) {
+		return self.Steps[self.CurrentStep]
+	}
+	return nil
 }
 
 func (f *StepReport) IsIncremental() bool {
@@ -214,14 +254,14 @@ func (r *Report) Error() string {
 	return ""
 }
 
-func (r *Report) Running() time.Duration {
+func (r *Report) Running() (time.Duration, bool) {
 	if len(r.Attempts) > 0 {
 		att := r.Attempts[len(r.Attempts)-1]
 		if att.FinishAt.IsZero() {
-			return time.Since(att.StartAt)
+			return time.Since(att.StartAt), true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // Returns true in case the AttemptState is a terminal

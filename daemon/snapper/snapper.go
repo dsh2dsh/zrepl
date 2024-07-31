@@ -46,11 +46,25 @@ func (self *Report) Error() string {
 	return ""
 }
 
-func (self *Report) Running() time.Duration {
+func (self *Report) Running() (time.Duration, bool) {
 	if p := self.Periodic; p != nil {
 		return p.Running()
 	}
-	return 0
+	return 0, false
+}
+
+func (self *Report) Cron() string {
+	if p := self.Periodic; p != nil {
+		return p.CronSpec
+	}
+	return ""
+}
+
+func (self *Report) SleepingUntil() time.Time {
+	if p := self.Periodic; p != nil {
+		return p.SleepUntil
+	}
+	return time.Time{}
 }
 
 func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingEnum) (Snapper, error) {

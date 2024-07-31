@@ -9,10 +9,6 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon"
 )
 
-type Client struct {
-	control *jsonclient.Client
-}
-
 func NewClient(network, addr string) (*Client, error) {
 	control, err := jsonclient.NewUnix(addr)
 	if err != nil {
@@ -21,8 +17,12 @@ func NewClient(network, addr string) (*Client, error) {
 	return &Client{control: control}, nil
 }
 
-func (c *Client) Status() (s daemon.Status, err error) {
-	err = c.control.Get(context.Background(),
+type Client struct {
+	control *jsonclient.Client
+}
+
+func (self *Client) Status() (s daemon.Status, err error) {
+	err = self.control.Get(context.Background(),
 		daemon.ControlJobEndpointStatus, &s)
 	if err != nil {
 		err = fmt.Errorf("daemon status: %w", err)
@@ -30,9 +30,9 @@ func (c *Client) Status() (s daemon.Status, err error) {
 	return
 }
 
-func (c *Client) StatusRaw() ([]byte, error) {
+func (self *Client) StatusRaw() ([]byte, error) {
 	var r json.RawMessage
-	err := c.control.Get(context.Background(),
+	err := self.control.Get(context.Background(),
 		daemon.ControlJobEndpointStatus, &r)
 	if err != nil {
 		return nil, fmt.Errorf("daemon status: %w", err)
@@ -40,8 +40,16 @@ func (c *Client) StatusRaw() ([]byte, error) {
 	return r, nil
 }
 
-func (c *Client) signal(job, sig string) error {
-	err := c.control.Post(context.Background(),
+func (self *Client) SignalWakeup(job string) error {
+	return self.signal(job, "wakeup")
+}
+
+func (self *Client) SignalReset(job string) error {
+	return self.signal(job, "reset")
+}
+
+func (self *Client) signal(job, sig string) error {
+	err := self.control.Post(context.Background(),
 		daemon.ControlJobEndpointSignal,
 		struct {
 			Name string
@@ -55,12 +63,4 @@ func (c *Client) signal(job, sig string) error {
 		return fmt.Errorf("daemon signal %q to job %q: %w", sig, job, err)
 	}
 	return nil
-}
-
-func (c *Client) SignalWakeup(job string) error {
-	return c.signal(job, "wakeup")
-}
-
-func (c *Client) SignalReset(job string) error {
-	return c.signal(job, "reset")
 }

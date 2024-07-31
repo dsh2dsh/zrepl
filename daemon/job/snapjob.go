@@ -116,11 +116,25 @@ func (self *SnapJobStatus) Error() string {
 	return ""
 }
 
-func (self *SnapJobStatus) Running() time.Duration {
+func (self *SnapJobStatus) Running() (time.Duration, bool) {
 	if snap := self.Snapshotting; snap != nil {
 		return snap.Running()
 	}
-	return 0
+	return 0, false
+}
+
+func (self *SnapJobStatus) Cron() string {
+	if snap := self.Snapshotting; snap != nil {
+		return snap.Cron()
+	}
+	return ""
+}
+
+func (self *SnapJobStatus) SleepingUntil() time.Time {
+	if snap := self.Snapshotting; snap != nil {
+		return snap.SleepingUntil()
+	}
+	return time.Time{}
 }
 
 func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

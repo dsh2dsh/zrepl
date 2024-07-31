@@ -481,7 +481,7 @@ func (self *monitorAlive) checkJobs(jobs map[string]*job.Status) bool {
 			self.resp.UpdateStatus(monitoringplugin.WARNING, "job: "+jname)
 			return false
 		}
-		if d := status.Running(); d > lasting.d {
+		if d, ok := status.Running(); ok && d > lasting.d {
 			lasting.name = jname
 			lasting.d = d
 		}

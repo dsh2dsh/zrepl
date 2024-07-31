@@ -511,17 +511,36 @@ func (self *ActiveSideStatus) Error() string {
 	return ""
 }
 
-func (self *ActiveSideStatus) Running() time.Duration {
-	var d time.Duration
+func (self *ActiveSideStatus) Running() (time.Duration, bool) {
 	if repl := self.Replication; repl != nil {
-		d = repl.Running()
-	}
-	if snap := self.Snapshotting; snap != nil {
-		if d2 := snap.Running(); d2 > d {
-			d = d2
+		if d, ok := repl.Running(); ok {
+			return d, ok
 		}
 	}
-	return d
+	if snap := self.Snapshotting; snap != nil {
+		if d, ok := snap.Running(); ok {
+			return d, ok
+		}
+	}
+	return 0, false
+}
+
+func (self *ActiveSideStatus) Cron() string {
+	if self.CronSpec != "" {
+		return self.CronSpec
+	} else if self.Snapshotting != nil {
+		return self.Snapshotting.Cron()
+	}
+	return ""
+}
+
+func (self *ActiveSideStatus) SleepingUntil() time.Time {
+	if !self.SleepUntil.IsZero() {
+		return self.SleepUntil
+	} else if snap := self.Snapshotting; snap != nil {
+		return snap.SleepingUntil()
+	}
+	return time.Time{}
 }
 
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

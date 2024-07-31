@@ -1,9 +1,11 @@
 package snapper
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -480,18 +482,24 @@ type PeriodicReport struct {
 	Progress []*ReportFilesystem
 }
 
-func (self *PeriodicReport) Running() time.Duration {
-	var d time.Duration
+func (self *PeriodicReport) Running() (d time.Duration, ok bool) {
 	if progress := self.Progress; progress != nil {
 		for _, fs := range progress {
 			if fs.State == SnapStarted {
 				if d2 := time.Since(fs.StartAt); d2 > d {
-					d = d2
+					d, ok = d2, true
 				}
 			}
 		}
 	}
-	return d
+	return
+}
+
+func (self *PeriodicReport) SortProgress() []*ReportFilesystem {
+	slices.SortFunc(self.Progress, func(a, b *ReportFilesystem) int {
+		return cmp.Compare(a.Path, b.Path)
+	})
+	return self.Progress
 }
 
 func (s *Periodic) Shutdown() {

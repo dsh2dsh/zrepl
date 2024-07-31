@@ -283,6 +283,8 @@ FreeBSD port is
 
     This configuration allows using of `zrepl status` for the group.
 
+  * Redesigned `zrepl status`
+
   * Small cosmetic changes
 
 ## Upstream user documentation

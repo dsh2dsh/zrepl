@@ -254,6 +254,10 @@ type SnapshotReport struct {
 	Date       time.Time
 }
 
+func (self *Report) StateString() (State, error) {
+	return StateString(self.State)
+}
+
 func (p *Pruner) Report() *Report {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()

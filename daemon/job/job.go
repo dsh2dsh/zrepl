@@ -46,7 +46,14 @@ const (
 
 type Status struct {
 	Type        Type
-	JobSpecific interface{}
+	JobSpecific JobStatus
+}
+
+type JobStatus interface {
+	Error() string
+	Running() (time.Duration, bool)
+	Cron() string
+	SleepingUntil() time.Time
 }
 
 func (s *Status) MarshalJSON() ([]byte, error) {
@@ -111,15 +118,28 @@ func (s *Status) UnmarshalJSON(in []byte) (err error) {
 }
 
 func (s *Status) Error() string {
-	if v, ok := s.JobSpecific.(interface{ Error() string }); ok {
-		return v.Error()
-	}
-	return ""
+	return s.JobSpecific.Error()
 }
 
-func (s *Status) Running() time.Duration {
-	if v, ok := s.JobSpecific.(interface{ Running() time.Duration }); ok {
-		return v.Running()
+func (s *Status) Running() (time.Duration, bool) {
+	return s.JobSpecific.Running()
+}
+
+func (s *Status) Internal() bool { return s.Type == TypeInternal }
+
+func (s *Status) Cron() string {
+	return s.JobSpecific.Cron()
+}
+
+func (s *Status) SleepingUntil() time.Time {
+	return s.JobSpecific.SleepingUntil()
+}
+
+func (s *Status) CanSignal() string {
+	if _, ok := s.Running(); ok {
+		return "reset"
+	} else if t := s.SleepingUntil(); !t.IsZero() {
+		return "wakeup"
 	}
-	return 0
+	return ""
 }
