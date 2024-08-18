@@ -41,10 +41,10 @@ func humanizeDuration(d time.Duration) string {
 	seconds := int64(math.Mod(d.Seconds(), 60))
 	chunks := []int64{days, hours, minutes, seconds}
 
-	parts := []string{}
+	parts := make([]string, 0, len(chunks))
 	force := false
 	for i, chunk := range chunks {
-		if force || chunk > 0 {
+		if force || chunk > 0 || i == len(chunks)-1 {
 			padding := 0
 			if force {
 				padding = 2
