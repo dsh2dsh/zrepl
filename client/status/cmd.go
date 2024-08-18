@@ -34,7 +34,7 @@ var Subcommand = &cli.Subcommand{
 	},
 
 	SetupSubcommands: func() []*cli.Subcommand {
-		return []*cli.Subcommand{oldCmd, dumpCmd, rawCmd}
+		return []*cli.Subcommand{dumpCmd, rawCmd}
 	},
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string) error {
@@ -46,18 +46,6 @@ var Subcommand = &cli.Subcommand{
 				return fmt.Errorf("running program: %w", err)
 			}
 			return model.Err()
-		})
-	},
-}
-
-var oldCmd = &cli.Subcommand{
-	Use:        "old",
-	Short:      "daemon status old TUI",
-	SetupCobra: func(cmd *cobra.Command) { cmd.Args = cobra.ExactArgs(0) },
-
-	Run: func(_ context.Context, cmd *cli.Subcommand, args []string) error {
-		return withStatusClient(cmd, func(c *Client) error {
-			return interactive(c, refreshInterval, selectedJob)
 		})
 	},
 }

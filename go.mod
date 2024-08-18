@@ -11,7 +11,6 @@ require (
 	github.com/dsh2dsh/cron/v3 v3.0.2
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.17.0
-	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/google/uuid v1.6.0
@@ -28,7 +27,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	github.com/yudai/gojsondiff v1.0.0
-	gitlab.com/tslocum/cview v1.5.3
 	golang.org/x/net v0.28.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/sys v0.24.0
@@ -68,7 +66,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ftrvxmtrx/fd v0.0.0-20150925145434-c6d800382fff // indirect
-	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -87,9 +84,7 @@ require (
 	github.com/theckman/goconstraint v1.11.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
-	gitlab.com/tslocum/cbind v0.1.4 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
 	golang.org/x/text v0.17.0
 	gopkg.in/yaml.v3 v3.0.1
 )
