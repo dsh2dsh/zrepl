@@ -45,7 +45,7 @@ func (r *Bits) UnmarshalJSON(b []byte) error {
 
 	if match[2] == "bit" {
 		if math.Round(bps) != bps {
-			return genericErr(fmt.Errorf("unit bit must be an integer value"))
+			return genericErr(errors.New("unit bit must be an integer value"))
 		}
 		r.bits = bps
 		return nil

@@ -20,7 +20,7 @@ type KeepGrid struct {
 
 func NewKeepGrid(in *config.PruneGrid) (p *KeepGrid, err error) {
 	if in.Regex == "" {
-		return nil, fmt.Errorf("Regex must not be empty")
+		return nil, errors.New("Regex must not be empty")
 	}
 	re, err := regexp.Compile(in.Regex)
 	if err != nil {

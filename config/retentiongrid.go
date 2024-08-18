@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -56,7 +57,7 @@ var retentionStringIntervalRegex *regexp.Regexp = regexp.MustCompile(`^\s*(\d+)\
 func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, err error) {
 	comps := retentionStringIntervalRegex.FindStringSubmatch(e)
 	if comps == nil {
-		err = fmt.Errorf("retention string does not match expected format")
+		err = errors.New("retention string does not match expected format")
 		return
 	}
 
@@ -64,7 +65,7 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 	if err != nil {
 		return nil, err
 	} else if times <= 0 {
-		return nil, fmt.Errorf("contains factor <= 0")
+		return nil, errors.New("contains factor <= 0")
 	}
 
 	duration, err := parsePositiveDuration(comps[2])
@@ -79,7 +80,7 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 		re := regexp.MustCompile(`^\s*keep=(.+)\s*$`)
 		res := re.FindStringSubmatch(comps[4])
 		if res == nil || len(res) != 2 {
-			err = fmt.Errorf("interval parameter contains unknown parameters")
+			err = errors.New("interval parameter contains unknown parameters")
 			return
 		}
 		if res[1] == "all" {
@@ -87,7 +88,7 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 		} else {
 			keepCount, err = strconv.Atoi(res[1])
 			if err != nil {
-				err = fmt.Errorf("cannot parse keep_count value")
+				err = errors.New("cannot parse keep_count value")
 				return
 			}
 		}

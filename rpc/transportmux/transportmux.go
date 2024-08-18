@@ -7,6 +7,7 @@ package transportmux
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -229,7 +230,7 @@ func (c labeledConnecter) Connect(ctx context.Context) (transport.Wire, error) {
 		return nil, err
 	}
 	if n != len(c.label) {
-		closeConn(fmt.Errorf("short label write"))
+		closeConn(errors.New("short label write"))
 		return nil, io.ErrShortWrite
 	}
 	return conn, nil

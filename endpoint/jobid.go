@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/dsh2dsh/zrepl/zfs"
@@ -15,7 +16,7 @@ type JobID struct {
 
 func MakeJobID(s string) (JobID, error) {
 	if len(s) == 0 {
-		return JobID{}, fmt.Errorf("must not be empty string")
+		return JobID{}, errors.New("must not be empty string")
 	}
 
 	if err := zfs.ComponentNamecheck(s); err != nil {

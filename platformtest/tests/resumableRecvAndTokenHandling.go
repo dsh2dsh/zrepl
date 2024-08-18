@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/platformtest"
@@ -17,8 +15,8 @@ func ResumableRecvAndTokenHandling(ctx *platformtest.Context) {
 	+	"send er"
 	`)
 
-	sendFS := fmt.Sprintf("%s/send er", ctx.RootDataset)
-	recvFS := fmt.Sprintf("%s/recv er", ctx.RootDataset)
+	sendFS := ctx.RootDataset + "/send er"
+	recvFS := ctx.RootDataset + "/recv er"
 
 	supported, err := zfs.ResumeRecvSupported(ctx, mustDatasetPath(sendFS))
 	check(err)

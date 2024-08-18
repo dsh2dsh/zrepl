@@ -80,7 +80,7 @@ func parseDuration(e string) (d time.Duration, err error) {
 	switch comps[2] {
 	case "":
 		if durationFactor != 0 {
-			err = fmt.Errorf("missing time unit")
+			err = errors.New("missing time unit")
 			return
 		} else {
 			// It's the case where user specified '0'.

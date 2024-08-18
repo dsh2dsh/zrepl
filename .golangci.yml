@@ -10,6 +10,7 @@ linters:
     - "makezero"
     - "misspell"
     - "nolintlint"
+    - "perfsprint"
 
 linters-settings:
   goconst:

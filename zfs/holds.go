@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -59,7 +60,7 @@ func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 	if err := validateZFSFilesystem(fs); err != nil {
 		return nil, fmt.Errorf("`fs` is not a valid filesystem path: %w", err)
 	} else if snap == "" {
-		return nil, fmt.Errorf("`snap` must not be empty")
+		return nil, errors.New("`snap` must not be empty")
 	}
 
 	dp := fmt.Sprintf("%s@%s", fs, snap)

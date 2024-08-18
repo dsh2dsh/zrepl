@@ -89,6 +89,7 @@ package trace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	runtimedebug "runtime/debug"
@@ -155,7 +156,7 @@ func (s *traceNode) debugString() string {
 // Wrong call order / forgetting to call it will result in panics.
 type DoneFunc func()
 
-var ErrTaskStillHasActiveChildTasks = fmt.Errorf("end task: task still has active child tasks")
+var ErrTaskStillHasActiveChildTasks = errors.New("end task: task still has active child tasks")
 
 // Start a new root task or create a child task of an existing task.
 //
@@ -279,8 +280,8 @@ func WithTask(ctx context.Context, taskName string) (context.Context, DoneFunc) 
 }
 
 var (
-	ErrAlreadyActiveChildSpan      = fmt.Errorf("create child span: span already has an active child span")
-	ErrSpanStillHasActiveChildSpan = fmt.Errorf("end span: span still has active child spans")
+	ErrAlreadyActiveChildSpan      = errors.New("create child span: span already has an active child span")
+	ErrSpanStillHasActiveChildSpan = errors.New("end span: span still has active child spans")
 )
 
 // Start a new span.

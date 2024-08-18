@@ -22,12 +22,12 @@ func BatchDestroy(ctx *platformtest.Context) {
 	reqs := []*zfs.DestroySnapOp{
 		{
 			ErrOut:     new(error),
-			Filesystem: fmt.Sprintf("%s/foo bar", ctx.RootDataset),
+			Filesystem: ctx.RootDataset + "/foo bar",
 			Name:       "3",
 		},
 		{
 			ErrOut:     new(error),
-			Filesystem: fmt.Sprintf("%s/foo bar", ctx.RootDataset),
+			Filesystem: ctx.RootDataset + "/foo bar",
 			Name:       "2",
 		},
 	}
@@ -36,7 +36,7 @@ func BatchDestroy(ctx *platformtest.Context) {
 		panic("expecting no error")
 	}
 	err := (*reqs[1].ErrOut).Error()
-	if !strings.Contains(err, fmt.Sprintf("%s/foo bar@2", ctx.RootDataset)) {
+	if !strings.Contains(err, ctx.RootDataset+"/foo bar@2") {
 		panic(fmt.Sprintf("expecting error about being unable to destroy @2: %T\n%s", err, err))
 	}
 

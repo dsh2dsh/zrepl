@@ -1,6 +1,7 @@
 package job
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -85,7 +86,7 @@ func validateReceivingSidesDoNotOverlap(receivingRootFSs []string) error {
 	// if any i is prefix of i+n (n >= 1), there is overlap
 	for i := 0; i < len(rfss)-1; i++ {
 		if strings.HasPrefix(rfss[i+1], rfss[i]) {
-			return fmt.Errorf("receiving jobs with overlapping root filesystems are forbidden")
+			return errors.New("receiving jobs with overlapping root filesystems are forbidden")
 		}
 	}
 	return nil
@@ -93,7 +94,7 @@ func validateReceivingSidesDoNotOverlap(receivingRootFSs []string) error {
 
 func buildBandwidthLimitConfig(in *config.BandwidthLimit) (c bandwidthlimit.Config, _ error) {
 	if in.Max.ToBytes() > 0 && int64(in.Max.ToBytes()) == 0 {
-		return c, fmt.Errorf("bandwidth limit `max` is too small, must at least specify one byte")
+		return c, errors.New("bandwidth limit `max` is too small, must at least specify one byte")
 	}
 	return bandwidthlimit.Config{
 		Max:            int64(in.Max.ToBytes()),

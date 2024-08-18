@@ -1,7 +1,7 @@
 package trace
 
 import (
-	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -42,7 +42,7 @@ func TestUniqueConcurrentTaskNamer(t *testing.T) {
 	for i := 0; i < N; i++ {
 		go func(i int) {
 			defer wg.Done()
-			name := fmt.Sprintf("%d", i/Q)
+			name := strconv.Itoa(i / Q)
 			uniqueName, done := namer.UniqueConcurrentTaskName(name)
 			act, _ := m.LoadOrStore(uniqueName, i)
 			if act.(int) != i {

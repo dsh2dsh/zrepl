@@ -294,7 +294,7 @@ func (self *JobRender) viewNextStep(nextStep *report.StepReport) string {
 	if nextStep.IsIncremental() {
 		next = fmt.Sprintf("%s ➡ %s", nextStep.Info.From, nextStep.Info.To)
 	} else {
-		next = fmt.Sprintf("full send %s", nextStep.Info.To)
+		next = "full send " + nextStep.Info.To
 	}
 
 	if !nextStep.Info.Resumed {

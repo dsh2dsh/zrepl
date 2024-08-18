@@ -3,6 +3,7 @@ package dataconn
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -201,7 +202,7 @@ func (s *Server) serveConnRequest(ctx context.Context, endpoint string, c *strea
 		res, handlerErr = s.h.PingDataconn(ctx, &req) // SHADOWING
 	default:
 		s.log.WithField("endpoint", endpoint).Error("unknown endpoint")
-		handlerErr = fmt.Errorf("requested endpoint does not exist")
+		handlerErr = errors.New("requested endpoint does not exist")
 	}
 
 	s.log.WithField("endpoint", endpoint).WithField("errType", fmt.Sprintf("%T", handlerErr)).Debug("handler returned")

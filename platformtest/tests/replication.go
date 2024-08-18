@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -772,7 +773,7 @@ type FailSendCompletedSender struct {
 var _ logic.Sender = (*FailSendCompletedSender)(nil)
 
 func (p *FailSendCompletedSender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error) {
-	return nil, fmt.Errorf("[mock] SendCompleted not delivered to actual endpoint")
+	return nil, errors.New("[mock] SendCompleted not delivered to actual endpoint")
 }
 
 type replicationStepCompletedLost_scenario struct {
@@ -937,7 +938,7 @@ func ReplicationReceiverErrorWhileStillSending(ctx *platformtest.Context) {
 	sfs := ctx.RootDataset + "/sender"
 	rfsRoot := ctx.RootDataset + "/receiver"
 
-	mockRecvErr := fmt.Errorf("YiezahK3thie8ahKiel5sah2uugei2ize1yi8feivuu7musoat")
+	mockRecvErr := errors.New("YiezahK3thie8ahKiel5sah2uugei2ize1yi8feivuu7musoat")
 
 	rep := replicationInvocation{
 		sjid:      sjid,
@@ -994,7 +995,7 @@ func ReplicationFailingInitialParentProhibitsChildReplication(ctx *platformtest.
 	mustAddToSFilter(ctx, sfilter, fsAA)
 	rfsRoot := ctx.RootDataset + "/receiver"
 
-	mockRecvErr := fmt.Errorf("yifae4ohPhaquaes0hohghiep9oufie4roo7quoWooluaj2ee8")
+	mockRecvErr := errors.New("yifae4ohPhaquaes0hohghiep9oufie4roo7quoWooluaj2ee8")
 
 	rep := replicationInvocation{
 		sjid:      sjid,

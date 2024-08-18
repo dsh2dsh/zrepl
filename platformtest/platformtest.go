@@ -2,6 +2,7 @@ package platformtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/stretchr/testify/assert"
@@ -20,12 +21,14 @@ type Context struct {
 	QueueSubtest func(id string, stf func(*Context))
 }
 
-var FailNowSentinel = fmt.Errorf("platformtest: FailNow called on context")
+var FailNowSentinel = errors.New("platformtest: FailNow called on context")
 
-var SkipNowSentinel = fmt.Errorf("platformtest: SkipNow called on context")
+var SkipNowSentinel = errors.New("platformtest: SkipNow called on context")
 
-var _ assert.TestingT = (*Context)(nil)
-var _ require.TestingT = (*Context)(nil)
+var (
+	_ assert.TestingT  = (*Context)(nil)
+	_ require.TestingT = (*Context)(nil)
+)
 
 func (c *Context) Logf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)

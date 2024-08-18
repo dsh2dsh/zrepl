@@ -18,7 +18,7 @@ func IdempotentBookmark(ctx *platformtest.Context) {
 		+  "foo bar@another snap"
 	`)
 
-	fs := fmt.Sprintf("%s/foo bar", ctx.RootDataset)
+	fs := ctx.RootDataset + "/foo bar"
 
 	asnap := fsversion(ctx, fs, "@a snap")
 	anotherSnap := fsversion(ctx, fs, "@another snap")
@@ -38,21 +38,21 @@ func IdempotentBookmark(ctx *platformtest.Context) {
 	// should fail for another snapshot
 	_, err = zfs.ZFSBookmark(ctx, fs, anotherSnap, "a bookmark")
 	if err == nil {
-		panic(err)
+		panic("error expected")
 	}
 	if _, ok := err.(*zfs.BookmarkExists); !ok {
 		panic(fmt.Sprintf("has type %T", err))
 	}
 
 	// destroy the snapshot
-	if err := zfs.ZFSDestroy(ctx, fmt.Sprintf("%s@a snap", fs)); err != nil {
+	if err := zfs.ZFSDestroy(ctx, fs+"@a snap"); err != nil {
 		panic(err)
 	}
 
 	// do it again, should fail with special error type
 	_, err = zfs.ZFSBookmark(ctx, fs, asnap, "a bookmark")
 	if err == nil {
-		panic(err)
+		panic("error expected")
 	}
 	if _, ok := err.(*zfs.DatasetDoesNotExist); !ok {
 		panic(fmt.Sprintf("has type %T", err))

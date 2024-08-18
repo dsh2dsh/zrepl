@@ -44,7 +44,7 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 		return fmt.Errorf("invalid filter specification on command line: %w", err)
 	}
 
-	abstractions, errors, drainDone, err := endpoint.ListAbstractionsStreamed(ctx, q)
+	abstractions, errs, drainDone, err := endpoint.ListAbstractionsStreamed(ctx, q)
 	if err != nil {
 		return err // context clear by invocation of command
 	}
@@ -81,7 +81,7 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for err := range errors {
+		for err := range errs {
 			func() {
 				defer line.Lock().Unlock()
 				errorsSlice = append(errorsSlice, err)
@@ -92,7 +92,7 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 	wg.Wait()
 	if len(errorsSlice) > 0 {
 		errorColor.Add(color.Bold).Fprintf(os.Stderr, "there were errors in listing the abstractions")
-		return fmt.Errorf("")
+		return errors.New("")
 	} else {
 		return nil
 	}

@@ -36,9 +36,9 @@ type Conn struct {
 	writeClean bool
 }
 
-var readMessageSentinel = fmt.Errorf("read stream complete")
+var readMessageSentinel = errors.New("read stream complete")
 
-var errWriteStreamToErrorUnknownState = fmt.Errorf("dataconn read stream: connection is in unknown state")
+var errWriteStreamToErrorUnknownState = errors.New("dataconn read stream: connection is in unknown state")
 
 func Wrap(nc timeoutconn.Wire, sendHeartbeatInterval, peerTimeout time.Duration) *Conn {
 	hc := heartbeatconn.Wrap(nc, sendHeartbeatInterval, peerTimeout)
@@ -86,7 +86,7 @@ func (c *Conn) ReadStreamedMessage(ctx context.Context, maxSize uint32, frameTyp
 	if !c.readClean {
 		return nil, &ReadStreamError{
 			Kind: ReadStreamErrorKindConn,
-			Err:  fmt.Errorf("dataconn read message: connection is in unknown state"),
+			Err:  errors.New("dataconn read message: connection is in unknown state"),
 		}
 	}
 
@@ -175,7 +175,7 @@ func (c *Conn) WriteStreamedMessage(ctx context.Context, buf io.Reader, frameTyp
 	c.writeMtx.Lock()
 	defer c.writeMtx.Unlock()
 	if !c.writeClean {
-		return fmt.Errorf("dataconn write message: connection is in unknown state")
+		return errors.New("dataconn write message: connection is in unknown state")
 	}
 	errBuf, errConn := writeStream(ctx, c.hc, buf, frameType)
 	if errBuf != nil {
@@ -200,7 +200,7 @@ func (c *Conn) SendStream(ctx context.Context, stream io.ReadCloser, frameType u
 	c.writeMtx.Lock()
 	defer c.writeMtx.Unlock()
 	if !c.writeClean {
-		return fmt.Errorf("dataconn send stream: connection is in unknown state")
+		return errors.New("dataconn send stream: connection is in unknown state")
 	}
 
 	errStream, errConn := writeStream(ctx, c.hc, stream, frameType)

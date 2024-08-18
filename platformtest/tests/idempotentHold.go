@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-
 	"github.com/dsh2dsh/zrepl/platformtest"
 	"github.com/dsh2dsh/zrepl/zfs"
 )
@@ -20,7 +18,7 @@ func IdempotentHold(ctx *platformtest.Context) {
 		-  "foo bar"
 	`)
 
-	fs := fmt.Sprintf("%s/foo bar", ctx.RootDataset)
+	fs := ctx.RootDataset + "/foo bar"
 	v1 := fsversion(ctx, fs, "@1")
 
 	tag := "zrepl_platformtest"

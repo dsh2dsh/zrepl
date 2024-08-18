@@ -235,7 +235,7 @@ func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*
 		if len(noCommonAncestor.SortedReceiverVersions) == 0 {
 
 			if len(noCommonAncestor.SortedSenderVersions) == 0 {
-				return nil, fmt.Errorf("no snapshots available on sender side")
+				return nil, errors.New("no snapshots available on sender side")
 			}
 
 			switch policy.InitialReplication {
@@ -264,7 +264,7 @@ func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*
 
 			case InitialReplicationAutoResolutionFail:
 
-				return nil, fmt.Errorf("automatic conflict resolution for initial replication is disabled in config")
+				return nil, errors.New("automatic conflict resolution for initial replication is disabled in config")
 
 			default:
 				panic(fmt.Sprintf("unimplemented: %#v", policy.InitialReplication))
@@ -428,7 +428,7 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 		if toVersion == nil {
 			return nil, fmt.Errorf("resume token `toguid` = %v not found on sender (`toname` = %q)", resumeToken.ToGUID, resumeToken.ToName)
 		} else if fromVersion == toVersion {
-			return nil, fmt.Errorf("resume token `fromguid` and `toguid` match same version on sener")
+			return nil, errors.New("resume token `fromguid` and `toguid` match same version on sener")
 		}
 		// fromVersion may be nil, toVersion is no nil, encryption matches
 		// good to go this one step!
@@ -578,7 +578,7 @@ func (s *Step) updateSizeEstimate(ctx context.Context) error {
 		log.WithError(err).Error("dry run send request failed")
 		return err
 	} else if sres == nil {
-		err := fmt.Errorf("got nil send result")
+		err := errors.New("got nil send result")
 		log.WithError(err).Error("dry run send request failed")
 		return err
 	}
@@ -612,7 +612,7 @@ func (s *Step) doReplication(ctx context.Context) error {
 		return err
 	}
 	if sres == nil {
-		err := fmt.Errorf("send request returned nil send result")
+		err := errors.New("send request returned nil send result")
 		log.Error(err.Error())
 		return err
 	}

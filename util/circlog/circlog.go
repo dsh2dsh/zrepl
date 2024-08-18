@@ -1,7 +1,7 @@
 package circlog
 
 import (
-	"fmt"
+	"errors"
 	"math/bits"
 	"sync"
 )
@@ -37,7 +37,7 @@ func MustNewCircularLog(max int) *CircularLog {
 
 func NewCircularLog(max int) (*CircularLog, error) {
 	if max <= 0 {
-		return nil, fmt.Errorf("max must be positive")
+		return nil, errors.New("max must be positive")
 	}
 
 	return &CircularLog{

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -84,7 +85,7 @@ func chrometraceBeginTask(s *traceNode) {
 	// => use flow events to link parent and child
 
 	flowId := atomic.AddUint64(&chrometraceFlowId, 1)
-	flowIdStr := fmt.Sprintf("%x", flowId)
+	flowIdStr := strconv.FormatUint(flowId, 16)
 
 	parentTask := s.parentTask.TaskName()
 	chrometraceWrite(chrometraceEvent{

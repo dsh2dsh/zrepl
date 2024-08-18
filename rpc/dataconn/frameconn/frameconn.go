@@ -87,7 +87,7 @@ type Frame struct {
 	Buffer Buffer
 }
 
-var ErrShutdown = fmt.Errorf("frameconn: shutting down")
+var ErrShutdown = errors.New("frameconn: shutting down")
 
 // ReadFrame reads a frame from the connection.
 //

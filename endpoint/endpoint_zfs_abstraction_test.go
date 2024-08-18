@@ -1,9 +1,9 @@
 package endpoint
 
 import (
-	"fmt"
 	"math"
 	"runtime/debug"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -216,7 +216,7 @@ func TestCreateTXGRange(t *testing.T) {
 				})
 			} else {
 				for i, e := range tc.expect {
-					t.Run(fmt.Sprint(i), func(t *testing.T) {
+					t.Run(strconv.Itoa(i), func(t *testing.T) {
 						defer func() {
 							v := recover()
 							if v != nil {

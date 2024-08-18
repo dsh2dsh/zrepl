@@ -122,7 +122,7 @@ func (m DatasetMapFilter) mostSpecificPrefixMapping(path *zfs.DatasetPath) (idx 
 // Returns target == nil if there is no mapping
 func (m DatasetMapFilter) Map(source *zfs.DatasetPath) (target *zfs.DatasetPath, err error) {
 	if m.filterMode {
-		err = fmt.Errorf("using a filter for mapping simply does not work")
+		err = errors.New("using a filter for mapping simply does not work")
 		return
 	}
 
@@ -135,7 +135,7 @@ func (m DatasetMapFilter) Map(source *zfs.DatasetPath) (target *zfs.DatasetPath,
 	if me.mapping == "" {
 		// Special case treatment: 'foo/bar<' => ''
 		if !me.subtreeMatch {
-			return nil, fmt.Errorf("mapping to '' must be a subtree match")
+			return nil, errors.New("mapping to '' must be a subtree match")
 		}
 		// ok...
 	} else {
@@ -161,7 +161,7 @@ func (m DatasetMapFilter) Map(source *zfs.DatasetPath) (target *zfs.DatasetPath,
 
 func (m DatasetMapFilter) Filter(p *zfs.DatasetPath) (pass bool, err error) {
 	if !m.filterMode {
-		err = fmt.Errorf("using a mapping as a filter does not work")
+		err = errors.New("using a mapping as a filter does not work")
 		return
 	}
 

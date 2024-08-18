@@ -446,7 +446,7 @@ func (p *Sender) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCurs
 }
 
 func (p *Sender) Receive(ctx context.Context, r *pdu.ReceiveReq, _ io.ReadCloser) (*pdu.ReceiveRes, error) {
-	return nil, fmt.Errorf("sender does not implement Receive()")
+	return nil, errors.New("sender does not implement Receive()")
 }
 
 type FSFilter interface { // FIXME unused
@@ -574,7 +574,7 @@ func clientRoot(rootFS *zfs.DatasetPath, clientIdentity string) (*zfs.DatasetPat
 		return nil, err
 	}
 	if rootFSLen+1 != clientRoot.Length() {
-		return nil, fmt.Errorf("client identity must be a single ZFS filesystem path component")
+		return nil, errors.New("client identity must be a single ZFS filesystem path component")
 	}
 	return clientRoot, nil
 }
@@ -730,17 +730,17 @@ func (s *Receiver) WaitForConnectivity(ctx context.Context) error {
 
 func (s *Receiver) ReplicationCursor(ctx context.Context, _ *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error) {
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-	return nil, fmt.Errorf("ReplicationCursor not implemented for Receiver")
+	return nil, errors.New("ReplicationCursor not implemented for Receiver")
 }
 
 func (s *Receiver) Send(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error) {
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-	return nil, nil, fmt.Errorf("receiver does not implement Send()")
+	return nil, nil, errors.New("receiver does not implement Send()")
 }
 
 func (s *Receiver) SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error) {
 	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-	return nil, fmt.Errorf("receiver does not implement SendDry()")
+	return nil, errors.New("receiver does not implement SendDry()")
 }
 
 func (s *Receiver) receive_GetPlaceholderCreationEncryptionValue(client_root, path *zfs.DatasetPath) (zfs.FilesystemPlaceholderCreateEncryptionValue, error) {
@@ -760,7 +760,7 @@ func (s *Receiver) receive_GetPlaceholderCreationEncryptionValue(client_root, pa
 
 	switch s.conf.PlaceholderEncryption {
 	case PlaceholderCreationEncryptionPropertyUnspecified:
-		return 0, fmt.Errorf("placeholder filesystem encryption handling is unspecified in receiver config")
+		return 0, errors.New("placeholder filesystem encryption handling is unspecified in receiver config")
 	case PlaceholderCreationEncryptionPropertyInherit:
 		return zfs.FilesystemPlaceholderCreateEncryptionInherit, nil
 	case PlaceholderCreationEncryptionPropertyOff:

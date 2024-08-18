@@ -240,7 +240,7 @@ func (p *snapProgress) report() (hooksStr string, hooksHadError bool) {
 	lens := make([]int, numCols)
 	for i, e := range hr {
 		rows[i] = make([]string, numCols)
-		rows[i][0] = fmt.Sprintf("%d", i+1)
+		rows[i][0] = strconv.Itoa(i + 1)
 		rows[i][1] = e.Status.String()
 		runTime := "..."
 		if e.Status != hooks.StepPending {

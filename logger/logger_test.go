@@ -1,7 +1,7 @@
 package logger_test
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 	"time"
 
@@ -40,7 +40,7 @@ func TestLogger_Basic(t *testing.T) {
 
 	l.WithField("fieldname", "fieldval").Info("log with field")
 
-	l.WithError(fmt.Errorf("fooerror")).Error("error")
+	l.WithError(errors.New("fooerror")).Error("error")
 
 	t.Log(pretty.Sprint(outlet_arr))
 }

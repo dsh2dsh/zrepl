@@ -3,7 +3,7 @@ package zfs
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 	"regexp"
@@ -44,7 +44,7 @@ func (m *mockBatchDestroy) Destroy(ctx context.Context, args []string) error {
 	if m.commaUnsupported {
 		snapnames = append(snapnames, a)
 		if strings.Contains(a, ",") {
-			return fmt.Errorf("unsupported syntax mock error")
+			return errors.New("unsupported syntax mock error")
 		}
 	} else {
 		snapnames = append(snapnames, strings.Split(a, ",")...)
@@ -74,7 +74,7 @@ func (m *mockBatchDestroy) Destroy(ctx context.Context, args []string) error {
 		}
 	}
 	if m.randomerror != "" && strings.Contains(a, m.randomerror) {
-		return fmt.Errorf("randomerror")
+		return errors.New("randomerror")
 	}
 	return nil
 }

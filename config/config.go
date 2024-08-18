@@ -218,7 +218,7 @@ func (i *PositiveDurationOrManual) UnmarshalYAML(value *yaml.Node) (err error) {
 		i.Manual = true
 		i.Interval = 0
 	case "":
-		return fmt.Errorf("value must not be empty")
+		return errors.New("value must not be empty")
 	default:
 		i.Manual = false
 		i.Interval, err = parsePositiveDuration(s)

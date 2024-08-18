@@ -39,7 +39,7 @@ func sendArgsValidationEncryptedSendOfUnencryptedDatasetForbidden_impl(ctx *plat
 	+   "send er@a snap"
 	`)
 
-	fs := fmt.Sprintf("%s/send er", ctx.RootDataset)
+	fs := ctx.RootDataset + "/send er"
 	props := mustGetFilesystemVersion(ctx, fs+"@a snap")
 
 	sendArgs, err := zfs.ZFSSendArgsUnvalidated{
@@ -95,9 +95,9 @@ func SendArgsValidationResumeTokenEncryptionMismatchForbidden(ctx *platformtest.
 	+	"send er" encrypted
 	`)
 
-	sendFS := fmt.Sprintf("%s/send er", ctx.RootDataset)
-	unencRecvFS := fmt.Sprintf("%s/unenc recv", ctx.RootDataset)
-	encRecvFS := fmt.Sprintf("%s/enc recv", ctx.RootDataset)
+	sendFS := ctx.RootDataset + "/send er"
+	unencRecvFS := ctx.RootDataset + "/unenc recv"
+	encRecvFS := ctx.RootDataset + "/enc recv"
 
 	src := makeDummyDataSnapshots(ctx, sendFS)
 
@@ -170,9 +170,9 @@ func SendArgsValidationResumeTokenDifferentFilesystemForbidden(ctx *platformtest
 	+	"send er2"
 	`)
 
-	sendFS1 := fmt.Sprintf("%s/send er1", ctx.RootDataset)
-	sendFS2 := fmt.Sprintf("%s/send er2", ctx.RootDataset)
-	recvFS := fmt.Sprintf("%s/unenc recv", ctx.RootDataset)
+	sendFS1 := ctx.RootDataset + "/send er1"
+	sendFS2 := ctx.RootDataset + "/send er2"
+	recvFS := ctx.RootDataset + "/unenc recv"
 
 	src1 := makeDummyDataSnapshots(ctx, sendFS1)
 	src2 := makeDummyDataSnapshots(ctx, sendFS2)

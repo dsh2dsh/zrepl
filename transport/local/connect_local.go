@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,13 +18,13 @@ type LocalConnecter struct {
 
 func LocalConnecterFromConfig(in *config.LocalConnect) (*LocalConnecter, error) {
 	if in.ClientIdentity == "" {
-		return nil, fmt.Errorf("ClientIdentity must not be empty")
+		return nil, errors.New("ClientIdentity must not be empty")
 	}
 	if in.ListenerName == "" {
-		return nil, fmt.Errorf("ListenerName must not be empty")
+		return nil, errors.New("ListenerName must not be empty")
 	}
 	if in.DialTimeout < 0 {
-		return nil, fmt.Errorf("DialTimeout must be zero or positive")
+		return nil, errors.New("DialTimeout must be zero or positive")
 	}
 	cn := &LocalConnecter{
 		listenerName:   in.ListenerName,

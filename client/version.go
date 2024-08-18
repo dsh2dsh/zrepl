@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -36,7 +37,7 @@ var VersionCmd = &cli.Subcommand{
 func runVersionCmd() error {
 	args := versionArgs
 	if args.Show != "daemon" && args.Show != "client" && args.Show != "" {
-		return fmt.Errorf("show flag must be 'client' or 'server' or be left empty")
+		return errors.New("show flag must be 'client' or 'server' or be left empty")
 	}
 
 	var clientVersion, daemonVersion *version.ZreplVersionInformation

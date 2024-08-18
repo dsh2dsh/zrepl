@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -79,7 +80,7 @@ func (s *Status) UnmarshalJSON(in []byte) (err error) {
 	}
 	tJSON, ok := m["type"]
 	if !ok {
-		return fmt.Errorf("field 'type' not found")
+		return errors.New("field 'type' not found")
 	}
 	if err := json.Unmarshal(tJSON, &s.Type); err != nil {
 		return err

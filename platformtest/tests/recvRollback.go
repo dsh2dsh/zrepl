@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,8 +21,8 @@ func ReceiveForceRollbackWorksUnencrypted(ctx *platformtest.Context) {
 		+  "sender@1"
 	`)
 
-	rfs := fmt.Sprintf("%s/foo bar", ctx.RootDataset)
-	sfs := fmt.Sprintf("%s/sender", ctx.RootDataset)
+	rfs := ctx.RootDataset + "/foo bar"
+	sfs := ctx.RootDataset + "/sender"
 	sfsSnap1 := sendArgVersion(ctx, sfs, "@1")
 
 	sendArgs, err := zfs.ZFSSendArgsUnvalidated{

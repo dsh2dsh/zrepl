@@ -59,7 +59,7 @@ func (self *JobRender) renderPruningState(p *pruner.Report,
 
 	if p.Error != "" {
 		self.printLn(s.Content.Render(self.indentMultiline(
-			fmt.Sprintf("Error:\n%s", p.Error), s.Indent)))
+			"Error:\n"+p.Error, s.Indent)))
 	}
 
 	if totalItems == 0 || state == pruner.Plan || state == pruner.PlanErr {

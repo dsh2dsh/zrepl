@@ -134,7 +134,7 @@ func doZabsRelease_Common(ctx context.Context, destroy []endpoint.Abstraction) e
 
 	if hadErr {
 		colorErr.Add(color.Bold).Fprintf(os.Stderr, "there were errors in destroying the abstractions")
-		return fmt.Errorf("")
+		return errors.New("")
 	} else {
 		return nil
 	}

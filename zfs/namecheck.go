@@ -2,6 +2,7 @@ package zfs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -55,14 +56,14 @@ var componentValidChar = regexp.MustCompile(`^[0-9a-zA-Z-_\.: ]+$`)
 //	[-_.: ]
 func ComponentNamecheck(datasetPathComponent string) error {
 	if len(datasetPathComponent) == 0 {
-		return fmt.Errorf("path component must not be empty")
+		return errors.New("path component must not be empty")
 	}
 	if len(datasetPathComponent) > MaxDatasetNameLen {
 		return fmt.Errorf("path component must not be longer than %d chars", MaxDatasetNameLen)
 	}
 
 	if !(isASCII(datasetPathComponent)) {
-		return fmt.Errorf("path component must be ASCII")
+		return errors.New("path component must be ASCII")
 	}
 
 	if !componentValidChar.MatchString(datasetPathComponent) {

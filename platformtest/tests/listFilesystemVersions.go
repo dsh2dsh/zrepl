@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -40,7 +39,7 @@ func ListFilesystemVersionsTypeFilteringAndPrefix(t *platformtest.Context) {
 		+  "foo bar/child dataset@ foo with leading whitespace"
 	`)
 
-	fs := fmt.Sprintf("%s/foo bar", t.RootDataset)
+	fs := t.RootDataset + "/foo bar"
 
 	// no options := all types
 	vs, err := zfs.ZFSListFilesystemVersions(t, mustDatasetPath(fs), zfs.ListFilesystemVersionsOptions{})
@@ -79,7 +78,7 @@ func ListFilesystemVersionsZeroExistIsNotAnError(t *platformtest.Context) {
 	+ "foo bar"
 	`)
 
-	fs := fmt.Sprintf("%s/foo bar", t.RootDataset)
+	fs := t.RootDataset + "/foo bar"
 
 	vs, err := zfs.ZFSListFilesystemVersions(t, mustDatasetPath(fs), zfs.ListFilesystemVersionsOptions{})
 	require.Empty(t, vs)
@@ -92,7 +91,7 @@ func ListFilesystemVersionsFilesystemNotExist(t *platformtest.Context) {
 	CREATEROOT
 	`)
 
-	nonexistentFS := fmt.Sprintf("%s/not existent", t.RootDataset)
+	nonexistentFS := t.RootDataset + "/not existent"
 
 	vs, err := zfs.ZFSListFilesystemVersions(t, mustDatasetPath(nonexistentFS), zfs.ListFilesystemVersionsOptions{})
 	require.Empty(t, vs)
@@ -135,7 +134,7 @@ func ListFilesystemVersionsUserrefs(t *platformtest.Context) {
 	+ "foo bar/child datset#snap 4" "foo bar/child datset@snap 4"
 	`)
 
-	fs := fmt.Sprintf("%s/foo bar", t.RootDataset)
+	fs := t.RootDataset + "/foo bar"
 
 	vs, err := zfs.ZFSListFilesystemVersions(t, mustDatasetPath(fs), zfs.ListFilesystemVersionsOptions{})
 	require.NoError(t, err)

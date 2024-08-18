@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -24,7 +24,7 @@ func sendStreamTest(ctx *platformtest.Context) *zfs.SendStream {
 		+  "sender"
 	`)
 
-	fs := fmt.Sprintf("%s/sender", ctx.RootDataset)
+	fs := ctx.RootDataset + "/sender"
 
 	fsmpo, err := zfs.ZFSGetMountpoint(ctx, fs)
 	require.NoError(ctx, err)
@@ -158,7 +158,7 @@ func SendStreamNonEOFReadErrorHandling(ctx *platformtest.Context) {
 	require.Equal(ctx, len(buf), n)
 	require.NoError(ctx, err)
 
-	mockError := fmt.Errorf("taeghaefow4piesahwahjocu7ul5tiachaiLipheijae8ooZ8Pies8shohGee9feeTeirai5aiFeiyaecai4kiaLoh4azeih0tea")
+	mockError := errors.New("taeghaefow4piesahwahjocu7ul5tiachaiLipheijae8ooZ8Pies8shohGee9feeTeirai5aiFeiyaecai4kiaLoh4azeih0tea")
 	mock := &failingReadCloser{err: mockError}
 	orig := sendStream.TestOnly_ReplaceStdoutReader(mock)
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -130,7 +131,7 @@ type RunOp struct {
 func (o *RunOp) Run(ctx context.Context, e Execer) error {
 	cmd := exec.CommandContext(ctx, "/usr/bin/env", "bash", "-c", o.Script)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("ROOTDS=%s", o.RootDS))
+	cmd.Env = append(cmd.Env, "ROOTDS="+o.RootDS)
 	log := GetLog(ctx).WithField("script", o.Script)
 	log.Info("start script")
 	defer log.Info("script done")
@@ -221,7 +222,7 @@ func splitQuotedWords(data []byte, atEOF bool) (advance int, token []byte, err e
 		}
 		return end, data[begin:end], nil
 	}
-	return 0, nil, fmt.Errorf("unexpected")
+	return 0, nil, errors.New("unexpected")
 }
 
 func parseSequence(rootds, stmtsStr string) (stmts []Stmt, err error) {

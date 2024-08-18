@@ -3,6 +3,7 @@ package stream
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -278,7 +279,7 @@ func readStream(reads <-chan readFrameResult, c *heartbeatconn.Conn, receiver io
 			return rserr
 		}
 		if !utf8.Valid(errBuf.Bytes()) {
-			return &ReadStreamError{ReadStreamErrorKindStreamErrTrailerEncoding, fmt.Errorf("source error, but not encoded as UTF-8")}
+			return &ReadStreamError{ReadStreamErrorKindStreamErrTrailerEncoding, errors.New("source error, but not encoded as UTF-8")}
 		}
 		return &ReadStreamError{ReadStreamErrorKindSource, fmt.Errorf("%s", errBuf.String())}
 	}

@@ -37,7 +37,7 @@ func (self *JobRender) renderSnapHeader(r *snapper.PeriodicReport) {
 
 	if r.Error != "" {
 		self.printLn(s.Content.Render(self.indentMultiline(
-			fmt.Sprintf("Error:\n%s", r.Error), s.Indent)))
+			"Error:\n"+r.Error, s.Indent)))
 	}
 }
 
@@ -130,7 +130,7 @@ func (self *JobRender) viewSnapperFsStatus(fs *snapper.ReportFilesystem,
 	sb.WriteString(fmt.Sprintf("%s %s",
 		s.SnapState.Render(state), s.SnapTime.Render(d)))
 	if fs.State != snapper.SnapPending {
-		sb.WriteString(fmt.Sprintf(" @%s", fs.SnapName))
+		sb.WriteString(" @" + fs.SnapName)
 	}
 	if fs.HooksHadError {
 		sb.WriteByte('\n')

@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -69,7 +70,7 @@ func newIPMapEntry(input string, ident string) (*ipMapEntry, error) {
 		// expect full IP, no '*' placeholder expansion
 
 		if strings.Count(ident, "*") != 0 {
-			return nil, fmt.Errorf("non-CIDR matches must not contain '*' placeholder")
+			return nil, errors.New("non-CIDR matches must not contain '*' placeholder")
 		}
 
 		if err := transport.ValidateClientIdentity(ident); err != nil {
@@ -95,7 +96,7 @@ func newIPMapEntry(input string, ident string) (*ipMapEntry, error) {
 	// expect CIDR and '*' placeholder expansion
 
 	if strings.Count(ident, "*") != 1 {
-		err = fmt.Errorf("CIDRs require 1 IP placeholder")
+		err = errors.New("CIDRs require 1 IP placeholder")
 		return nil, fmt.Errorf("invalid client identity %q for IP %q: %w", ident, ip, err)
 	}
 

@@ -3,6 +3,7 @@ package zfs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -60,9 +61,9 @@ func doDestroy(ctx context.Context, reqs []*DestroySnapOp, e destroyer) {
 		// ZFS will generally fail because those are invalid destroy arguments,
 		// but we'd rather apply defensive programming here (doing destroy after all)
 		if req.Filesystem == "" {
-			*req.ErrOut = fmt.Errorf("Filesystem must not be an empty string")
+			*req.ErrOut = errors.New("Filesystem must not be an empty string")
 		} else if req.Name == "" {
-			*req.ErrOut = fmt.Errorf("Name must not be an empty string")
+			*req.ErrOut = errors.New("Name must not be an empty string")
 		} else {
 			validated = append(validated, req)
 		}

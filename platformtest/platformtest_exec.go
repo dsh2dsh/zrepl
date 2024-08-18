@@ -2,6 +2,7 @@ package platformtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 
@@ -39,7 +40,7 @@ func (e *ex) runNoOutput(expectSuccess bool, ctx context.Context, cmd string, ar
 	if expectSuccess && err != nil {
 		return fmt.Errorf("expecting no error, got error: %s\n%s", err, buf.String())
 	} else if !expectSuccess && err == nil {
-		return fmt.Errorf("expecting error, got no error")
+		return errors.New("expecting error, got no error")
 	}
 	return nil
 }

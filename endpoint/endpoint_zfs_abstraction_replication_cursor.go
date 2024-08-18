@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -19,7 +20,7 @@ func replicationCursorBookmarkNameImpl(fs string, guid uint64, jobid string) (st
 	return makeJobAndGuidBookmarkName(replicationCursorBookmarkNamePrefix, fs, guid, jobid)
 }
 
-var ErrV1ReplicationCursor = fmt.Errorf("bookmark name is a v1-replication cursor")
+var ErrV1ReplicationCursor = errors.New("bookmark name is a v1-replication cursor")
 
 // err != nil always means that the bookmark is not a valid replication bookmark
 //

@@ -57,7 +57,7 @@ type RemoteHandlerError struct {
 }
 
 func (e *RemoteHandlerError) Error() string {
-	return fmt.Sprintf("server error: %s", e.msg)
+	return "server error: " + e.msg
 }
 
 type ProtocolError struct {

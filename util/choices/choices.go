@@ -56,7 +56,7 @@ func (c Choices) choicesList(escaped bool) []string {
 }
 
 func (c Choices) Usage() string {
-	return fmt.Sprintf("one of %s", strings.Join(c.choicesList(true), ", "))
+	return "one of " + strings.Join(c.choicesList(true), ", ")
 }
 
 func (c Choices) InputForChoice(v interface{}) (string, error) {

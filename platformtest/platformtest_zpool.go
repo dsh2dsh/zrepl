@@ -83,7 +83,7 @@ func CreateOrReplaceZpool(ctx context.Context, e Execer, args ZpoolCreateArgs) (
 
 	// create the pool
 	err = e.RunExpectSuccessNoOutput(ctx, "zpool", "create", "-f",
-		"-O", fmt.Sprintf("mountpoint=%s", args.Mountpoint),
+		"-O", "mountpoint="+args.Mountpoint,
 		args.PoolName, args.ImagePath,
 	)
 	if err != nil {
@@ -110,9 +110,7 @@ func (p *Zpool) Destroy(ctx context.Context, e Execer) error {
 			runtime.Gosched()
 			continue
 		}
-		if err != nil {
-			return fmt.Errorf("export pool %q: %w", p.args.PoolName, err)
-		}
+		return fmt.Errorf("export pool %q: %w", p.args.PoolName, err)
 	}
 
 	if err := os.Remove(p.args.ImagePath); err != nil {

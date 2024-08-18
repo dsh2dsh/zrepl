@@ -374,7 +374,7 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 	}
 
 	if hardErrs == len(fss) {
-		return time.Time{}, fmt.Errorf(
+		return time.Time{}, errors.New(
 			"hard errors in determining sync point for every matching filesystem")
 	}
 
@@ -405,7 +405,7 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 	return winnerSyncPoint, nil
 }
 
-var findSyncPointFSNoFilesystemVersionsErr = fmt.Errorf("no filesystem versions")
+var findSyncPointFSNoFilesystemVersionsErr = errors.New("no filesystem versions")
 
 func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time,
 	interval time.Duration, prefix string, d *zfs.DatasetPath,

@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/platformtest"
@@ -26,8 +24,8 @@ func ReceiveForceIntoEncryptedErr(ctx *platformtest.Context) {
 		+  "sender@1"
 	`)
 
-	rfs := fmt.Sprintf("%s/foo bar", ctx.RootDataset)
-	sfs := fmt.Sprintf("%s/sender", ctx.RootDataset)
+	rfs := ctx.RootDataset + "/foo bar"
+	sfs := ctx.RootDataset + "/sender"
 	sfsSnap1 := sendArgVersion(ctx, sfs, "@1")
 
 	sendArgs, err := zfs.ZFSSendArgsUnvalidated{

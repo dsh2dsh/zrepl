@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -135,11 +136,11 @@ func (l *LocalListener) Accept(ctx context.Context) (*transport.AuthConn, error)
 
 	transport.GetLogger(ctx).WithField("client_identity", req.clientIdentity).Debug("got connect request")
 	if req.clientIdentity == "" {
-		res := connectResult{nil, fmt.Errorf("client identity must not be empty")}
+		res := connectResult{nil, errors.New("client identity must not be empty")}
 		if err := respondToRequest(req, res); err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("client connected with empty client identity")
+		return nil, errors.New("client connected with empty client identity")
 	}
 
 	transport.GetLogger(ctx).Debug("creating socketpair")
@@ -180,7 +181,7 @@ func (l *LocalListener) Close() error {
 
 func LocalListenerFactoryFromConfig(g *config.Global, in *config.LocalServe) (transport.AuthenticatedListenerFactory, error) {
 	if in.ListenerName == "" {
-		return nil, fmt.Errorf("ListenerName must not be empty")
+		return nil, errors.New("ListenerName must not be empty")
 	}
 	listenerName := in.ListenerName
 	lf := func() (transport.AuthenticatedListener, error) {

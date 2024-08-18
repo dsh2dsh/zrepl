@@ -241,13 +241,11 @@ func (s *jobs) start(ctx context.Context, j job.Job, internal bool) {
 
 	jobName := j.Name()
 	if !internal && IsInternalJobName(jobName) {
-		panic(fmt.Sprintf(
-			"internal job name used for non-internal job %s", jobName))
+		panic("internal job name used for non-internal job " + jobName)
 	} else if internal && !IsInternalJobName(jobName) {
-		panic(fmt.Sprintf(
-			"internal job does not use internal job name %s", jobName))
+		panic("internal job does not use internal job name " + jobName)
 	} else if _, ok := s.jobs[jobName]; ok {
-		panic(fmt.Sprintf("duplicate job name %s", jobName))
+		panic("duplicate job name " + jobName)
 	}
 
 	j.RegisterMetrics(prometheus.DefaultRegisterer)

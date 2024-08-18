@@ -100,7 +100,7 @@ func NewLocalPrunerFactory(in config.PruningLocal, promPruneSecs *prometheus.His
 		if _, ok := r.Ret.(*config.PruneKeepNotReplicated); ok {
 			// rule NotReplicated  for a local pruner doesn't make sense
 			// because no replication happens with that job type
-			return nil, fmt.Errorf("single-site pruner cannot support `not_replicated` keep rule")
+			return nil, errors.New("single-site pruner cannot support `not_replicated` keep rule")
 		}
 	}
 	f := &LocalPrunerFactory{
@@ -421,7 +421,7 @@ tfss_loop:
 			t := fmt.Sprintf("%T", err)
 			pfs.planErr = err
 			pfs.planErrContext = message
-			l.WithField("orig_err_type", t).WithError(err).Error(fmt.Sprintf("%s: plan error, skipping filesystem", message))
+			l.WithField("orig_err_type", t).WithError(err).Error(message + ": plan error, skipping filesystem")
 		}
 
 		tfsvsres, err := target.ListFilesystemVersions(ctx, &pdu.ListFilesystemVersionsReq{Filesystem: tfs.Path})
@@ -483,7 +483,7 @@ tfss_loop:
 			})
 		}
 		if preCursor {
-			pfsPlanErrAndLog(fmt.Errorf("prune target has no snapshot that corresponds to sender replication cursor bookmark"), "")
+			pfsPlanErrAndLog(errors.New("prune target has no snapshot that corresponds to sender replication cursor bookmark"), "")
 			continue tfss_loop
 		}
 

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -40,10 +41,10 @@ var testFilter = &cli.Subcommand{
 
 func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []string) error {
 	if testFilterArgs.job == "" {
-		return fmt.Errorf("must specify --job flag")
+		return errors.New("must specify --job flag")
 	}
 	if !(testFilterArgs.all != (testFilterArgs.input != "")) { // xor
-		return fmt.Errorf("must set one: --all or --input")
+		return errors.New("must set one: --all or --input")
 	}
 
 	conf := subcommand.Config()
@@ -109,7 +110,7 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 	}
 
 	if hadFilterErr {
-		return fmt.Errorf("filter errors occurred")
+		return errors.New("filter errors occurred")
 	}
 	return nil
 }
@@ -158,7 +159,7 @@ func runTestPlaceholder(ctx context.Context, subcommand *cli.Subcommand, args []
 			return err
 		}
 		if dp.Empty() {
-			return fmt.Errorf("must specify --dataset DATASET or --all")
+			return errors.New("must specify --dataset DATASET or --all")
 		}
 		checkDPs = append(checkDPs, dp)
 	}
@@ -201,7 +202,7 @@ var testDecodeResumeToken = &cli.Subcommand{
 
 func runTestDecodeResumeTokenCmd(ctx context.Context, subcommand *cli.Subcommand, args []string) error {
 	if testDecodeResumeTokenArgs.token == "" {
-		return fmt.Errorf("token argument must be specified")
+		return errors.New("token argument must be specified")
 	}
 	token, err := zfs.ParseResumeToken(ctx, testDecodeResumeTokenArgs.token)
 	if err != nil {

@@ -4,7 +4,7 @@ package netadaptor
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 
 	"github.com/dsh2dsh/zrepl/logger"
@@ -53,12 +53,12 @@ func (a Listener) Accept() (net.Conn, error) {
 	select {
 	case a.accepts <- req:
 	case <-a.stop:
-		return nil, fmt.Errorf("already closed") // TODO net.Error
+		return nil, errors.New("already closed") // TODO net.Error
 	}
 
 	res, ok := <-req.callback
 	if !ok {
-		return nil, fmt.Errorf("already closed") // TODO net.Error
+		return nil, errors.New("already closed") // TODO net.Error
 	}
 	return res.conn, res.err
 }

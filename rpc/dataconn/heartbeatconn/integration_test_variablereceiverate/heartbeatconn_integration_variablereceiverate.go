@@ -62,7 +62,7 @@ func orDie(err error) {
 	if err != nil {
 		grepfield := path.Base(os.Args[0])[:10]
 		fmt.Fprintf(os.Stderr, "grepping for %s\n", grepfield)
-		sh := fmt.Sprintf("ss -ntpi | grep -A1 %s", grepfield)
+		sh := "ss -ntpi | grep -A1 " + grepfield
 		cmd := exec.Command("bash", "-c", sh)
 		o, _ := cmd.CombinedOutput()
 		buf := bytes.NewBuffer(o)

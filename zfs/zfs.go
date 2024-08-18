@@ -111,7 +111,7 @@ func (p *DatasetPath) UnmarshalJSON(b []byte) error {
 
 func (p *DatasetPath) Pool() (string, error) {
 	if len(p.comps) < 1 {
-		return "", fmt.Errorf("dataset path does not have a pool component")
+		return "", errors.New("dataset path does not have a pool component")
 	}
 	return p.comps[0], nil
 }
@@ -135,7 +135,7 @@ func NewDatasetPath(s string) (p *DatasetPath, err error) {
 	}
 	p.comps = strings.Split(s, "/")
 	if p.comps[len(p.comps)-1] == "" {
-		err = fmt.Errorf("must not end with a '/'")
+		err = errors.New("must not end with a '/'")
 		return
 	}
 	return
@@ -661,11 +661,11 @@ func ZFSSendArgsSkipValidation(ctx context.Context) context.Context {
 // This function is not pure because GUIDs are checked against the local host's datasets.
 func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsValidated, _ error) {
 	if dp, err := NewDatasetPath(a.FS); err != nil || dp.Length() == 0 {
-		return v, newGenericValidationError(a, fmt.Errorf("`FS` must be a valid non-zero dataset path"))
+		return v, newGenericValidationError(a, errors.New("`FS` must be a valid non-zero dataset path"))
 	}
 
 	if a.To == nil {
-		return v, newGenericValidationError(a, fmt.Errorf("`To` must not be nil"))
+		return v, newGenericValidationError(a, errors.New("`To` must not be nil"))
 	}
 	toVersion, err := a.To.ValidateExistsAndGetVersion(ctx, a.FS)
 	if err != nil {
@@ -917,7 +917,7 @@ func (a ZFSSendArgsUnvalidated) validateEncryptionFlagsCorrespondToResumeToken(c
 
 var zfsSendStderrCaptureMaxSize = envconst.Int("ZREPL_ZFS_SEND_STDERR_MAX_CAPTURE_SIZE", 1<<15)
 
-var ErrEncryptedSendNotSupported = fmt.Errorf("raw sends which are required for encrypted zfs send are not supported")
+var ErrEncryptedSendNotSupported = errors.New("raw sends which are required for encrypted zfs send are not supported")
 
 // if token != "", then send -t token is used
 // otherwise send [-i from] to is used
@@ -1607,7 +1607,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 	if depth != 0 {
 		args = append(args, "-r")
 		if depth != -1 {
-			args = append(args, "-d", fmt.Sprintf("%d", depth))
+			args = append(args, "-d", strconv.Itoa(depth))
 		}
 	}
 	if len(dstypes) > 0 {
@@ -1640,7 +1640,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 			return r == '\t'
 		})
 		if len(fields) != 4 {
-			return nil, fmt.Errorf("zfs get did not return name,property,value,source tuples")
+			return nil, errors.New("zfs get did not return name,property,value,source tuples")
 		}
 		for _, p := range allowedPrefixes {
 			// prefix-match so that SourceAny (= "") works
@@ -1688,11 +1688,11 @@ func zfsGet(ctx context.Context, path string, props []string, allowedSources Pro
 		return &ZFSProperties{make(map[string]PropertyValue)}, nil
 	}
 	if len(propMap) != 1 {
-		return nil, fmt.Errorf("zfs get unexpectedly returned properties for multiple datasets")
+		return nil, errors.New("zfs get unexpectedly returned properties for multiple datasets")
 	}
 	res, ok := propMap[path]
 	if !ok {
-		return nil, fmt.Errorf("zfs get returned properties for a different dataset that requested")
+		return nil, errors.New("zfs get returned properties for a different dataset that requested")
 	}
 	return res, nil
 }
@@ -1845,7 +1845,7 @@ func (e *BookmarkExists) Error() string {
 	)
 }
 
-var ErrBookmarkCloningNotSupported = fmt.Errorf("bookmark cloning feature is not yet supported by ZFS")
+var ErrBookmarkCloningNotSupported = errors.New("bookmark cloning feature is not yet supported by ZFS")
 
 // idempotently create bookmark of the given version v
 //

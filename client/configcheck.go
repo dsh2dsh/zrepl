@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -121,7 +122,7 @@ var ConfigcheckCmd = &cli.Subcommand{
 		wf()
 
 		if hadErr {
-			return fmt.Errorf("config parsing failed")
+			return errors.New("config parsing failed")
 		} else {
 			return nil
 		}

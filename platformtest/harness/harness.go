@@ -47,7 +47,7 @@ func main() {
 	}
 }
 
-var exitWithErr = fmt.Errorf("exit with error")
+var exitWithErr = errors.New("exit with error")
 
 type HarnessArgs struct {
 	CreateArgs            platformtest.ZpoolCreateArgs
@@ -73,14 +73,14 @@ func newInvocation(runFunc tests.Case, id string) *invocation {
 func (i *invocation) String() string {
 	idsuffix := ""
 	if i.idstring != "" {
-		idsuffix = fmt.Sprintf(": %s", i.idstring)
+		idsuffix = ": " + i.idstring
 	}
 	return fmt.Sprintf("%s%s", i.runFunc.String(), idsuffix)
 }
 
 func (i *invocation) RegisterChild(c *invocation) error {
 	if c.idstring == "" {
-		return fmt.Errorf("child must have id string")
+		return errors.New("child must have id string")
 	}
 	if oc := i.children[c.idstring]; oc != nil {
 		return fmt.Errorf("idstring %q is already taken by %s", c.idstring, oc)

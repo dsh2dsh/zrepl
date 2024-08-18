@@ -121,7 +121,7 @@ var (
 	fail = color.New(color.FgRed)
 )
 
-var migrateReplicationCursorSkipSentinel = fmt.Errorf("skipping this filesystem")
+var migrateReplicationCursorSkipSentinel = errors.New("skipping this filesystem")
 
 func doMigrateReplicationCursor(ctx context.Context, sc *cli.Subcommand, args []string) error {
 	if len(args) != 0 {
@@ -133,7 +133,7 @@ func doMigrateReplicationCursor(ctx context.Context, sc *cli.Subcommand, args []
 	if err != nil {
 		fmt.Printf("cannot parse config:\n%s\n\n", err)
 		fmt.Printf("NOTE: this migration was released together with a change in job name requirements.\n")
-		return fmt.Errorf("exiting migration after error")
+		return errors.New("exiting migration after error")
 	}
 
 	v1cursorJobs := make([]job.Job, 0, len(cfg.Jobs))

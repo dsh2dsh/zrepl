@@ -15,7 +15,7 @@ func StepHoldTag(jobid JobID) (string, error) {
 }
 
 func stepHoldTagImpl(jobid string) (string, error) {
-	t := fmt.Sprintf("zrepl_STEP_J_%s", jobid)
+	t := "zrepl_STEP_J_" + jobid
 	if err := zfs.ValidHoldTag(t); err != nil {
 		return "", err
 	}
