@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/creasty/defaults"
+	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 
 	"github.com/dsh2dsh/zrepl/util/datasizeunit"
 	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
-	"github.com/go-playground/validator/v10"
 )
 
 type ParseFlags uint
