@@ -96,7 +96,7 @@ func (c *Conn) sendHeartbeats() {
 					return
 				}
 				debug("send heartbeat")
-				// if the connection is in zombie mode (aka iptables DROP inbetween peers)
+				// if the connection is in zombie mode (aka iptables DROP between peers)
 				// this call or one of its successors will block after filling up the kernel tx buffer
 				err := c.fc.WriteFrame([]byte{}, heartbeat)
 				if err != nil {

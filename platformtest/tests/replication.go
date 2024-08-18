@@ -235,11 +235,11 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 	require.NoError(ctx, err)
 	require.Contains(ctx, holds, expectRjidHoldTag)
 
-	// create artifical stale replication cursors & step holds
+	// create artificial stale replication cursors & step holds
 	createArtificalStaleAbstractions := func(jobId endpoint.JobID) []endpoint.Abstraction {
 		snap2Cursor, err := endpoint.CreateReplicationCursor(ctx, sfs, snap2, jobId) // no shadow
 		require.NoError(ctx, err)
-		// create artifical stale step holds jobId
+		// create artificial stale step holds jobId
 		snap1Hold, err := endpoint.HoldStep(ctx, sfs, snap1, jobId) // no shadow
 		require.NoError(ctx, err)
 		snap2Hold, err := endpoint.HoldStep(ctx, sfs, snap2, jobId) // no shadow

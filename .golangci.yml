@@ -3,7 +3,12 @@ linters:
     - "asciicheck"
     - "bidichk"
     - "copyloopvar"
+    # - "errorlint"
+    # - "gocritic"
+    # - "gofumpt"
     - "goimports"
+    - "makezero"
+    - "misspell"
 
 issues:
   exclude-rules:

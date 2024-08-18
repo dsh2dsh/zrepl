@@ -90,7 +90,7 @@ func TestMultiFrameStreamErrTraileror(t *testing.T) {
 	log := logger.NewStderrDebugLogger()
 	ctx := WithLogger(context.Background(), log)
 
-	longErr := fmt.Errorf("an error that definitley spans more than one frame:\n%s", strings.Repeat("a\n", 1<<4))
+	longErr := fmt.Errorf("an error that definitely spans more than one frame:\n%s", strings.Repeat("a\n", 1<<4))
 
 	stype := uint32(0x23)
 

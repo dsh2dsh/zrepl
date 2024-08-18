@@ -132,7 +132,7 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 		}
 
 		filename := path.Base(p)
-		t.Logf("checking for presence additonal checks for file %q", filename)
+		t.Logf("checking for presence additional checks for file %q", filename)
 		additionalCheck := additionalChecks[filename]
 		if additionalCheck == nil {
 			t.Logf("no additional checks")

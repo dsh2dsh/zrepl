@@ -24,7 +24,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 	sendOpts := in.GetSendOptions()
 	bwlim, err := buildBandwidthLimitConfig(&sendOpts.BandwidthLimit)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build bandwith limit config: %w", err)
+		return nil, fmt.Errorf("cannot build bandwidth limit config: %w", err)
 	}
 
 	sc := &endpoint.SenderConfig{
@@ -70,7 +70,7 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 
 	bwlim, err := buildBandwidthLimitConfig(&recvOpts.BandwidthLimit)
 	if err != nil {
-		return rc, fmt.Errorf("cannot build bandwith limit config: %w", err)
+		return rc, fmt.Errorf("cannot build bandwidth limit config: %w", err)
 	}
 
 	placeholderEncryption, err := endpoint.PlaceholderCreationEncryptionPropertyString(recvOpts.Placeholder.Encryption)

@@ -219,7 +219,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	l := getLogger(ctx)
 
 	// it's a stack, execute until we reach the end of the list (last item in)
-	// or fail inbetween
+	// or fail between
 	l.Info("run pre-edges in configuration order")
 	next := 0
 	for ; next < len(p.pre); next++ {
