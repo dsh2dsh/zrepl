@@ -490,13 +490,36 @@ func (self *JobStatus) headerView() string {
 func (self *JobStatus) renderTitle(sb io.StringWriter) {
 	s := &self.Styles
 	sb.WriteString(s.Title.Render(self.name))
+
+	if self.job != nil {
+		self.renderJobTime(sb)
+	}
+
 	if self.filterState == FilterApplied {
 		sb.WriteString(s.StatusBar.Render(fmt.Sprintf(" %s “%s”",
 			eyes, self.FilterInput.Value())))
 	}
+
 	if self.statusMessage != "" {
 		sb.WriteString(fmt.Sprintf(" %s %s",
 			s.DividerDot, self.statusMessage))
+	}
+}
+
+//nolint:errcheck // I don't expect errors from sb
+func (self *JobStatus) renderJobTime(sb io.StringWriter) {
+	if self.viewport.YOffset < self.render.JobTimeLine() {
+		return
+	}
+
+	s := &self.Styles
+	if d, ok := self.job.Running(); ok {
+		sb.WriteString(" " + runner)
+		sb.WriteString(s.StatusBar.Render(d.Truncate(time.Second).String()))
+	} else if t := self.job.SleepingUntil(); !t.IsZero() {
+		sb.WriteString(" " + sleeping)
+		sb.WriteString(s.StatusBar.Render(
+			time.Until(t).Truncate(time.Second).String()))
 	}
 }
 

@@ -99,6 +99,9 @@ type JobRender struct {
 	job *job.Status
 	b   bytes.Buffer
 
+	lines       int
+	jobTimeLine int
+
 	filterState FilterState
 	filterValue string
 
@@ -117,6 +120,7 @@ func (self *JobRender) Reset() {
 
 func (self *JobRender) View() string {
 	defer self.b.Reset()
+	self.lines = 0
 	self.viewType()
 	switch j := self.job.JobSpecific.(type) {
 	case *job.ActiveSideStatus:
@@ -136,6 +140,8 @@ func (self *JobRender) View() string {
 	return self.b.String()
 }
 
+func (self *JobRender) JobTimeLine() int { return self.jobTimeLine }
+
 func (self *JobRender) viewType() {
 	defer self.sectionEnd()
 	self.printLn("Type: " + string(self.job.Type))
@@ -149,6 +155,7 @@ func (self *JobRender) viewType() {
 		self.printLn(fmt.Sprintf("Sleep until: %s (%s remaining)",
 			t, time.Until(t).Truncate(time.Second)))
 	}
+	self.jobTimeLine = self.lines
 
 	if err := self.job.Error(); err != "" {
 		self.printLn("Last error: " + err)
@@ -166,6 +173,7 @@ func (self *JobRender) printLn(s string) {
 
 func (self *JobRender) newline() {
 	self.b.WriteByte('\n')
+	self.lines++
 }
 
 func (self *JobRender) viewActiveStatus(j *job.ActiveSideStatus) {
