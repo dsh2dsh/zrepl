@@ -75,12 +75,11 @@ func (self *JobRender) renderPrunedDatasets(p *pruner.Report) {
 }
 
 func (self *JobRender) renderPruningProgress(p *pruner.Report) {
-	totalItems := len(p.Pending) + len(p.Completed)
-	pct := float64(len(p.Completed)) / float64(totalItems)
+	expected, completed := p.Progress()
+	pct := float64(completed) / float64(expected)
 	s := &self.Styles
 	self.printLn(s.Content.Render(fmt.Sprintf(
-		"Progress: %s %d/%d",
-		self.bar.ViewAs(pct), len(p.Completed), totalItems)))
+		"Progress: %s %d/%d", self.bar.ViewAs(pct), completed, expected)))
 }
 
 func (self *JobRender) filterPrunerFs(items []prunerFs,

@@ -278,6 +278,19 @@ func (self *Report) Running() (d time.Duration, ok bool) {
 	return d, !self.IsTerminal()
 }
 
+func (self *Report) Progress() (expected, completed uint64) {
+	for i := range self.Pending {
+		fs := &self.Pending[i]
+		expected += uint64(len(fs.DestroyList))
+	}
+	for i := range self.Completed {
+		fs := &self.Completed[i]
+		expected += uint64(len(fs.DestroyList))
+		completed += uint64(len(fs.DestroyList))
+	}
+	return
+}
+
 func (p *Pruner) Report() *Report {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
