@@ -122,6 +122,8 @@ func (s State) sf() state {
 	return m[s]
 }
 
+func (s State) IsTerminal() bool { return s != Planning && s != Snapshotting }
+
 type (
 	updater func(u func(*Periodic)) State
 	state   func(a periodicArgs, u updater) state
@@ -514,6 +516,19 @@ func (self *PeriodicReport) SortProgress() []*ReportFilesystem {
 		return cmp.Compare(a.Path, b.Path)
 	})
 	return self.Progress
+}
+
+func (self *PeriodicReport) IsTerminal() bool { return self.State.IsTerminal() }
+
+func (self *PeriodicReport) CompletionProgress() (expected, completed uint64) {
+	for _, fs := range self.Progress {
+		expected++
+		switch fs.State {
+		case SnapDone, SnapError:
+			completed++
+		}
+	}
+	return
 }
 
 func (s *Periodic) Shutdown() {

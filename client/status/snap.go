@@ -39,6 +39,16 @@ func (self *JobRender) renderSnapHeader(r *snapper.PeriodicReport) {
 		self.printLn(s.Content.Render(self.indentMultiline(
 			"Error:\n"+r.Error, s.Indent)))
 	}
+
+	expected, completed := r.CompletionProgress()
+	if !r.IsTerminal() {
+		pct := float64(completed) / float64(expected)
+		self.printLn(s.Content.Render(fmt.Sprintf(
+			"Progress: %s %d/%d", self.bar.ViewAs(pct), completed, expected)))
+	} else if expected > 0 {
+		self.printLn(s.Content.Render(fmt.Sprintf("Completed: %d/%d",
+			completed, expected)))
+	}
 }
 
 func (self *JobRender) renderSnapper(r *snapper.PeriodicReport) {
