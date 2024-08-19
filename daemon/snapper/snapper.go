@@ -24,6 +24,7 @@ type Snapper interface {
 	Run(ctx context.Context, snapshotsTaken chan<- struct{}, cron *cron.Cron)
 	Report() Report
 	Shutdown()
+	Running() (time.Duration, bool)
 }
 
 type Report struct {

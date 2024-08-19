@@ -68,7 +68,8 @@ type Pruner struct {
 
 	mtx sync.RWMutex
 
-	state State
+	state     State
+	startedAt time.Time
 
 	// State PlanErr
 	err error
@@ -151,7 +152,8 @@ func (f *PrunerFactory) BuildSenderPruner(ctx context.Context, target Target, se
 			f.considerSnapAtCursorReplicated,
 			f.promPruneSecs.WithLabelValues("sender"),
 		},
-		state: Plan,
+		state:     Plan,
+		startedAt: time.Now(),
 	}
 	return p
 }
@@ -167,7 +169,8 @@ func (f *PrunerFactory) BuildReceiverPruner(ctx context.Context, target Target, 
 			false, // senseless here anyways
 			f.promPruneSecs.WithLabelValues("receiver"),
 		},
-		state: Plan,
+		state:     Plan,
+		startedAt: time.Now(),
 	}
 	return p
 }
@@ -183,7 +186,8 @@ func (f *LocalPrunerFactory) BuildLocalPruner(ctx context.Context, target Target
 			false, // considerSnapAtCursorReplicated is not relevant for local pruning
 			f.promPruneSecs.WithLabelValues("local"),
 		},
-		state: Plan,
+		state:     Plan,
+		startedAt: time.Now(),
 	}
 	return p
 }
@@ -237,6 +241,7 @@ func (p *Pruner) prune(args args) {
 
 type Report struct {
 	State              string
+	StartedAt          time.Time
 	Error              string
 	Pending, Completed []FSReport
 }
@@ -258,11 +263,26 @@ func (self *Report) StateString() (State, error) {
 	return StateString(self.State)
 }
 
+func (self *Report) IsTerminal() bool {
+	switch self.State {
+	case "Plan", "Exec":
+		return false
+	}
+	return true
+}
+
+func (self *Report) Running() (d time.Duration, ok bool) {
+	if !self.StartedAt.IsZero() {
+		d = time.Since(self.StartedAt)
+	}
+	return d, !self.IsTerminal()
+}
+
 func (p *Pruner) Report() *Report {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
-	r := Report{State: p.state.String()}
+	r := Report{State: p.state.String(), StartedAt: p.startedAt}
 
 	if p.err != nil {
 		r.Error = p.err.Error()

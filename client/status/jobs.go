@@ -104,7 +104,7 @@ func (self *JobDelegate) descrStyle(m list.Model, item *ListItem,
 		s = listStyles.NormalDesc
 	}
 
-	s = s.MarginLeft(self.maxTitle - len(item.Title()) + 2)
+	s = s.MarginLeft(self.maxTitle - len(item.Title()))
 	return
 }
 

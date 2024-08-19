@@ -66,7 +66,8 @@ const (
 )
 
 type activeSideTasks struct {
-	state ActiveSideState
+	state     ActiveSideState
+	startedAt time.Time
 
 	// valid for state ActiveSideReplicating, ActiveSidePruneSender,
 	// ActiveSidePruneReceiver, ActiveSideDone
@@ -101,6 +102,7 @@ type activeMode interface {
 	ResetConnectBackoff()
 	Shutdown()
 	Wait()
+	Running() (time.Duration, bool)
 }
 
 type modePush struct {
@@ -182,6 +184,13 @@ func (m *modePush) Shutdown() {
 
 func (m *modePush) Wait() {
 	m.wg.Wait()
+}
+
+func (m *modePush) Running() (time.Duration, bool) {
+	if m.snapper.RunPeriodic() {
+		return m.snapper.Running()
+	}
+	return 0, false
 }
 
 func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.JobID) (*modePush, error) {
@@ -293,6 +302,8 @@ func (m *modePull) ResetConnectBackoff() {
 func (m *modePull) Shutdown() {}
 
 func (m *modePull) Wait() {}
+
+func (m *modePull) Running() (time.Duration, bool) { return 0, false }
 
 func modePullFromConfig(_ *config.Global, in *config.PullJob,
 	jobID endpoint.JobID,
@@ -434,7 +445,10 @@ func (j *ActiveSide) Status() *Status {
 	tasks := j.updateTasks(nil)
 	s := &ActiveSideStatus{
 		CronSpec:     j.mode.Cron(),
+		StartedAt:    tasks.startedAt,
 		Snapshotting: j.mode.SnapperReport(),
+
+		state: tasks.state,
 	}
 
 	if id := j.cronId; id > 0 {
@@ -455,15 +469,16 @@ func (j *ActiveSide) Status() *Status {
 	if tasks.prunerReceiver != nil {
 		s.PruningReceiver = tasks.prunerReceiver.Report()
 	}
-
-	s.Snapshotting = j.mode.SnapperReport()
 	return &Status{Type: j.mode.Type(), JobSpecific: s}
 }
 
 type ActiveSideStatus struct {
 	CronSpec   string
 	SleepUntil time.Time
-	err        error
+	StartedAt  time.Time
+
+	state ActiveSideState
+	err   error
 
 	Replication                    *report.Report
 	PruningSender, PruningReceiver *pruner.Report
@@ -473,6 +488,18 @@ type ActiveSideStatus struct {
 func (self *ActiveSideStatus) Error() string {
 	if self.err != nil {
 		return self.err.Error()
+	}
+
+	if snap := self.Snapshotting; snap != nil {
+		if s := snap.Error(); s != "" {
+			return s
+		}
+	}
+
+	if repl := self.Replication; repl != nil {
+		if s := repl.Error(); s != "" {
+			return s
+		}
 	}
 
 	if prun := self.PruningSender; prun != nil {
@@ -496,33 +523,40 @@ func (self *ActiveSideStatus) Error() string {
 			}
 		}
 	}
-
-	if snap := self.Snapshotting; snap != nil {
-		if s := snap.Error(); s != "" {
-			return s
-		}
-	}
-
-	if repl := self.Replication; repl != nil {
-		if s := repl.Error(); s != "" {
-			return s
-		}
-	}
 	return ""
 }
 
-func (self *ActiveSideStatus) Running() (time.Duration, bool) {
-	if repl := self.Replication; repl != nil {
-		if d, ok := repl.Running(); ok {
-			return d, ok
+func (self *ActiveSideStatus) Running() (d time.Duration, ok bool) {
+	if s := self.Snapshotting; s != nil {
+		if d, ok = s.Running(); ok {
+			return
 		}
 	}
-	if snap := self.Snapshotting; snap != nil {
-		if d, ok := snap.Running(); ok {
-			return d, ok
+
+	if r := self.Replication; r != nil {
+		if d == 0 {
+			d, ok = r.Running()
+		} else {
+			_, ok = r.Running()
 		}
 	}
-	return 0, false
+
+	if p := self.PruningSender; p != nil {
+		if d == 0 {
+			d, ok = p.Running()
+		} else {
+			_, ok = p.Running()
+		}
+	}
+
+	if p := self.PruningReceiver; p != nil {
+		if d == 0 {
+			d, ok = p.Running()
+		} else {
+			_, ok = p.Running()
+		}
+	}
+	return
 }
 
 func (self *ActiveSideStatus) Cron() string {
@@ -676,7 +710,7 @@ func (j *ActiveSide) do(ctx context.Context, cnt int) {
 		var repWait driver.WaitFunc
 		j.updateTasks(func(tasks *activeSideTasks) {
 			// reset it
-			*tasks = activeSideTasks{}
+			*tasks = activeSideTasks{startedAt: time.Now()}
 			tasks.replicationReport, repWait = replication.Do(
 				ctx, j.replicationDriverConfig, logic.NewPlanner(
 					j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
@@ -747,4 +781,16 @@ func (j *ActiveSide) wait(l logger.Logger) {
 		defer l.Info("mode job exited")
 	}
 	j.mode.Wait()
+}
+
+func (j *ActiveSide) Running() (d time.Duration, ok bool) {
+	tasks := j.updateTasks(nil)
+	if !tasks.startedAt.IsZero() {
+		d = time.Since(tasks.startedAt)
+	}
+	switch tasks.state {
+	case ActiveSideReplicating, ActiveSidePruneSender, ActiveSidePruneReceiver:
+		ok = true
+	}
+	return
 }

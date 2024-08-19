@@ -149,6 +149,8 @@ func (self *AttemptReport) SortFilesystems() []*FilesystemReport {
 	return self.Filesystems
 }
 
+func (self *AttemptReport) IsTerminal() bool { return self.State.IsTerminal() }
+
 func (self *FilesystemReport) BytesSum() (expected, replicated uint64,
 	containsInvalidSizeEstimates bool,
 ) {
@@ -254,14 +256,12 @@ func (r *Report) Error() string {
 	return ""
 }
 
-func (r *Report) Running() (time.Duration, bool) {
+func (r *Report) Running() (d time.Duration, ok bool) {
 	if len(r.Attempts) > 0 {
 		att := r.Attempts[len(r.Attempts)-1]
-		if att.FinishAt.IsZero() {
-			return time.Since(att.StartAt), true
-		}
+		d, ok = time.Since(att.StartAt), !att.IsTerminal()
 	}
-	return 0, false
+	return
 }
 
 // Returns true in case the AttemptState is a terminal

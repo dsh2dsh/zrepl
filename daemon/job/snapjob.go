@@ -116,11 +116,21 @@ func (self *SnapJobStatus) Error() string {
 	return ""
 }
 
-func (self *SnapJobStatus) Running() (time.Duration, bool) {
-	if snap := self.Snapshotting; snap != nil {
-		return snap.Running()
+func (self *SnapJobStatus) Running() (d time.Duration, ok bool) {
+	if s := self.Snapshotting; s != nil {
+		if d, ok = s.Running(); ok {
+			return
+		}
 	}
-	return 0, false
+
+	if p := self.Pruning; p != nil {
+		if d == 0 {
+			d, ok = p.Running()
+		} else {
+			_, ok = p.Running()
+		}
+	}
+	return
 }
 
 func (self *SnapJobStatus) Cron() string {

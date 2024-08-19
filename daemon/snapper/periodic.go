@@ -439,6 +439,19 @@ func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time,
 	return latest.Creation.Add(interval), nil
 }
 
+func (s *Periodic) Running() (d time.Duration, ok bool) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if !s.lastInvocation.IsZero() {
+		d = time.Since(s.lastInvocation)
+	}
+	switch s.state {
+	case Planning, Snapshotting:
+		ok = true
+	}
+	return
+}
+
 func (s *Periodic) Report() Report {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -466,6 +479,7 @@ func (s *Periodic) Report() Report {
 		SleepUntil: sleepUntil,
 		Error:      errOrEmptyString(err),
 		Progress:   progress,
+		StartedAt:  s.lastInvocation,
 	}
 
 	return Report{Type: TypePeriodic, Periodic: r}
@@ -474,6 +488,8 @@ func (s *Periodic) Report() Report {
 type PeriodicReport struct {
 	CronSpec string
 	State    State
+	// valid in states Planning and Snapshotting
+	StartedAt time.Time
 	// valid in state SyncUp and Waiting
 	SleepUntil time.Time
 	// valid in state Err
@@ -483,14 +499,12 @@ type PeriodicReport struct {
 }
 
 func (self *PeriodicReport) Running() (d time.Duration, ok bool) {
-	if progress := self.Progress; progress != nil {
-		for _, fs := range progress {
-			if fs.State == SnapStarted {
-				if d2 := time.Since(fs.StartAt); d2 > d {
-					d, ok = d2, true
-				}
-			}
-		}
+	if !self.StartedAt.IsZero() {
+		d = time.Since(self.StartedAt)
+	}
+	switch self.State {
+	case Planning, Snapshotting:
+		ok = true
 	}
 	return
 }

@@ -2,6 +2,7 @@ package snapper
 
 import (
 	"context"
+	"time"
 
 	"github.com/dsh2dsh/cron/v3"
 )
@@ -15,6 +16,8 @@ func (s *manual) Run(ctx context.Context, wakeUpCommon chan<- struct{},
 ) {
 	// nothing to do
 }
+
+func (s *manual) Running() (time.Duration, bool) { return 0, false }
 
 func (s *manual) Report() Report {
 	return Report{Type: TypeManual, Manual: &struct{}{}}
