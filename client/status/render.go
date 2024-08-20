@@ -89,6 +89,8 @@ func NewJobRender() *JobRender {
 	return &JobRender{
 		Styles: DefaultRenderStyles(),
 
+		jumpLines: make([]int, 0, 4),
+
 		bar: progress.New(),
 	}
 }
@@ -99,8 +101,9 @@ type JobRender struct {
 	job *job.Status
 	b   bytes.Buffer
 
-	lines       int
+	currentLine int
 	jobTimeLine int
+	jumpLines   []int
 
 	filterState FilterState
 	filterValue string
@@ -115,13 +118,17 @@ func (self *JobRender) SetJob(job *job.Status) {
 
 func (self *JobRender) Reset() {
 	self.job = nil
+	self.jumpLines = self.jumpLines[:0]
 	self.speed.Reset()
 }
 
 func (self *JobRender) View() string {
+	self.currentLine = 0
+	self.jumpLines = self.jumpLines[:0]
+
 	defer self.b.Reset()
-	self.lines = 0
 	self.viewType()
+
 	switch j := self.job.JobSpecific.(type) {
 	case *job.ActiveSideStatus:
 		self.viewActiveStatus(j)
@@ -140,8 +147,6 @@ func (self *JobRender) View() string {
 	return self.b.String()
 }
 
-func (self *JobRender) JobTimeLine() int { return self.jobTimeLine }
-
 func (self *JobRender) viewType() {
 	defer self.sectionEnd()
 	self.printLn("Type: " + string(self.job.Type))
@@ -149,13 +154,13 @@ func (self *JobRender) viewType() {
 		self.printLn("Interval: " + cron)
 	}
 
+	self.jobTimeLine = self.currentLine
 	if t, ok := self.job.Running(); ok {
 		self.printLn("Running: " + t.Truncate(time.Second).String())
 	} else if t := self.job.SleepingUntil(); !t.IsZero() {
 		self.printLn(fmt.Sprintf("Sleep until: %s (%s remaining)",
 			t, time.Until(t).Truncate(time.Second)))
 	}
-	self.jobTimeLine = self.lines
 
 	if err := self.job.Error(); err != "" {
 		self.printLn("Last error: " + err)
@@ -168,13 +173,18 @@ func (self *JobRender) sectionEnd() {
 
 func (self *JobRender) printLn(s string) {
 	self.b.WriteString(s)
+	self.currentLine += strings.Count(s, "\n")
 	self.newline()
 }
 
 func (self *JobRender) newline() {
 	self.b.WriteByte('\n')
-	self.lines++
+	self.currentLine++
 }
+
+func (self *JobRender) JobTimeLine() int { return self.jobTimeLine }
+
+func (self *JobRender) JumpLines() []int { return self.jumpLines }
 
 func (self *JobRender) viewActiveStatus(j *job.ActiveSideStatus) {
 	self.viewReplication(j.Replication)
@@ -186,6 +196,7 @@ func (self *JobRender) viewActiveStatus(j *job.ActiveSideStatus) {
 }
 
 func (self *JobRender) sectionWithTitle(title string) func() {
+	self.jumpLines = append(self.jumpLines, self.currentLine)
 	self.printLn(self.Styles.Title.Render(title))
 	return self.sectionEnd
 }

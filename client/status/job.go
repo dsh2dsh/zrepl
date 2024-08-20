@@ -139,6 +139,10 @@ func DefaultJobKeys() JobKeys {
 			key.WithHelp("enter", "apply filter"),
 		),
 
+		Jump: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "jump")),
+
 		Signal: key.NewBinding(
 			key.WithKeys("s"),
 			key.WithHelp("s", "signal")),
@@ -172,6 +176,7 @@ type JobKeys struct {
 	CancelWhileFiltering key.Binding
 	AcceptWhileFiltering key.Binding
 
+	Jump   key.Binding
 	Back   key.Binding
 	Signal key.Binding
 
@@ -191,6 +196,7 @@ func (self *JobKeys) SetEnabled(v bool) {
 	self.CancelWhileFiltering.SetEnabled(v)
 	self.AcceptWhileFiltering.SetEnabled(v)
 
+	self.Jump.SetEnabled(v)
 	self.Back.SetEnabled(v)
 	self.Signal.SetEnabled(v)
 
@@ -399,6 +405,9 @@ func (self *JobStatus) handleLocalKeys(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, k.ClearFilter):
 		return self.resetFiltering()
 
+	case key.Matches(msg, k.Jump):
+		return self.jumpToNextSection()
+
 	case key.Matches(msg, k.Signal):
 		self.confirmSignal(self.canSignal)
 		return nil
@@ -508,7 +517,7 @@ func (self *JobStatus) renderTitle(sb io.StringWriter) {
 
 //nolint:errcheck // I don't expect errors from sb
 func (self *JobStatus) renderJobTime(sb io.StringWriter) {
-	if self.viewport.YOffset < self.render.JobTimeLine() {
+	if self.viewport.YOffset <= self.render.JobTimeLine() {
 		return
 	}
 
@@ -531,8 +540,9 @@ func (self *JobStatus) footerView() string {
 func (self *JobStatus) paginationView() string {
 	var sb strings.Builder
 	s := &self.Styles
-	sb.WriteString(s.ArabicPagination.Render(fmt.Sprintf("%.f%%",
-		self.viewport.ScrollPercent()*100)))
+	scrollPercent := self.scrollPercent()
+	sb.WriteString(s.ArabicPagination.Render(fmt.Sprintf(
+		"%.f%%", scrollPercent*100)))
 
 	w := s.Pagination.GetHorizontalFrameSize()
 	maxPages := self.width - w - lipgloss.Width(sb.String())
@@ -540,7 +550,7 @@ func (self *JobStatus) paginationView() string {
 
 	activeDotsN := 1
 	if pages > 1 {
-		activeDotsN = int(self.viewport.ScrollPercent() * float64(pages))
+		activeDotsN = int(scrollPercent * float64(pages))
 	}
 
 	if activeDotsN > 0 {
@@ -551,6 +561,15 @@ func (self *JobStatus) paginationView() string {
 		sb.WriteString(strings.Repeat(s.InactivePaginationDot.Render(), n))
 	}
 	return s.Pagination.Render(sb.String())
+}
+
+func (self *JobStatus) scrollPercent() float64 {
+	totalLines := self.viewport.TotalLineCount()
+	height := self.viewport.Height
+	if totalLines <= height {
+		return 1.0
+	}
+	return min(1.0, float64(self.viewport.YOffset)/float64(totalLines-height))
 }
 
 func (self *JobStatus) pages() int {
@@ -576,6 +595,7 @@ func (self *JobStatus) ShortHelp() []key.Binding {
 		self.viewport.KeyMap.Down,
 		self.viewport.KeyMap.Up,
 
+		self.Keys.Jump,
 		self.Keys.Filter,
 		self.Keys.ClearFilter,
 		self.Keys.AcceptWhileFiltering,
@@ -604,14 +624,15 @@ func (self *JobStatus) FullHelp() [][]key.Binding {
 			self.viewport.KeyMap.HalfPageUp,
 		},
 		{
+			self.Keys.Jump,
 			self.Keys.Filter,
 			self.Keys.ClearFilter,
 			self.Keys.AcceptWhileFiltering,
 			self.Keys.CancelWhileFiltering,
 			self.Keys.Signal,
-			self.Keys.Back,
 		},
 		{
+			self.Keys.Back,
 			self.Keys.Quit,
 			self.Keys.CloseFullHelp,
 		},
@@ -636,6 +657,10 @@ func (self *JobStatus) SetJob(name string, job *job.Status) {
 
 func (self *JobStatus) updateContent() {
 	self.viewport.SetContent(strings.TrimRight(self.render.View(), "\n"))
+	if self.filterState != Filtering {
+		self.Keys.Jump.SetEnabled(len(self.render.JumpLines()) > 0 &&
+			self.viewport.TotalLineCount() > self.viewport.VisibleLineCount())
+	}
 }
 
 func (self *JobStatus) Reset() {
@@ -643,6 +668,7 @@ func (self *JobStatus) Reset() {
 	self.canSignal = ""
 	self.render.Reset()
 	self.viewport.SetContent("")
+	self.viewport.SetYOffset(0)
 }
 
 func (self *JobStatus) confirmSignal(name string) {
@@ -718,4 +744,26 @@ func (self *JobStatus) hideStatusMessage(id uint64) {
 	if self.statusId == id {
 		self.statusMessage = ""
 	}
+}
+
+func (self *JobStatus) jumpToNextSection() tea.Cmd {
+	jumpLines := self.render.JumpLines()
+	if len(jumpLines) == 0 ||
+		self.viewport.VisibleLineCount() == self.viewport.TotalLineCount() {
+		return nil
+	} else if self.viewport.AtBottom() {
+		self.viewport.SetYOffset(0)
+		return nil
+	}
+
+	maxLine := self.viewport.TotalLineCount() - self.viewport.Height
+	for i := 0; i < len(jumpLines); i++ {
+		if nextLine := jumpLines[i]; nextLine > self.viewport.YOffset &&
+			nextLine <= maxLine {
+			self.viewport.SetYOffset(nextLine)
+			return nil
+		}
+	}
+	self.viewport.SetYOffset(0)
+	return nil
 }
