@@ -4,9 +4,9 @@ go 1.23
 
 require (
 	github.com/bits-and-blooms/bitset v1.13.0
-	github.com/charmbracelet/bubbles v0.18.0
+	github.com/charmbracelet/bubbles v0.19.0
 	github.com/charmbracelet/bubbletea v0.27.0
-	github.com/charmbracelet/lipgloss v0.12.1
+	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/creasty/defaults v1.8.0
 	github.com/dsh2dsh/cron/v3 v3.0.2
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
@@ -21,7 +21,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/pkg/profile v1.7.0
 	github.com/problame/go-netssh v0.0.0-20201229122201-330ad6c9cc6f
-	github.com/prometheus/client_golang v1.20.0
+	github.com/prometheus/client_golang v1.20.1
 	github.com/sahilm/fuzzy v0.1.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
@@ -73,7 +73,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/onsi/ginkgo v1.10.2 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
