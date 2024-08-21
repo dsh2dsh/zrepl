@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -18,8 +20,10 @@ import (
 )
 
 const (
-	runner   = "\U0001F3C3"
-	sleeping = "\U0001F4A4"
+	defTitle   = "zrepl"
+	rightArrow = "➡"
+	runner     = "\U0001F3C3"
+	sleeping   = "\U0001F4A4"
 )
 
 func DefaultItemStyle() (s ItemStyle) {
@@ -154,6 +158,7 @@ type JobsList struct {
 	Choose key.Binding
 	Style  lipgloss.Style
 
+	status   *daemon.Status
 	items    []ListItem
 	list     *ListModel
 	delegate *JobDelegate
@@ -207,14 +212,16 @@ func (self *JobsList) Loading() tea.Cmd {
 }
 
 func (self *JobsList) SetItems(status *daemon.Status) []ListItem {
+	self.status = status
 	self.items = self.makeJobItems(status.Jobs)
 	self.delegate.SetStatus(status, self.items)
 	self.list.SetItems(self.items)
 
 	l := self.List()
-	l.Title = "zrepl"
 	l.StopSpinner()
 	l.SetShowStatusBar(true)
+
+	self.Refresh()
 	return self.items
 }
 
@@ -246,5 +253,27 @@ func (self *JobsList) Select(name string) {
 			self.selectedCmd(item)
 			return
 		}
+	}
+}
+
+func (self *JobsList) Refresh() {
+	self.updateTitle()
+}
+
+func (self *JobsList) updateTitle() {
+	l := self.List()
+	l.Title = defTitle
+
+	var sb strings.Builder
+	runCnt, withErr := self.status.JobCounts()
+	if runCnt > 0 {
+		sb.WriteString(strconv.Itoa(runCnt) + runner)
+	}
+	if withErr > 0 {
+		sb.WriteString(strconv.Itoa(withErr) + crossMark)
+	}
+
+	if sb.Len() > 0 {
+		l.Title += " " + rightArrow + " " + sb.String()
 	}
 }

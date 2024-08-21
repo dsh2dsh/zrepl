@@ -292,7 +292,8 @@ func filesystemState(state report.FilesystemState) string {
 func (self *JobRender) viewNextStep(nextStep *report.StepReport) string {
 	var next string
 	if nextStep.IsIncremental() {
-		next = fmt.Sprintf("%s ➡ %s", nextStep.Info.From, nextStep.Info.To)
+		next = fmt.Sprintf("%s %s %s",
+			nextStep.Info.From, rightArrow, nextStep.Info.To)
 	} else {
 		next = "full send " + nextStep.Info.To
 	}

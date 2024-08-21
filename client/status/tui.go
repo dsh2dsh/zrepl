@@ -129,6 +129,8 @@ func (self *StatusTUI) handleStatus(s daemon.Status) tea.Cmd {
 		}
 	} else if self.state == stateSelected {
 		self.selected.SetJob(self.jobName, self.job())
+	} else {
+		self.jobs.Refresh()
 	}
 	return self.refreshCmd()
 }
@@ -156,4 +158,5 @@ func (self *StatusTUI) backToJobs() {
 	self.jobName = ""
 	self.selected.Reset()
 	self.state = stateListJobs
+	self.jobs.Refresh()
 }

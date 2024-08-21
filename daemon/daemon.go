@@ -21,7 +21,6 @@ import (
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/endpoint"
 	"github.com/dsh2dsh/zrepl/logger"
-	"github.com/dsh2dsh/zrepl/util/envconst"
 	"github.com/dsh2dsh/zrepl/version"
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
@@ -170,17 +169,6 @@ func (s *jobs) Shutdown() {
 	for _, j := range s.jobs {
 		j.Shutdown()
 	}
-}
-
-type Status struct {
-	Jobs   map[string]*job.Status
-	Global GlobalStatus
-}
-
-type GlobalStatus struct {
-	ZFSCmds   *zfscmd.Report
-	Envconst  *envconst.Report
-	OsEnviron []string
 }
 
 func (s *jobs) status() map[string]*job.Status {
