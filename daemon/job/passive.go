@@ -160,6 +160,16 @@ func (self *PassiveStatus) Error() string {
 	return ""
 }
 
+func (self *PassiveStatus) Steps() (expected, step int) {
+	if s := self.Snapper; s != nil {
+		expected++
+		if _, ok := s.Running(); ok {
+			step++
+		}
+	}
+	return
+}
+
 func (self *PassiveStatus) Running() (time.Duration, bool) {
 	if snap := self.Snapper; snap != nil {
 		return snap.Running()

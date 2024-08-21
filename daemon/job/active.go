@@ -577,6 +577,38 @@ func (self *ActiveSideStatus) SleepingUntil() time.Time {
 	return time.Time{}
 }
 
+func (self *ActiveSideStatus) Steps() (expected, step int) {
+	expected = 3
+	if s := self.Snapshotting; s == nil {
+		expected--
+	} else if d, ok := s.Running(); !ok && d == 0 {
+		expected--
+	}
+
+	if s := self.Snapshotting; s != nil {
+		if d, ok := s.Running(); ok || d > 0 {
+			step++
+		}
+	}
+
+	if r := self.Replication; r != nil {
+		if d, ok := r.Running(); ok || d > 0 {
+			step++
+		}
+	}
+
+	if p := self.PruningSender; p != nil {
+		if d, ok := p.Running(); ok || d > 0 {
+			step++
+		}
+	} else if p := self.PruningReceiver; p != nil {
+		if d, ok := p.Running(); ok || d > 0 {
+			step++
+		}
+	}
+	return
+}
+
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 	pull, ok := j.mode.(*modePull)
 	if !ok {

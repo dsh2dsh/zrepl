@@ -55,6 +55,7 @@ type JobStatus interface {
 	Running() (time.Duration, bool)
 	Cron() string
 	SleepingUntil() time.Time
+	Steps() (expected, step int)
 }
 
 func (s *Status) MarshalJSON() ([]byte, error) {
@@ -143,4 +144,8 @@ func (s *Status) CanSignal() string {
 		return "wakeup"
 	}
 	return ""
+}
+
+func (s *Status) Steps() (expected, step int) {
+	return s.JobSpecific.Steps()
 }

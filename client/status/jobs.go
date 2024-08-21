@@ -27,6 +27,8 @@ const (
 )
 
 func DefaultItemStyle() (s ItemStyle) {
+	verySubduedColor := lipgloss.AdaptiveColor{Light: "#DDDADA", Dark: "#3C3C3C"}
+
 	s.Time = lipgloss.NewStyle().MarginLeft(1).Width(10).Align(lipgloss.Right)
 
 	s.Running = lipgloss.NewStyle().SetString(runner)
@@ -37,6 +39,16 @@ func DefaultItemStyle() (s ItemStyle) {
 		BorderForeground(lipgloss.AdaptiveColor{
 			Light: "#FF0000", Dark: "#FF0000",
 		})
+
+	s.Steps = lipgloss.NewStyle().Width(3).MarginLeft(1)
+
+	s.ActiveStepDot = lipgloss.NewStyle().
+		Foreground(lipgloss.AdaptiveColor{Light: "#847A85", Dark: "#979797"}).
+		SetString(bullet)
+
+	s.InactiveStepDot = lipgloss.NewStyle().
+		Foreground(verySubduedColor).
+		SetString(bullet)
 	return
 }
 
@@ -47,6 +59,10 @@ type ItemStyle struct {
 	Sleeping lipgloss.Style
 
 	WithError lipgloss.Style
+
+	Steps           lipgloss.Style
+	ActiveStepDot   lipgloss.Style
+	InactiveStepDot lipgloss.Style
 }
 
 // --------------------------------------------------
@@ -123,11 +139,14 @@ func (self *JobDelegate) job(item list.Item) (*ListItem, *job.Status) {
 
 func (self *JobDelegate) description(job *job.Status) string {
 	defer self.b.Reset()
-	self.renderTime(job)
+	if self.renderTime(job) {
+		s := &self.Style
+		self.b.WriteString(s.Steps.Render(self.viewSteps(job.Steps())))
+	}
 	return self.b.String()
 }
 
-func (self *JobDelegate) renderTime(job *job.Status) {
+func (self *JobDelegate) renderTime(job *job.Status) (running bool) {
 	s := &self.Style
 	var withError lipgloss.Style
 	if err := job.Error(); err != "" {
@@ -137,11 +156,26 @@ func (self *JobDelegate) renderTime(job *job.Status) {
 	if d, ok := job.Running(); ok {
 		self.b.WriteString(s.Running.Inherit(withError).Render())
 		self.b.WriteString(s.Time.Render(d.Truncate(time.Second).String()))
+		running = true
 	} else if t := job.SleepingUntil(); !t.IsZero() {
 		self.b.WriteString(s.Sleeping.Inherit(withError).Render())
 		self.b.WriteString(s.Time.Render(
 			time.Until(t).Truncate(time.Second).String()))
 	}
+	return
+}
+
+func (self *JobDelegate) viewSteps(expected, step int) string {
+	s := &self.Style
+	if expected == 0 {
+		return ""
+	}
+
+	view := strings.Repeat(s.ActiveStepDot.Render(), step)
+	if n := expected - step; n > 0 {
+		view += strings.Repeat(s.InactiveStepDot.Render(), n)
+	}
+	return view
 }
 
 // --------------------------------------------------

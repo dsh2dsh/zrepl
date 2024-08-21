@@ -147,6 +147,23 @@ func (self *SnapJobStatus) SleepingUntil() time.Time {
 	return time.Time{}
 }
 
+func (self *SnapJobStatus) Steps() (expected, step int) {
+	if s := self.Snapshotting; s != nil {
+		if d, ok := s.Running(); ok || d > 0 {
+			expected++
+			step++
+		}
+	}
+
+	if p := self.Pruning; p != nil {
+		if d, ok := p.Running(); ok || d > 0 {
+			expected++
+			step++
+		}
+	}
+	return
+}
+
 func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 	return nil, false
 }

@@ -136,7 +136,7 @@ func (self *StatusTUI) handleStatus(s daemon.Status) tea.Cmd {
 		}
 		cmd = self.jobs.RefreshTitle()
 	}
-	return tea.Batch(cmd, self.refreshCmd())
+	return tea.Sequence(cmd, self.refreshCmd())
 }
 
 func (self *StatusTUI) job() *job.Status {
