@@ -149,7 +149,7 @@ func (self *JobDelegate) renderTime(job *job.Status) {
 func NewJobsList() *JobsList {
 	jobs := &JobsList{
 		Choose: key.NewBinding(key.WithKeys("enter"),
-			key.WithHelp("enter", "choose")),
+			key.WithHelp("enter", "show")),
 	}
 	return jobs.init()
 }
