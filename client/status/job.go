@@ -540,7 +540,7 @@ func (self *JobStatus) footerView() string {
 func (self *JobStatus) paginationView() string {
 	var sb strings.Builder
 	s := &self.Styles
-	scrollPercent := self.scrollPercent()
+	scrollPercent := self.viewport.ScrollPercent()
 	sb.WriteString(s.ArabicPagination.Render(fmt.Sprintf(
 		"%.f%%", scrollPercent*100)))
 
@@ -561,15 +561,6 @@ func (self *JobStatus) paginationView() string {
 		sb.WriteString(strings.Repeat(s.InactivePaginationDot.Render(), n))
 	}
 	return s.Pagination.Render(sb.String())
-}
-
-func (self *JobStatus) scrollPercent() float64 {
-	totalLines := self.viewport.TotalLineCount()
-	height := self.viewport.Height
-	if totalLines <= height {
-		return 1.0
-	}
-	return min(1.0, float64(self.viewport.YOffset)/float64(totalLines-height))
 }
 
 func (self *JobStatus) pages() int {
