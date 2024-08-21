@@ -57,9 +57,10 @@ func (self *StatusTUI) WithInitialJob(name string) *StatusTUI {
 }
 
 func (self *StatusTUI) Init() tea.Cmd {
-	return tea.Sequence(self.jobs.Loading(), func() tea.Msg {
-		return self.load()
-	})
+	return tea.Sequence(
+		tea.SetWindowTitle(defTitle),
+		self.jobs.Loading(),
+		func() tea.Msg { return self.load() })
 }
 
 func (self *StatusTUI) refreshCmd() tea.Cmd {
@@ -120,19 +121,22 @@ func (self *StatusTUI) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 
 func (self *StatusTUI) handleStatus(s daemon.Status) tea.Cmd {
 	self.status = s
+	var cmd tea.Cmd
+
 	if !self.loaded {
 		self.loaded = true
-		self.jobs.SetItems(&self.status)
+		cmd = self.jobs.SetItems(&self.status)
 		if self.initialJob != "" {
 			self.jobs.Select(self.initialJob)
 			self.initialJob = ""
 		}
-	} else if self.state == stateSelected {
-		self.selected.SetJob(self.jobName, self.job())
 	} else {
-		self.jobs.Refresh()
+		if self.state == stateSelected {
+			self.selected.SetJob(self.jobName, self.job())
+		}
+		cmd = self.jobs.RefreshTitle()
 	}
-	return self.refreshCmd()
+	return tea.Batch(cmd, self.refreshCmd())
 }
 
 func (self *StatusTUI) job() *job.Status {
@@ -158,5 +162,4 @@ func (self *StatusTUI) backToJobs() {
 	self.jobName = ""
 	self.selected.Reset()
 	self.state = stateListJobs
-	self.jobs.Refresh()
 }

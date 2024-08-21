@@ -211,7 +211,7 @@ func (self *JobsList) Loading() tea.Cmd {
 	return self.List().StartSpinner()
 }
 
-func (self *JobsList) SetItems(status *daemon.Status) []ListItem {
+func (self *JobsList) SetItems(status *daemon.Status) tea.Cmd {
 	self.status = status
 	self.items = self.makeJobItems(status.Jobs)
 	self.delegate.SetStatus(status, self.items)
@@ -221,8 +221,7 @@ func (self *JobsList) SetItems(status *daemon.Status) []ListItem {
 	l.StopSpinner()
 	l.SetShowStatusBar(true)
 
-	self.Refresh()
-	return self.items
+	return self.RefreshTitle()
 }
 
 func (self *JobsList) makeJobItems(jobs map[string]*job.Status) []ListItem {
@@ -256,14 +255,7 @@ func (self *JobsList) Select(name string) {
 	}
 }
 
-func (self *JobsList) Refresh() {
-	self.updateTitle()
-}
-
-func (self *JobsList) updateTitle() {
-	l := self.List()
-	l.Title = defTitle
-
+func (self *JobsList) RefreshTitle() tea.Cmd {
 	var sb strings.Builder
 	runCnt, withErr := self.status.JobCounts()
 	if runCnt > 0 {
@@ -273,7 +265,17 @@ func (self *JobsList) updateTitle() {
 		sb.WriteString(strconv.Itoa(withErr) + crossMark)
 	}
 
+	var title string
 	if sb.Len() > 0 {
-		l.Title += " " + rightArrow + " " + sb.String()
+		title += defTitle + " " + rightArrow + " " + sb.String()
+	} else {
+		title = defTitle
 	}
+
+	l := self.List()
+	if l.Title != title {
+		l.Title = title
+		return tea.SetWindowTitle(title)
+	}
+	return nil
 }
