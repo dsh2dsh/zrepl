@@ -98,12 +98,12 @@ jobs:
 			jobs, err := JobsFromConfig(conf, config.ParseFlagsNone)
 
 			if c.valid {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				require.Len(t, jobs, 1)
 				assert.Equal(t, c.jobName, jobs[0].Name())
 			} else {
 				t.Logf("error: %s", err)
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, jobs)
 			}
 		})
@@ -199,7 +199,7 @@ func testSampleConfig_BandwidthLimit(t *testing.T, jobs []Job) {
 		require.True(t, ok, "%T", unlimitedSink)
 
 		max := unlimitedSinkMode.receiverConfig.BandwidthLimit.Max
-		assert.Less(t, max, int64(0), max, "unlimited mode <=> negative value for .Max, see bandwidthlimit.Config")
+		assert.Negative(t, max, max, "unlimited mode <=> negative value for .Max, see bandwidthlimit.Config")
 	}
 }
 
@@ -287,7 +287,7 @@ jobs:
 
 	for _, ts := range tests {
 		t.Run(ts.name, func(t *testing.T) {
-			assert.True(t, (ts.expectError) != (ts.expectOk != nil))
+			assert.NotEqual(t, (ts.expectError), (ts.expectOk != nil))
 
 			cstr := fill(ts.input)
 			t.Logf("testing config:\n%s", cstr)

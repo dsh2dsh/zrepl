@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,7 +31,7 @@ func TestPositiveDurationOrManual(t *testing.T) {
 			input := fmt.Sprintf("\nfieldname: %s\n", tc.Input)
 			err := yaml.Unmarshal([]byte(input), &out)
 			if tc.Result == nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 				t.Logf("%#v", out)
 			} else {
 				assert.Equal(t, *tc.Result, out.FieldName)

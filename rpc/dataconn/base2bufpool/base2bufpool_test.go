@@ -8,7 +8,6 @@ import (
 )
 
 func TestPoolAllocBehavior(t *testing.T) {
-
 	type testcase struct {
 		poolMinShift, poolMaxShift uint
 		behavior                   NoFitBehavior
@@ -70,8 +69,8 @@ func TestPoolAllocBehavior(t *testing.T) {
 				return
 			}
 			buf := pool.Get(tc.get)
-			assert.True(t, uint(len(buf.Bytes())) == tc.get)
-			assert.True(t, int64(len(buf.shiftBuf)) == tc.expShiftBufLen)
+			assert.Equal(t, tc.get, uint(len(buf.Bytes())))
+			assert.Equal(t, tc.expShiftBufLen, int64(len(buf.shiftBuf)))
 		})
 	}
 }

@@ -9,10 +9,10 @@ import (
 	"testing/quick"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnchunker(t *testing.T) {
-
 	buf := bytes.Buffer{}
 	binary.Write(&buf, ChunkHeaderByteOrder, uint32(2))
 	buf.WriteByte(0xca)
@@ -24,14 +24,12 @@ func TestUnchunker(t *testing.T) {
 
 	recv := bytes.Buffer{}
 	n, err := io.Copy(&recv, un)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(2), n)
 	assert.Equal(t, []byte{0xca, 0xfe}, recv.Bytes())
-
 }
 
 func TestChunker(t *testing.T) {
-
 	buf := bytes.Buffer{}
 	buf.WriteByte(0xca)
 	buf.WriteByte(0xfe)
@@ -40,16 +38,13 @@ func TestChunker(t *testing.T) {
 
 	chunked := bytes.Buffer{}
 	n, err := io.Copy(&chunked, &ch)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(4+2+4), n)
 	assert.Equal(t, []byte{0x2, 0x0, 0x0, 0x0, 0xca, 0xfe, 0x0, 0x0, 0x0, 0x0}, chunked.Bytes())
-
 }
 
 func TestUnchunkerUnchunksChunker(t *testing.T) {
-
 	f := func(b []byte) bool {
-
 		buf := bytes.NewBuffer(b)
 		ch := NewChunker(buf)
 		unch := NewUnchunker(&ch)
@@ -70,5 +65,4 @@ func TestUnchunkerUnchunksChunker(t *testing.T) {
 	if err := quick.Check(f, &cfg); err != nil {
 		t.Error(err)
 	}
-
 }

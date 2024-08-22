@@ -25,7 +25,7 @@ func TestHandshakeMessage_Encode(t *testing.T) {
 	t.Logf("enc: %s", enc)
 
 	assert.False(t, strings.ContainsAny(enc[0:10], " "))
-	assert.True(t, enc[10] == ' ')
+	assert.Equal(t, uint8(' '), enc[10])
 
 	var headerlen, protoversion, extensionCount int
 	n, err := fmt.Sscanf(enc, "%010d ZREPL_ZFS_REPLICATION PROTOVERSION=%04d EXTENSIONS=%04d\n",
@@ -46,7 +46,7 @@ func TestHandshakeMessage_Encode_InvalidProtocolVersion(t *testing.T) {
 			ProtocolVersion: pv,
 		}
 		b, err := msg.Encode()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, b)
 	}
 }
@@ -62,9 +62,9 @@ func TestHandshakeMessage_DecodeReader(t *testing.T) {
 
 	out := HandshakeMessage{}
 	err = out.DecodeReader(bytes.NewReader([]byte(enc)), 4*4096)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2342, out.ProtocolVersion)
-	assert.Equal(t, 2, len(out.Extensions))
+	assert.Len(t, out.Extensions, 2)
 	assert.Equal(t, "foo", out.Extensions[0])
 	assert.Equal(t, "bar 2342", out.Extensions[1])
 }
@@ -83,12 +83,12 @@ func TestDoHandshakeVersion_ErrorOnDifferentVersions(t *testing.T) {
 	}()
 	err = DoHandshakeVersion(client, time.Now().Add(2*time.Second), 2)
 	t.Log(err)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "version"))
 
 	srvErr := <-srvErrCh
 	t.Log(srvErr)
-	assert.Error(t, srvErr)
+	require.Error(t, srvErr)
 	assert.True(t, strings.Contains(srvErr.Error(), "version"))
 }
 
@@ -105,6 +105,6 @@ func TestDoHandshakeCurrentVersion(t *testing.T) {
 		srvErrCh <- DoHandshakeVersion(srv, time.Now().Add(2*time.Second), 1)
 	}()
 	err = DoHandshakeVersion(client, time.Now().Add(2*time.Second), 1)
-	assert.Nil(t, err)
-	assert.Nil(t, <-srvErrCh)
+	assert.Nil(t, err)        //nolint:testifylint // I'm not sure
+	assert.Nil(t, <-srvErrCh) //nolint:testifylint // I'm not sure
 }

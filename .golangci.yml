@@ -12,6 +12,7 @@ linters:
     - "nolintlint"
     - "perfsprint"
     - "prealloc"
+    - "testifylint"
 
 linters-settings:
   goconst:

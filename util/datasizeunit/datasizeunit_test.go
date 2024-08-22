@@ -41,11 +41,12 @@ func TestBits(t *testing.T) {
 			var bits Bits
 			err := yaml.Unmarshal([]byte(tc.input), &bits)
 			if tc.expectErr != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Regexp(t, tc.expectErr, err.Error())
 				assert.Zero(t, bits.bits)
 			} else {
 				require.NoError(t, err)
+				//nolint:testifylint // not sure
 				assert.Equal(t, tc.expectRate, bits.bits)
 			}
 		})

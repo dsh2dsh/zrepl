@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilesystemVersion_RelName(t *testing.T) {
-
 	type TestCase struct {
 		In    *FilesystemVersion
 		Out   string
@@ -53,17 +53,14 @@ func TestFilesystemVersion_RelName(t *testing.T) {
 			assert.Equal(t, tc.Out, o)
 		}
 	}
-
 }
 
 func TestFilesystemVersion_ZFSFilesystemVersion(t *testing.T) {
-
 	empty := &FilesystemVersion{}
 	_, err := empty.ZFSFilesystemVersion()
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	dateInvalid := &FilesystemVersion{Creation: "foobar"}
 	_, err = dateInvalid.ZFSFilesystemVersion()
 	assert.Error(t, err)
-
 }

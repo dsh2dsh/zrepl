@@ -286,7 +286,7 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 			Concurrency: 1,
 		})
 		require.NoError(ctx, err)
-		require.Len(ctx, rAbsErrs, 0)
+		require.Empty(ctx, rAbsErrs)
 		ctx.Logf("rAbs=%s", rAbs)
 		ctx.Logf("expectedOjidAbstractions=%s", expectedOjidAbstractions)
 		require.Equal(ctx, len(expectedOjidAbstractions), len(rAbs))
@@ -369,9 +369,9 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 			Concurrency: 1,
 		})
 		require.NoError(ctx, err)
-		require.Len(ctx, rAbsErrs, 0)
+		require.Empty(ctx, rAbsErrs)
 		require.Len(ctx, rAbs, 1)
-		require.Equal(ctx, rAbs[0].GetType(), endpoint.AbstractionLastReceivedHold)
+		require.Equal(ctx, endpoint.AbstractionLastReceivedHold, rAbs[0].GetType())
 		require.Equal(ctx, *rAbs[0].GetJobID(), rjid)
 		require.Equal(ctx, rAbs[0].GetFilesystemVersion().GetGuid(), snap5.GetGuid())
 	}
@@ -440,11 +440,11 @@ func ReplicationIncrementalHandlesFromVersionEqTentativeCursorCorrectly(ctx *pla
 
 	// Ensure that the tentative cursor was used.
 	require.Len(ctx, rep2.Attempts, 1)
-	require.Equal(ctx, rep2.Attempts[0].State, report.AttemptDone)
+	require.Equal(ctx, report.AttemptDone, rep2.Attempts[0].State)
 	require.Len(ctx, rep2.Attempts[0].Filesystems, 1)
 	require.Nil(ctx, rep2.Attempts[0].Filesystems[0].Error())
 	require.Len(ctx, rep2.Attempts[0].Filesystems[0].Steps, 1)
-	require.EqualValues(ctx, rep2.Attempts[0].Filesystems[0].CurrentStep, 1)
+	require.EqualValues(ctx, 1, rep2.Attempts[0].Filesystems[0].CurrentStep)
 	require.Len(ctx, rep2.Attempts[0].Filesystems[0].Steps, 1)
 	require.Equal(ctx, rep2.Attempts[0].Filesystems[0].Steps[0].Info.From, snap1_tentativeCursor.GetFilesystemVersion().RelName())
 
@@ -702,7 +702,7 @@ func ReplicationIncrementalDestroysStepHoldsIffIncrementalStepHoldsAreDisabledBu
 	}
 	rfs := rep.ReceiveSideFilesystem()
 	for i := 0; ; i++ {
-		require.True(ctx, i < 5)
+		require.Less(ctx, i, 5)
 		report := rep.Do(ctx)
 		ctx.Logf("retry run=%v\n%s", i, pretty.Sprint(report))
 		_, err := zfs.ZFSGetFilesystemVersion(ctx, rfs+"@2")
@@ -725,7 +725,7 @@ func ReplicationIncrementalDestroysStepHoldsIffIncrementalStepHoldsAreDisabledBu
 	})
 	require.NoError(ctx, err)
 	require.Empty(ctx, absErrs)
-	require.Len(ctx, abs, 0)
+	require.Empty(ctx, abs)
 
 	// assert that the replication cursor bookmark exists
 	abs, absErrs, err = endpoint.ListAbstractions(ctx, endpoint.ListZFSHoldsAndBookmarksQuery{
@@ -1229,7 +1229,7 @@ func ReplicationPlaceholderEncryption__UnspecifiedLeadsToFailureAtRuntimeWhenCre
 	afs := attempt.Filesystems[0]
 	require.Equal(ctx, childfs, afs.Info.Name)
 
-	require.Equal(ctx, 1, len(afs.Steps))
+	require.Len(ctx, afs.Steps, 1)
 	require.Equal(ctx, 0, afs.CurrentStep)
 
 	require.Equal(ctx, report.FilesystemSteppingErrored, afs.State)
@@ -1367,7 +1367,7 @@ func replicationPlaceholderEncryption__EncryptOnReceiverUseCase__impl(ctx *platf
 	afs := attempt.Filesystems[0]
 	require.Equal(ctx, childfs, afs.Info.Name)
 
-	require.Equal(ctx, 1, len(afs.Steps))
+	require.Len(ctx, afs.Steps, 1)
 
 	rfs := mustDatasetPath(rfsRoot + "/" + childfs)
 	mustGetFilesystemVersion(ctx, rfs.ToString()+"@initial")

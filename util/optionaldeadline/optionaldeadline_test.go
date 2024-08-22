@@ -43,7 +43,7 @@ func TestContextWithOptionalDeadline(t *testing.T) {
 	if !checker.receivedCancellation.IsZero() {
 		t.Fatalf("no enforcement means no cancellation")
 	}
-	require.Nil(t, cctx.Err(), "no error while not cancelled")
+	require.NoError(t, cctx.Err(), "no error while not cancelled")
 	dl, ok := cctx.Deadline()
 	require.False(t, ok)
 	require.Zero(t, dl)

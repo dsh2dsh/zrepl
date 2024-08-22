@@ -34,9 +34,9 @@ func CreateReplicationCursor(ctx *platformtest.Context) {
 	fs := ds.ToString()
 
 	checkCreateCursor := func(createErr error, c endpoint.Abstraction, references zfs.FilesystemVersion) {
-		assert.NoError(ctx, createErr)
+		require.NoError(ctx, createErr)
 		expectName, err := endpoint.ReplicationCursorBookmarkName(fs, references.Guid, jobid)
-		assert.NoError(ctx, err)
+		require.NoError(ctx, err)
 		require.Equal(ctx, expectName, c.GetFilesystemVersion().Name)
 	}
 

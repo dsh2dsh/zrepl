@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseJobAndGuidBookmarkName(t *testing.T) {
-
 	type Case struct {
 		input     string
 		expectErr bool
@@ -41,11 +41,10 @@ func TestParseJobAndGuidBookmarkName(t *testing.T) {
 			if cases[i].expectErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, cases[i].guid, guid)
 				assert.Equal(t, MustMakeJobID(cases[i].jobid), jobid)
 			}
 		})
 	}
-
 }

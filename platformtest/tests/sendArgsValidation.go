@@ -74,7 +74,7 @@ func sendArgsValidationEncryptedSendOfUnencryptedDatasetForbidden_impl(ctx *plat
 	ctx.Logf("send err: %T %s", err, err)
 	validationErr, ok := err.(*zfs.ZFSSendArgsValidationError)
 	require.True(ctx, ok)
-	require.True(ctx, validationErr.What == zfs.ZFSSendArgsEncryptedSendRequestedButFSUnencrypted)
+	require.Equal(ctx, zfs.ZFSSendArgsEncryptedSendRequestedButFSUnencrypted, validationErr.What)
 }
 
 func SendArgsValidationResumeTokenEncryptionMismatchForbidden(ctx *platformtest.Context) {
@@ -128,12 +128,12 @@ func SendArgsValidationResumeTokenEncryptionMismatchForbidden(ctx *platformtest.
 		_, err := maliciousSend.Validate(ctx)
 		validationErr, ok := err.(*zfs.ZFSSendArgsValidationError)
 		require.True(ctx, ok)
-		require.Equal(ctx, validationErr.What, zfs.ZFSSendArgsResumeTokenMismatch)
+		require.Equal(ctx, zfs.ZFSSendArgsResumeTokenMismatch, validationErr.What)
 		ctx.Logf("%s", validationErr)
 
 		mismatchError, ok := validationErr.Msg.(*zfs.ZFSSendArgsResumeTokenMismatchError)
 		require.True(ctx, ok)
-		require.Equal(ctx, mismatchError.What, zfs.ZFSSendArgsResumeTokenMismatchEncryptionNotSet)
+		require.Equal(ctx, zfs.ZFSSendArgsResumeTokenMismatchEncryptionNotSet, mismatchError.What)
 	}
 
 	// threat model: use of a crafted resume token that requests an encrypted send
@@ -147,12 +147,12 @@ func SendArgsValidationResumeTokenEncryptionMismatchForbidden(ctx *platformtest.
 		ctx.Logf("send err: %T %s", err, err)
 		validationErr, ok := err.(*zfs.ZFSSendArgsValidationError)
 		require.True(ctx, ok)
-		require.Equal(ctx, validationErr.What, zfs.ZFSSendArgsResumeTokenMismatch)
+		require.Equal(ctx, zfs.ZFSSendArgsResumeTokenMismatch, validationErr.What)
 		ctx.Logf("%s", validationErr)
 
 		mismatchError, ok := validationErr.Msg.(*zfs.ZFSSendArgsResumeTokenMismatchError)
 		require.True(ctx, ok)
-		require.Equal(ctx, mismatchError.What, zfs.ZFSSendArgsResumeTokenMismatchEncryptionSet)
+		require.Equal(ctx, zfs.ZFSSendArgsResumeTokenMismatchEncryptionSet, mismatchError.What)
 	}
 }
 
@@ -204,12 +204,12 @@ func SendArgsValidationResumeTokenDifferentFilesystemForbidden(ctx *platformtest
 	ctx.Logf("send err: %T %s", err, err)
 	validationErr, ok := err.(*zfs.ZFSSendArgsValidationError)
 	require.True(ctx, ok)
-	require.Equal(ctx, validationErr.What, zfs.ZFSSendArgsResumeTokenMismatch)
+	require.Equal(ctx, zfs.ZFSSendArgsResumeTokenMismatch, validationErr.What)
 	ctx.Logf("%s", validationErr)
 
 	mismatchError, ok := validationErr.Msg.(*zfs.ZFSSendArgsResumeTokenMismatchError)
 	require.True(ctx, ok)
-	require.Equal(ctx, mismatchError.What, zfs.ZFSSendArgsResumeTokenMismatchFilesystem)
+	require.Equal(ctx, zfs.ZFSSendArgsResumeTokenMismatchFilesystem, mismatchError.What)
 }
 
 type sendArgsValidationEndToEndTestOutcome string

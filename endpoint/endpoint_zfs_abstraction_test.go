@@ -200,7 +200,7 @@ func TestCreateTXGRange(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			require.True(t, tc.expectInvalid != (len(tc.expect) > 0), "invalid test config: must either expect invalid or have expectations: %s", tc.name)
+			require.NotEqual(t, tc.expectInvalid, (len(tc.expect) > 0), "invalid test config: must either expect invalid or have expectations: %s", tc.name)
 			require.NotEmpty(t, tc.expectString)
 			assert.Equal(t, tc.expectString, tc.config.String())
 

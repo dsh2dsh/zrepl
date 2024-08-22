@@ -9,20 +9,19 @@ import (
 )
 
 func TestKeepLastN(t *testing.T) {
-
 	o := func(minutes int) time.Time {
 		return time.Unix(123, 0).Add(time.Duration(minutes) * time.Minute)
 	}
 
 	inputs := map[string][]Snapshot{
-		"s1": []Snapshot{
+		"s1": {
 			stubSnap{name: "1", date: o(10)},
 			stubSnap{name: "2", date: o(20)},
 			stubSnap{name: "3", date: o(15)},
 			stubSnap{name: "4", date: o(30)},
 			stubSnap{name: "5", date: o(30)},
 		},
-		"s2": []Snapshot{},
+		"s2": {},
 	}
 
 	tcs := map[string]testCase{
@@ -103,7 +102,7 @@ func TestKeepLastN(t *testing.T) {
 	t.Run("mustBePositive", func(t *testing.T) {
 		var err error
 		_, err = NewKeepLastN(0, "foo")
-		assert.Error(t, err)
+		require.Error(t, err)
 		_, err = NewKeepLastN(-5, "foo")
 		assert.Error(t, err)
 	})
@@ -112,5 +111,4 @@ func TestKeepLastN(t *testing.T) {
 		_, err := NewKeepLastN(23, "")
 		require.NoError(t, err)
 	})
-
 }

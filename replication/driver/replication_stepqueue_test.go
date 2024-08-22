@@ -178,7 +178,7 @@ func TestPqConcurrent(t *testing.T) {
 	t.Logf("inter-quartile-range deviation: %v", iqrDev)
 
 	// each step should have the same "distribution" (=~ "spread")
-	assert.True(t, iqrDev < 0.01)
+	assert.Less(t, iqrDev, 0.01)
 
 	minTimeForAllStepsWithIdxI := sleepTimePerStep.Seconds() * float64(filesystems) / float64(concurrency)
 	t.Logf("minTimeForAllStepsWithIdxI = %11.8f", minTimeForAllStepsWithIdxI)
@@ -192,6 +192,6 @@ func TestPqConcurrent(t *testing.T) {
 		}
 		deltaFromIdeal := idealMean - mean
 		t.Logf("step %02d delta from ideal mean wake time: %11.8f - %11.8f = %11.8f", i, idealMean, mean, deltaFromIdeal)
-		assert.True(t, math.Abs(deltaFromIdeal) < 0.05)
+		assert.Less(t, math.Abs(deltaFromIdeal), 0.05)
 	}
 }

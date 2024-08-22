@@ -111,7 +111,7 @@ func TestSigpipe(t *testing.T) {
 	// => the script is going to exit after 5s
 	// => we should expect a broken pipe error from the copier's perspective
 	t.Logf("copy err = %T: %s", err, err)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "broken pipe"))
 
 	err = cmd.Wait()

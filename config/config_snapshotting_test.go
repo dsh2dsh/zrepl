@@ -104,8 +104,8 @@ jobs:
 	t.Run("hooks", func(t *testing.T) {
 		c = testValidConfig(t, fillSnapshotting(hooks))
 		hs := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingPeriodic).Hooks
-		assert.Equal(t, hs[0].Ret.(*HookCommand).Filesystems["<"], true)
-		assert.Equal(t, hs[1].Ret.(*HookCommand).Filesystems["zroot<"], true)
+		assert.True(t, hs[0].Ret.(*HookCommand).Filesystems["<"])
+		assert.True(t, hs[1].Ret.(*HookCommand).Filesystems["zroot<"])
 	})
 }
 

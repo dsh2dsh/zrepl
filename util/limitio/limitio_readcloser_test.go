@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockRC struct {
@@ -33,7 +34,7 @@ func TestReadCloser(t *testing.T) {
 	limited := ReadCloser(mock, 6)
 	var buf [20]byte
 	n, err := limited.Read(buf[:])
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 6, n)
 	assert.Equal(t, buf[:n], []byte("foobar"))
 	n, err = limited.Read(buf[:])

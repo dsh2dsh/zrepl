@@ -147,7 +147,7 @@ func makeResumeSituation(ctx *platformtest.Context, src dummySnapshotSituation, 
 	situation.recvErr = err
 	ctx.Logf("zfs recv exit with %T %s", err, err)
 
-	require.NotNil(ctx, err)
+	require.Error(ctx, err)
 	resumeErr, ok := err.(*zfs.RecvFailedWithResumeTokenErr)
 	require.True(ctx, ok)
 	situation.recvErrDecoded = resumeErr

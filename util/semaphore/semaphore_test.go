@@ -46,6 +46,6 @@ func TestSemaphore(t *testing.T) {
 
 	waitEnd()
 
-	assert.True(t, acquisitions.beforeT == concurrentSemaphore)
-	assert.True(t, acquisitions.afterT == numGoroutines-concurrentSemaphore)
+	assert.Equal(t, uint32(concurrentSemaphore), acquisitions.beforeT)
+	assert.Equal(t, uint32(numGoroutines-concurrentSemaphore), acquisitions.afterT)
 }

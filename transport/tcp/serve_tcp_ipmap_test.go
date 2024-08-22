@@ -179,8 +179,8 @@ func TestIPMap(t *testing.T) {
 				ipMapEntry, err := newIPMapEntry(input, "test")
 				require.NoError(t, err)
 				ones, bits := ipMapEntry.subnet.Mask.Size()
-				require.Equal(t, bits, net.IPv6len*8, "and we know ipMapEntry always expands its IPs to 16bytes")
-				require.Equal(t, ones, net.IPv6len*8, "test case addresses must be fully specified")
+				require.Equal(t, net.IPv6len*8, bits, "and we know ipMapEntry always expands its IPs to 16bytes")
+				require.Equal(t, net.IPv6len*8, ones, "test case addresses must be fully specified")
 				require.NotNil(t, ipMapEntry)
 				ident, err := m.Get(&net.IPAddr{
 					IP:   ipMapEntry.subnet.IP,
@@ -189,7 +189,7 @@ func TestIPMap(t *testing.T) {
 				if expect.expectNoMapping {
 					assert.Empty(t, ident)
 				} else {
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, expect.expectIdent, ident)
 				}
 			}
@@ -198,5 +198,4 @@ func TestIPMap(t *testing.T) {
 }
 
 func TestPackageNetAssumptions(t *testing.T) {
-
 }

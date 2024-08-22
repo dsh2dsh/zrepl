@@ -7,17 +7,15 @@ import (
 )
 
 func TestNewDatasetPathTree(t *testing.T) {
-
 	r := newDatasetPathTree(toDatasetPath("pool1/foo/bar").comps)
 
 	assert.Equal(t, "pool1", r.Component)
-	assert.True(t, len(r.Children) == 1)
+	assert.Len(t, r.Children, 1)
 	cr := r.Children[0]
 	assert.Equal(t, "foo", cr.Component)
-	assert.True(t, len(cr.Children) == 1)
+	assert.Len(t, cr.Children, 1)
 	ccr := cr.Children[0]
 	assert.Equal(t, "bar", ccr.Component)
-
 }
 
 type visitRecorder struct {
@@ -65,7 +63,6 @@ func expectedDatasetPathVisits(t *testing.T, expected []expectedDatasetPathVisit
 }
 
 func TestDatasetPathForestWalkTopDown(t *testing.T) {
-
 	paths := []*DatasetPath{
 		toDatasetPath("pool1"),
 		toDatasetPath("pool1/foo/bar"),
@@ -90,7 +87,6 @@ func TestDatasetPathForestWalkTopDown(t *testing.T) {
 }
 
 func TestDatasetPathWalkTopDownWorksUnordered(t *testing.T) {
-
 	paths := []*DatasetPath{
 		toDatasetPath("pool1"),
 		toDatasetPath("pool1/foo/bar/looloo"),
@@ -112,5 +108,4 @@ func TestDatasetPathWalkTopDownWorksUnordered(t *testing.T) {
 	}
 
 	expectedDatasetPathVisits(t, expectedVisits, rec.visits)
-
 }

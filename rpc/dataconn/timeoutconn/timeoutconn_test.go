@@ -31,7 +31,7 @@ func TestReadTimeout(t *testing.T) {
 		buf.WriteString("tooktoolong")
 		time.Sleep(500 * time.Millisecond)
 		_, err := io.Copy(a, &buf)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 
 	go func() {
@@ -42,7 +42,7 @@ func TestReadTimeout(t *testing.T) {
 		assert.Equal(t, 0, n)
 		assert.Error(t, err)
 		netErr, ok := err.(net.Error)
-		require.True(t, ok)
+		assert.True(t, ok)
 		assert.True(t, netErr.Timeout())
 	}()
 
@@ -74,7 +74,7 @@ func TestWriteTimeout(t *testing.T) {
 	conn := Wrap(blockConn, 100*time.Millisecond)
 	n, err := conn.Write(buf.Bytes())
 	assert.Equal(t, 0, n)
-	assert.Error(t, err)
+	require.Error(t, err)
 	netErr, ok := err.(net.Error)
 	require.True(t, ok)
 	assert.True(t, netErr.Timeout())
@@ -111,15 +111,15 @@ func TestNoPartialReadsDueToDeadline(t *testing.T) {
 		t.Logf("recv done n=%v err=%v", n, err)
 		t.Logf("buf=%v", buf.Bytes())
 		neterr, ok := err.(net.Error)
-		require.True(t, ok)
+		assert.True(t, ok)
 		assert.True(t, neterr.Timeout())
 
 		assert.Equal(t, int64(10), n)
 		assert.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, buf.Bytes())
 		// 50ms for the second read, 100ms after that one for the deadline
 		// allow for some jitter
-		assert.True(t, readDuration > 140*time.Millisecond)
-		assert.True(t, readDuration < 200*time.Millisecond)
+		assert.Greater(t, readDuration, 140*time.Millisecond)
+		assert.Less(t, readDuration, 200*time.Millisecond)
 	}()
 
 	wg.Wait()
@@ -159,10 +159,10 @@ func TestPartialWriteMockConn(t *testing.T) {
 	begin := time.Now()
 	n, err := mc.Write(buf[:])
 	duration := time.Since(begin)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 5, n)
-	assert.True(t, duration > 100*time.Millisecond)
-	assert.True(t, duration < 150*time.Millisecond)
+	assert.Greater(t, duration, 100*time.Millisecond)
+	assert.Less(t, duration, 150*time.Millisecond)
 }
 
 func TestNoPartialWritesDueToDeadline(t *testing.T) {
@@ -176,7 +176,7 @@ func TestNoPartialWritesDueToDeadline(t *testing.T) {
 	conn := Wrap(blockConn, 100*time.Millisecond)
 	n, err := conn.Write(buf.Bytes())
 	assert.Equal(t, 0, n)
-	assert.Error(t, err)
+	require.Error(t, err)
 	netErr, ok := err.(net.Error)
 	require.True(t, ok)
 	assert.True(t, netErr.Timeout())

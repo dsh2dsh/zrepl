@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/util/chainlock"
 )
@@ -109,16 +110,16 @@ func TestBatchDestroySnaps(t *testing.T) {
 
 		doDestroy(context.TODO(), opsTemplate, mock)
 
-		assert.NoError(t, errs[0])
-		assert.NoError(t, errs[1])
-		assert.NoError(t, errs[2])
-		assert.NoError(t, errs[3])
-		assert.NoError(t, errs[4])
-		assert.Error(t, errs[5], "undestroyable")
-		assert.NoError(t, errs[6])
-		assert.Error(t, errs[7], "randomerror")
-		assert.NoError(t, errs[8])
-		assert.NoError(t, errs[9])
+		require.NoError(t, errs[0])
+		require.NoError(t, errs[1])
+		require.NoError(t, errs[2])
+		require.NoError(t, errs[3])
+		require.NoError(t, errs[4])
+		require.Error(t, errs[5], "undestroyable")
+		require.NoError(t, errs[6])
+		require.Error(t, errs[7], "randomerror")
+		require.NoError(t, errs[8])
+		require.NoError(t, errs[9])
 
 		defer mock.mtx.Lock().Unlock()
 		assert.Equal(
@@ -179,9 +180,9 @@ func TestBatchDestroySnaps(t *testing.T) {
 		assert.NoError(t, errs[2])
 		assert.NoError(t, errs[3])
 		assert.NoError(t, errs[4])
-		assert.Error(t, errs[5], "undestroyable")
-		assert.NoError(t, errs[6])
-		assert.Error(t, errs[7], "randomerror")
+		require.Error(t, errs[5], "undestroyable")
+		require.NoError(t, errs[6])
+		require.Error(t, errs[7], "randomerror")
 		assert.NoError(t, errs[8])
 		assert.NoError(t, errs[9])
 
@@ -217,7 +218,7 @@ func TestBatchDestroySnaps(t *testing.T) {
 		var err error
 		ops := []*DestroySnapOp{{"somefs", "", &err}}
 		doDestroy(context.TODO(), ops, mock)
-		assert.Error(t, err)
+		require.Error(t, err)
 		defer mock.mtx.Lock().Unlock()
 		assert.Empty(t, mock.calls)
 	})
@@ -227,7 +228,7 @@ func TestBatchDestroySnaps(t *testing.T) {
 		var err error
 		ops := []*DestroySnapOp{{"", "fsname", &err}}
 		doDestroy(context.TODO(), ops, mock)
-		assert.Error(t, err)
+		require.Error(t, err)
 		defer mock.mtx.Lock().Unlock()
 		assert.Empty(t, mock.calls)
 	})

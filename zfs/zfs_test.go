@@ -24,7 +24,7 @@ func TestZFSListHandlesProducesZFSErrorOnNonZeroExit(t *testing.T) {
 
 	_, err = ZFSList(ctx, []string{"fictionalprop"}, "nonexistent/dataset")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	zfsError, ok := err.(*ZFSError)
 	assert.True(t, ok)
 	assert.Equal(t, "error: this is a mock\n", string(zfsError.Stderr))
@@ -32,7 +32,7 @@ func TestZFSListHandlesProducesZFSErrorOnNonZeroExit(t *testing.T) {
 
 func TestDatasetPathTrimNPrefixComps(t *testing.T) {
 	p, err := NewDatasetPath("foo/bar/a/b")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	p.TrimNPrefixComps(2)
 	assert.True(t, p.Equal(toDatasetPath("a/b")))
 	p.TrimNPrefixComps((2))
@@ -79,10 +79,10 @@ func TestZFSPropertySource(t *testing.T) {
 				continue // "" is the prefix that matches SourceAny
 			}
 			s, err := parsePropertySource(e)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			t.Logf("s: %x %s", s, s)
 			t.Logf("in: %x %s", tc.in, tc.in)
-			assert.True(t, s&tc.in != 0)
+			assert.NotEqual(t, 0, s&tc.in)
 		}
 
 		// prefix matching

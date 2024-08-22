@@ -36,7 +36,7 @@ func (rtt *resumeTokenTest) Test(t *platformtest.Context) {
 		return
 	}
 	if rtt.ExpectToken != nil {
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.EqualValues(t, rtt.ExpectToken, res)
 		return
 	}

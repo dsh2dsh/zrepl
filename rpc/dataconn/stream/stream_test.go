@@ -115,12 +115,12 @@ func TestMultiFrameStreamErrTraileror(t *testing.T) {
 		}()
 		err := readStream(ch, b, &buf, stype)
 		t.Logf("%s", err)
-		require.NotNil(t, err)
-		assert.True(t, buf.Len() == 0)
-		assert.Equal(t, err.Kind, ReadStreamErrorKindSource)
+		assert.NotNil(t, err)
+		assert.Equal(t, 0, buf.Len())
+		assert.Equal(t, ReadStreamErrorKindSource, err.Kind)
 		receivedErr := err.Err.Error()
 		expectedErr := longErr.Error()
-		assert.True(t, receivedErr == expectedErr) // builtin Equals is too slow
+		assert.Equal(t, expectedErr, receivedErr) // builtin Equals is too slow
 		if receivedErr != expectedErr {
 			t.Logf("lengths: %v %v", len(receivedErr), len(expectedErr))
 		}

@@ -97,7 +97,7 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 	// nothing to do if fully shared history
 	doTest(l("@a,1", "@b,2"), l("@a,1", "@b,2"), func(incpath []*FilesystemVersion, conflict error) {
 		assert.Nil(t, incpath)
-		assert.NotNil(t, conflict)
+		require.Error(t, conflict)
 		_, ok := conflict.(*ConflictMostRecentSnapshotAlreadyPresent)
 		assert.True(t, ok)
 	})
@@ -112,7 +112,7 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 	// no sender snapshots errors: empty receiver
 	doTest(l(), l(), func(incpath []*FilesystemVersion, conflict error) {
 		assert.Nil(t, incpath)
-		assert.NotNil(t, conflict)
+		require.Error(t, conflict)
 		t.Logf("%T", conflict)
 		_, ok := conflict.(*ConflictNoSenderSnapshots)
 		assert.True(t, ok)
@@ -121,7 +121,7 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 	// no sender snapshots errors: snapshots on receiver
 	doTest(l("@a,1"), l(), func(incpath []*FilesystemVersion, conflict error) {
 		assert.Nil(t, incpath)
-		assert.NotNil(t, conflict)
+		require.Error(t, conflict)
 		t.Logf("%T", conflict)
 		_, ok := conflict.(*ConflictNoSenderSnapshots)
 		assert.True(t, ok)
@@ -151,7 +151,7 @@ func TestIncrementalPath_BookmarkSupport(t *testing.T) {
 
 	// test that receive-side bookmarks younger than the most recent common ancestor do not cause a conflict
 	doTest(l("@a,1", "#b,2"), l("@a,1", "@c,3"), func(path []*FilesystemVersion, conflict error) {
-		assert.NoError(t, conflict)
+		require.NoError(t, conflict)
 		require.Len(t, path, 2)
 		assert.Equal(t, l("@a,1")[0], path[0])
 		assert.Equal(t, l("@c,3")[0], path[1])
