@@ -77,7 +77,7 @@ func (r *CommandHookReport) String() string {
 
 	// Make sure environment variables are always
 	// printed in the same order
-	var hookEnvKeys []HookEnvVar
+	hookEnvKeys := make([]HookEnvVar, 0, len(r.Env))
 	for k := range r.Env {
 		hookEnvKeys = append(hookEnvKeys, k)
 	}

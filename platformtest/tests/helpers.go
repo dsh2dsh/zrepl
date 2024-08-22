@@ -156,7 +156,7 @@ func makeResumeSituation(ctx *platformtest.Context, src dummySnapshotSituation, 
 }
 
 func versionRelnamesSorted(versions []zfs.FilesystemVersion) []string {
-	var vstrs []string
+	vstrs := make([]string, 0, len(versions))
 	for _, v := range versions {
 		vstrs = append(vstrs, v.RelName())
 	}
@@ -165,7 +165,7 @@ func versionRelnamesSorted(versions []zfs.FilesystemVersion) []string {
 }
 
 func datasetToStringSortedTrimPrefix(prefix *zfs.DatasetPath, paths []*zfs.DatasetPath) []string {
-	var pstrs []string
+	pstrs := make([]string, 0, len(paths))
 	for _, p := range paths {
 		trimmed := p.Copy()
 		trimmed.TrimPrefix(prefix)

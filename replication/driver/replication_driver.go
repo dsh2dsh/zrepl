@@ -496,7 +496,7 @@ func (f *fs) debug(format string, args ...interface{}) {
 
 // wake up children that watch for f.{planning.{err,done},planned.{step,stepErr}}
 func (f *fs) initialRepOrdWakeupChildren() {
-	var children []string
+	children := make([]string, 0, len(f.initialRepOrd.children))
 	for _, c := range f.initialRepOrd.children {
 		// no locking required, c.fs does not change
 		children = append(children, c.fs.ReportInfo().Name)
@@ -603,7 +603,7 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 
 	// wait for parents' initial replication
 	f.blockedOn = report.FsBlockedOnParentInitialRepl
-	var parents []string
+	parents := make([]string, 0, len(f.initialRepOrd.parents))
 	for _, p := range f.initialRepOrd.parents {
 		parents = append(parents, p.fs.ReportInfo().Name)
 	}

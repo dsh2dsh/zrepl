@@ -107,7 +107,8 @@ type Plan struct {
 }
 
 func NewPlan(hooks *List, phase Phase, cb *CallbackHook, extra Env) (*Plan, error) {
-	var pre, post []*Step
+	pre := make([]*Step, 0, len(*hooks))
+	post := make([]*Step, 0, len(*hooks))
 	// TODO sanity check unique name of hook?
 	for _, hook := range *hooks {
 		state := make(map[interface{}]interface{})

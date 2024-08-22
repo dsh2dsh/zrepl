@@ -19,7 +19,7 @@ type ActiveCommand struct {
 func GetReport() *Report {
 	active.mtx.RLock()
 	defer active.mtx.RUnlock()
-	var activeCommands []ActiveCommand
+	activeCommands := make([]ActiveCommand, 0, len(active.cmds))
 	for c := range active.cmds {
 		c.mtx.RLock()
 		activeCommands = append(activeCommands, ActiveCommand{

@@ -159,7 +159,7 @@ func ListFilesystemVersionsUserrefs(t *platformtest.Context) {
 		return strings.Compare(vs[i].RelName(), vs[j].RelName()) < 0
 	})
 
-	var expectRelNames []string
+	expectRelNames := make([]string, 0, len(expect))
 	for _, e := range expect {
 		expectRelNames = append(expectRelNames, e.relName)
 	}

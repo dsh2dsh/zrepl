@@ -11,6 +11,7 @@ linters:
     - "misspell"
     - "nolintlint"
     - "perfsprint"
+    - "prealloc"
 
 linters-settings:
   goconst:

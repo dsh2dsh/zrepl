@@ -36,7 +36,7 @@ var (
 )
 
 func (s VersionTypeSet) zfsListTFlagRepr() string {
-	var types []string
+	types := make([]string, 0, len(s))
 	for t := range s {
 		types = append(types, t.String())
 	}

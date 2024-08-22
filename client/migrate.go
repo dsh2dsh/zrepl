@@ -63,7 +63,7 @@ func doMigratePlaceholder0_1(ctx context.Context, sc *cli.Subcommand, args []str
 		rootFS  *zfs.DatasetPath
 		fss     []*zfs.DatasetPath
 	}
-	var wis []workItem
+	var wis []workItem //nolint:prealloc // not needed
 	for i, j := range cfg.Jobs {
 		var rfsS string
 		switch job := j.Ret.(type) {
