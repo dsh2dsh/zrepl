@@ -609,6 +609,35 @@ func (self *ActiveSideStatus) Steps() (expected, step int) {
 	return
 }
 
+func (self *ActiveSideStatus) Progress() (expected, completed uint64) {
+	if s := self.Snapshotting; s != nil {
+		if _, ok := s.Running(); ok {
+			return s.Progress()
+		}
+	}
+
+	if r := self.Replication; r != nil {
+		if _, ok := r.Running(); ok {
+			return r.Progress()
+		}
+	}
+
+	if p := self.PruningSender; p != nil {
+		if _, ok := p.Running(); ok {
+			expected, completed = p.Progress()
+		}
+	}
+
+	if p := self.PruningReceiver; p != nil {
+		if _, ok := p.Running(); ok {
+			expected2, completed2 := p.Progress()
+			expected += expected2
+			completed += completed2
+		}
+	}
+	return
+}
+
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 	pull, ok := j.mode.(*modePull)
 	if !ok {

@@ -148,20 +148,40 @@ func (self *SnapJobStatus) SleepingUntil() time.Time {
 }
 
 func (self *SnapJobStatus) Steps() (expected, step int) {
+	expected = 2
+	if s := self.Snapshotting; s == nil {
+		expected--
+	} else if d, ok := s.Running(); !ok && d == 0 {
+		expected--
+	}
+
 	if s := self.Snapshotting; s != nil {
 		if d, ok := s.Running(); ok || d > 0 {
-			expected++
 			step++
 		}
 	}
 
 	if p := self.Pruning; p != nil {
 		if d, ok := p.Running(); ok || d > 0 {
-			expected++
 			step++
 		}
 	}
 	return
+}
+
+func (self *SnapJobStatus) Progress() (uint64, uint64) {
+	if s := self.Snapshotting; s != nil {
+		if _, ok := s.Running(); ok {
+			return s.Progress()
+		}
+	}
+
+	if p := self.Pruning; p != nil {
+		if _, ok := p.Running(); ok {
+			return p.Progress()
+		}
+	}
+	return 0, 0
 }
 
 func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {

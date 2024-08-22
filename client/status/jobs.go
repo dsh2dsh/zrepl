@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -49,6 +50,8 @@ func DefaultItemStyle() (s ItemStyle) {
 	s.InactiveStepDot = lipgloss.NewStyle().
 		Foreground(verySubduedColor).
 		SetString(bullet)
+
+	s.Bar = lipgloss.NewStyle().MarginLeft(1)
 	return
 }
 
@@ -63,6 +66,8 @@ type ItemStyle struct {
 	Steps           lipgloss.Style
 	ActiveStepDot   lipgloss.Style
 	InactiveStepDot lipgloss.Style
+
+	Bar lipgloss.Style
 }
 
 // --------------------------------------------------
@@ -71,6 +76,8 @@ func NewJobDelegate() *JobDelegate {
 	return &JobDelegate{
 		DefaultDelegate: list.NewDefaultDelegate(),
 		Style:           DefaultItemStyle(),
+
+		bar: progress.New(),
 	}
 }
 
@@ -83,6 +90,7 @@ type JobDelegate struct {
 	status *daemon.Status
 
 	maxTitle int
+	bar      progress.Model
 }
 
 func (self *JobDelegate) SetStatus(s *daemon.Status, items []ListItem) {
@@ -141,7 +149,8 @@ func (self *JobDelegate) description(job *job.Status) string {
 	defer self.b.Reset()
 	if self.renderTime(job) {
 		s := &self.Style
-		self.b.WriteString(s.Steps.Render(self.viewSteps(job.Steps())))
+		self.b.WriteString(s.Steps.Render(self.viewSteps(job)))
+		self.renderProgressBar(job)
 	}
 	return self.b.String()
 }
@@ -165,17 +174,27 @@ func (self *JobDelegate) renderTime(job *job.Status) (running bool) {
 	return
 }
 
-func (self *JobDelegate) viewSteps(expected, step int) string {
-	s := &self.Style
+func (self *JobDelegate) viewSteps(job *job.Status) string {
+	expected, step := job.Steps()
 	if expected == 0 {
 		return ""
 	}
 
+	s := &self.Style
 	view := strings.Repeat(s.ActiveStepDot.Render(), step)
 	if n := expected - step; n > 0 {
 		view += strings.Repeat(s.InactiveStepDot.Render(), n)
 	}
 	return view
+}
+
+func (self *JobDelegate) renderProgressBar(job *job.Status) {
+	expected, completed := job.Progress()
+	if expected == 0 || completed == 0 {
+		return
+	}
+	pct := float64(completed) / float64(expected)
+	self.b.WriteString(self.Style.Bar.Render(self.bar.ViewAs(pct)))
 }
 
 // --------------------------------------------------

@@ -68,6 +68,13 @@ func (self *Report) SleepingUntil() time.Time {
 	return time.Time{}
 }
 
+func (self *Report) Progress() (uint64, uint64) {
+	if p := self.Periodic; p != nil {
+		return p.CompletionProgress()
+	}
+	return 0, 0
+}
+
 func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingEnum) (Snapper, error) {
 	switch v := in.Ret.(type) {
 	case *config.SnapshottingPeriodic:

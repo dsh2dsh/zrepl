@@ -264,6 +264,15 @@ func (r *Report) Running() (d time.Duration, ok bool) {
 	return
 }
 
+func (r *Report) Progress() (uint64, uint64) {
+	if len(r.Attempts) > 0 {
+		att := r.Attempts[len(r.Attempts)-1]
+		expected, replicated, _ := att.BytesSum()
+		return expected, replicated
+	}
+	return 0, 0
+}
+
 // Returns true in case the AttemptState is a terminal
 // state(AttemptPlanningError, AttemptFanOutError, AttemptDone)
 func (a AttemptState) IsTerminal() bool {

@@ -160,16 +160,6 @@ func (self *PassiveStatus) Error() string {
 	return ""
 }
 
-func (self *PassiveStatus) Steps() (expected, step int) {
-	if s := self.Snapper; s != nil {
-		expected++
-		if _, ok := s.Running(); ok {
-			step++
-		}
-	}
-	return
-}
-
 func (self *PassiveStatus) Running() (time.Duration, bool) {
 	if snap := self.Snapper; snap != nil {
 		return snap.Running()
@@ -189,6 +179,25 @@ func (self *PassiveStatus) SleepingUntil() time.Time {
 		return snap.SleepingUntil()
 	}
 	return time.Time{}
+}
+
+func (self *PassiveStatus) Steps() (expected, step int) {
+	if s := self.Snapper; s != nil {
+		expected++
+		if _, ok := s.Running(); ok {
+			step++
+		}
+	}
+	return
+}
+
+func (self *PassiveStatus) Progress() (uint64, uint64) {
+	if s := self.Snapper; s != nil {
+		if _, ok := s.Running(); ok {
+			return s.Progress()
+		}
+	}
+	return 0, 0
 }
 
 func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
