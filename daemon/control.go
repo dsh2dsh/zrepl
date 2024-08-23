@@ -156,11 +156,12 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 		if err := server.Shutdown(context.Background()); err != nil {
 			j.log.WithError(err).Error("cannot shutdown server")
 		}
-	case err = <-served:
+	case err := <-served:
 		if err != nil {
 			j.log.WithError(err).Error("error serving")
 		}
 	}
+	<-served
 
 	j.log.Info("waiting for pprof server exit")
 	j.pprofServer.Wait()
