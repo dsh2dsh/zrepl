@@ -25,6 +25,11 @@ import (
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
+const (
+	jobNamePrometheus = "_prometheus"
+	jobNameControl    = "_control"
+)
+
 func Run(ctx context.Context, conf *config.Config) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -103,7 +108,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	log.Info("starting daemon")
 
 	// start regular jobs
-	jobs.startJobsWithCron(ctx, confJobs, false)
+	jobs.startJobsWithCron(ctx, confJobs)
 
 	wait := jobs.wait()
 	select {
@@ -122,8 +127,6 @@ type jobs struct {
 	cron *cron.Cron
 	log  logger.Logger
 
-	// m protects all fields below it
-	m       sync.RWMutex
 	wakeups map[string]wakeup.Func // by Job.Name
 	resets  map[string]reset.Func  // by Job.Name
 	jobs    map[string]job.Job
@@ -172,9 +175,6 @@ func (s *jobs) Shutdown() {
 }
 
 func (s *jobs) status() map[string]*job.Status {
-	s.m.RLock()
-	defer s.m.RUnlock()
-
 	ret := make(map[string]*job.Status, len(s.jobs))
 	for name, j := range s.jobs {
 		ret[name] = j.Status()
@@ -183,9 +183,6 @@ func (s *jobs) status() map[string]*job.Status {
 }
 
 func (s *jobs) wakeup(job string) error {
-	s.m.RLock()
-	defer s.m.RUnlock()
-
 	wu, ok := s.wakeups[job]
 	if !ok {
 		return fmt.Errorf("Job %s does not exist", job)
@@ -194,9 +191,6 @@ func (s *jobs) wakeup(job string) error {
 }
 
 func (s *jobs) reset(job string) error {
-	s.m.RLock()
-	defer s.m.RUnlock()
-
 	wu, ok := s.resets[job]
 	if !ok {
 		return fmt.Errorf("Job %s does not exist", job)
@@ -204,29 +198,19 @@ func (s *jobs) reset(job string) error {
 	return wu()
 }
 
-func (s *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job,
-	internal bool,
-) {
+func (s *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
 	s.cron.Start()
 	for _, j := range confJobs {
-		s.start(ctx, j, internal)
+		s.start(ctx, j, false)
 	}
 	s.log.WithField("count", len(s.jobs)).Info("started jobs")
 }
-
-const (
-	jobNamePrometheus = "_prometheus"
-	jobNameControl    = "_control"
-)
 
 func IsInternalJobName(s string) bool {
 	return strings.HasPrefix(s, "_")
 }
 
 func (s *jobs) start(ctx context.Context, j job.Job, internal bool) {
-	s.m.Lock()
-	defer s.m.Unlock()
-
 	jobName := j.Name()
 	if !internal && IsInternalJobName(jobName) {
 		panic("internal job name used for non-internal job " + jobName)
