@@ -923,7 +923,8 @@ var ErrEncryptedSendNotSupported = errors.New("raw sends which are required for 
 // otherwise send [-i from] to is used
 // (if from is "" a full ZFS send is done)
 //
-// Returns ErrEncryptedSendNotSupported if encrypted send is requested but not supported by CLI
+// Returns ErrEncryptedSendNotSupported if encrypted send is requested but not
+// supported by CLI.
 func ZFSSend(
 	ctx context.Context, sendArgs ZFSSendArgsValidated, pipeCmds ...[]string,
 ) (*SendStream, error) {
@@ -933,13 +934,10 @@ func ZFSSend(
 	// pre-validation of sendArgs for plain ErrEncryptedSendNotSupported error
 	// we tie BackupProperties (send -b) and SendRaw (-w, same as with Encrypted) to this
 	// since these were released together.
-	if sendArgs.Encrypted.B || sendArgs.Raw || sendArgs.BackupProperties {
-		encryptionSupported, err := EncryptionCLISupported(ctx)
-		if err != nil {
+	if sendArgs.Encrypted.B {
+		if encryptionSupported, err := EncryptionCLISupported(ctx); err != nil {
 			return nil, fmt.Errorf("cannot determine CLI native encryption support: %w", err)
-		}
-
-		if !encryptionSupported {
+		} else if !encryptionSupported {
 			return nil, ErrEncryptedSendNotSupported
 		}
 	}
