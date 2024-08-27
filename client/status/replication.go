@@ -175,7 +175,7 @@ func (self *JobRender) renderAttemptProgress(expected, replicated uint64,
 		humanizeFormat(replicated, true, "%s %sB"),
 		humanizeFormat(expected, true, "%s %sB"),
 		humanizeFormat(uint64(bps), true, "%s %sB/s"))
-	if bps > 0 {
+	if bps > 0 && replicated < expected {
 		eta := time.Duration(
 			(float64(expected)-float64(replicated))/float64(bps)) * time.Second
 		fmt.Fprintf(&sb, " (%s remaining)", humanizeDuration(eta))
