@@ -14,23 +14,23 @@ import (
 // (Not all errors we observe at this layer) are actual errors in higher-level layers)
 
 func startPreLogging(c *Cmd, _ time.Time) {
-	c.log().Debug("starting command")
+	c.logWithCmd().Debug("starting command")
 }
 
 func startPostLogging(c *Cmd, err error, _ time.Time) {
 	if err == nil {
-		c.log().Info("started command")
+		c.log().Info("\"" + c.String() + "\"")
 	} else {
-		c.log().WithError(err).Error("cannot start command")
+		c.logWithCmd().WithError(err).Error("cannot start command")
 	}
 }
 
 func waitPreLogging(c *Cmd, _ time.Time) {
-	c.log().Debug("start waiting")
+	c.logWithCmd().Debug("start waiting")
 }
 
 func waitPostLogging(c *Cmd, err error, debug bool) {
-	log := c.log().
+	log := c.logWithCmd().
 		WithField("total_time_s", c.usage.total_secs).
 		WithField("systemtime_s", c.usage.system_secs).
 		WithField("usertime_s", c.usage.user_secs)
