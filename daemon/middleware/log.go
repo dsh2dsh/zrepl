@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,34 +14,59 @@ type PromControl struct {
 	RequestFinished *prometheus.HistogramVec
 }
 
-func genRequestId() uint64 {
-	return atomic.AddUint64(&nextRequestId, 1)
+func RequestLogger(log logger.Logger, prom *PromControl, opts ...loggerOption,
+) Middleware {
+	l := &requestLogger{
+		log:  log,
+		prom: prom,
+
+		completedLevel: logger.Debug,
+	}
+
+	for _, fn := range opts {
+		fn(l)
+	}
+	return l.middleware
 }
 
-var nextRequestId uint64
+type loggerOption func(l *requestLogger)
 
-func RequestLogger(log logger.Logger, prom *PromControl) Middleware {
-	return func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			log = log.WithField("request_id", genRequestId())
-			msg := "\"" + r.Method + " " + r.URL.String() + "\""
-			log.Info(msg)
+func WithCompletedInfo() loggerOption {
+	return func(self *requestLogger) { self.completedLevel = logger.Info }
+}
 
-			prom.RequestBegin.WithLabelValues(r.URL.Path).Inc()
-			defer prometheus.
-				NewTimer(prom.RequestFinished.WithLabelValues(r.URL.Path)).
-				ObserveDuration()
+type requestLogger struct {
+	log  logger.Logger
+	prom *PromControl
 
-			if next == nil {
-				log.WithField("method", r.Method).WithField("url", r.URL).
-					Error("no next handler configured")
-				return
-			}
+	completedLevel logger.Level
+}
 
-			t := time.Now()
-			next.ServeHTTP(w, r)
-			log.WithField("duration", time.Since(t)).Info(msg)
+func (self *requestLogger) middleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		log := self.log
+		if requestId := GetRequestId(r.Context()); requestId != "" {
+			log = log.WithField("rid", requestId)
 		}
-		return http.HandlerFunc(fn)
+
+		methodURL := r.Method + " " + r.URL.String()
+		log.Info("\"" + methodURL + "\"")
+		log = log.WithField("req", methodURL)
+
+		self.prom.RequestBegin.WithLabelValues(r.URL.Path).Inc()
+		defer prometheus.
+			NewTimer(self.prom.RequestFinished.WithLabelValues(r.URL.Path)).
+			ObserveDuration()
+
+		if next == nil {
+			log.Error("no next handler configured")
+			return
+		}
+
+		t := time.Now()
+		next.ServeHTTP(w, r)
+		log.WithField("duration", time.Since(t)).
+			Log(self.completedLevel, "request completed")
 	}
+	return http.HandlerFunc(fn)
 }

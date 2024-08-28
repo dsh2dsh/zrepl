@@ -14,16 +14,11 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/util/circlog"
 )
-
-func genCommandId() uint64 { return atomic.AddUint64(&nextCommandId, 1) }
-
-var nextCommandId uint64
 
 func CommandContext(ctx context.Context, name string, args ...string) *Cmd {
 	return New(ctx).WithCommand(name, args)
@@ -45,8 +40,6 @@ type Cmd struct {
 	stdoutStderr []byte
 	logError     bool
 
-	id        uint64
-	logger    Logger
 	cmdLogger Logger
 }
 
@@ -119,10 +112,7 @@ func (c *Cmd) String() string {
 }
 
 func (c *Cmd) log() Logger {
-	if c.logger == nil {
-		c.logger = getLogger(c.ctx).WithField("command_id", c.id)
-	}
-	return c.logger
+	return getLogger(c.ctx)
 }
 
 func (c *Cmd) logWithCmd() Logger {
@@ -173,8 +163,6 @@ func (c *Cmd) Wait() (err error) {
 }
 
 func (c *Cmd) startPre(newTask bool) {
-	c.id = genCommandId()
-
 	if newTask {
 		// avoid explosion of tasks with name c.String()
 		c.ctx, c.waitReturnEndSpanCb = trace.WithTaskAndSpan(c.ctx, "zfscmd", c.String())

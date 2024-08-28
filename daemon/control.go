@@ -116,12 +116,14 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 	}
 
 	mux := http.NewServeMux()
+	logRequest := middleware.RequestLogger(j.log, &promControl)
+
 	mux.Handle(ControlJobEndpointPProf, middleware.New(
-		middleware.RequestLogger(j.log, &promControl),
+		logRequest,
 		middleware.JsonRequestResponder(j.log, j.pprof)))
 
 	mux.Handle(ControlJobEndpointVersion, middleware.New(
-		middleware.RequestLogger(j.log, &promControl),
+		logRequest,
 		middleware.JsonResponder(j.log, func() (any, error) {
 			return version.NewZreplVersionInformation(), nil
 		})))
@@ -131,7 +133,7 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 		middleware.JsonResponder(j.log, j.status)))
 
 	mux.Handle(ControlJobEndpointSignal, middleware.New(
-		middleware.RequestLogger(j.log, &promControl),
+		logRequest,
 		middleware.JsonRequestResponder(j.log, j.signal)))
 
 	server := http.Server{
