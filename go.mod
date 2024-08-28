@@ -3,9 +3,9 @@ module github.com/dsh2dsh/zrepl
 go 1.23
 
 require (
-	github.com/bits-and-blooms/bitset v1.13.0
+	github.com/bits-and-blooms/bitset v1.14.2
 	github.com/charmbracelet/bubbles v0.19.0
-	github.com/charmbracelet/bubbletea v0.27.0
+	github.com/charmbracelet/bubbletea v1.0.0
 	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/creasty/defaults v1.8.0
 	github.com/dsh2dsh/cron/v3 v3.0.2
@@ -21,7 +21,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/pkg/profile v1.7.0
 	github.com/problame/go-netssh v0.0.0-20201229122201-330ad6c9cc6f
-	github.com/prometheus/client_golang v1.20.1
+	github.com/prometheus/client_golang v1.20.2
 	github.com/sahilm/fuzzy v0.1.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
@@ -31,7 +31,7 @@ require (
 	golang.org/x/sync v0.8.0
 	golang.org/x/sys v0.24.0
 	golang.org/x/tools v0.24.0
-	google.golang.org/grpc v1.65.0
+	google.golang.org/grpc v1.66.0
 	google.golang.org/protobuf v1.34.2
 )
 
@@ -58,7 +58,7 @@ require (
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/mod v0.20.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240528184218-531527333157 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240604185151-ef581f913117 // indirect
 )
 
 require (
