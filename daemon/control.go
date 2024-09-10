@@ -30,8 +30,6 @@ const (
 	ControlJobEndpointSignal  string = "/signal"
 )
 
-var promControl middleware.PromControl
-
 type controlJob struct {
 	sockaddr *net.UnixAddr
 	sockmode os.FileMode
@@ -40,6 +38,9 @@ type controlJob struct {
 
 	log         logger.Logger
 	pprofServer *pprofServer
+
+	requestBegin    *prometheus.CounterVec
+	requestFinished *prometheus.HistogramVec
 }
 
 func newControlJob(sockpath string, jobs *jobs, mode uint32,
@@ -66,22 +67,22 @@ func (j *controlJob) OwnedDatasetSubtreeRoot() (p *zfs.DatasetPath, ok bool) { r
 func (j *controlJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
 func (j *controlJob) RegisterMetrics(registerer prometheus.Registerer) {
-	promControl.RequestBegin = prometheus.NewCounterVec(prometheus.CounterOpts{
+	j.requestBegin = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "zrepl",
 		Subsystem: "control",
 		Name:      "request_begin",
 		Help:      "number of request we started to handle",
 	}, []string{"endpoint"})
 
-	promControl.RequestFinished = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	j.requestFinished = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "zrepl",
 		Subsystem: "control",
 		Name:      "request_finished",
 		Help:      "time it took a request to finish",
 		Buckets:   []float64{1e-6, 10e-6, 100e-6, 500e-6, 1e-3, 10e-3, 100e-3, 200e-3, 400e-3, 800e-3, 1, 10, 20},
 	}, []string{"endpoint"})
-	registerer.MustRegister(promControl.RequestBegin)
-	registerer.MustRegister(promControl.RequestFinished)
+	registerer.MustRegister(j.requestBegin)
+	registerer.MustRegister(j.requestFinished)
 }
 
 func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
@@ -115,29 +116,8 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 		})
 	}
 
-	mux := http.NewServeMux()
-	logRequest := middleware.RequestLogger(j.log, &promControl)
-
-	mux.Handle(ControlJobEndpointPProf, middleware.New(
-		logRequest,
-		middleware.JsonRequestResponder(j.log, j.pprof)))
-
-	mux.Handle(ControlJobEndpointVersion, middleware.New(
-		logRequest,
-		middleware.JsonResponder(j.log, func() (any, error) {
-			return version.NewZreplVersionInformation(), nil
-		})))
-
-	mux.Handle(ControlJobEndpointStatus, middleware.New(
-		// don't log requests to status endpoint, too spammy
-		middleware.JsonResponder(j.log, j.status)))
-
-	mux.Handle(ControlJobEndpointSignal, middleware.New(
-		logRequest,
-		middleware.JsonRequestResponder(j.log, j.signal)))
-
 	server := http.Server{
-		Handler: mux,
+		Handler: j.mux(),
 		// control socket is local, 1s timeout should be more than sufficient, even
 		// on a loaded system
 		WriteTimeout: envconst.Duration(
@@ -167,6 +147,31 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 
 	j.log.Info("waiting for pprof server exit")
 	j.pprofServer.Wait()
+}
+
+func (j *controlJob) mux() *http.ServeMux {
+	mux := http.NewServeMux()
+	logRequest := middleware.RequestLogger(j.log,
+		middleware.WithPrometheusMetrics(j.requestBegin, j.requestFinished))
+
+	mux.Handle(ControlJobEndpointPProf, middleware.New(
+		logRequest,
+		middleware.JsonRequestResponder(j.log, j.pprof)))
+
+	mux.Handle(ControlJobEndpointVersion, middleware.New(
+		logRequest,
+		middleware.JsonResponder(j.log, func() (any, error) {
+			return version.NewZreplVersionInformation(), nil
+		})))
+
+	mux.Handle(ControlJobEndpointStatus, middleware.New(
+		// don't log requests to status endpoint, too spammy
+		middleware.JsonResponder(j.log, j.status)))
+
+	mux.Handle(ControlJobEndpointSignal, middleware.New(
+		logRequest,
+		middleware.JsonRequestResponder(j.log, j.signal)))
+	return mux
 }
 
 func (j *controlJob) pprof(decoder middleware.JsonDecoder) (any, error) {

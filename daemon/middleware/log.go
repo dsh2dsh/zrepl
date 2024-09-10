@@ -9,17 +9,9 @@ import (
 	"github.com/dsh2dsh/zrepl/logger"
 )
 
-type PromControl struct {
-	RequestBegin    *prometheus.CounterVec
-	RequestFinished *prometheus.HistogramVec
-}
-
-func RequestLogger(log logger.Logger, prom *PromControl, opts ...loggerOption,
-) Middleware {
+func RequestLogger(log logger.Logger, opts ...loggerOption) Middleware {
 	l := &requestLogger{
-		log:  log,
-		prom: prom,
-
+		log:            log,
 		completedLevel: logger.Debug,
 	}
 
@@ -35,11 +27,22 @@ func WithCompletedInfo() loggerOption {
 	return func(self *requestLogger) { self.completedLevel = logger.Info }
 }
 
+func WithPrometheusMetrics(requestBegin *prometheus.CounterVec,
+	requestFinished *prometheus.HistogramVec,
+) loggerOption {
+	return func(self *requestLogger) {
+		self.requestBegin = requestBegin
+		self.requestFinished = requestFinished
+	}
+}
+
 type requestLogger struct {
-	log  logger.Logger
-	prom *PromControl
+	log logger.Logger
 
 	completedLevel logger.Level
+
+	requestBegin    *prometheus.CounterVec
+	requestFinished *prometheus.HistogramVec
 }
 
 func (self *requestLogger) middleware(next http.Handler) http.Handler {
@@ -53,10 +56,14 @@ func (self *requestLogger) middleware(next http.Handler) http.Handler {
 		log.Info("\"" + methodURL + "\"")
 		log = log.WithField("req", methodURL)
 
-		self.prom.RequestBegin.WithLabelValues(r.URL.Path).Inc()
-		defer prometheus.
-			NewTimer(self.prom.RequestFinished.WithLabelValues(r.URL.Path)).
-			ObserveDuration()
+		if self.requestBegin != nil {
+			self.requestBegin.WithLabelValues(r.URL.Path).Inc()
+		}
+		if self.requestFinished != nil {
+			defer prometheus.
+				NewTimer(self.requestFinished.WithLabelValues(r.URL.Path)).
+				ObserveDuration()
+		}
 
 		if next == nil {
 			log.Error("no next handler configured")
@@ -68,5 +75,6 @@ func (self *requestLogger) middleware(next http.Handler) http.Handler {
 		log.WithField("duration", time.Since(t)).
 			Log(self.completedLevel, "request completed")
 	}
+
 	return http.HandlerFunc(fn)
 }
