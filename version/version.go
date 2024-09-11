@@ -7,9 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	zreplVersion string // set by build infrastructure
-)
+var zreplVersion string // set by build infrastructure
 
 type ZreplVersionInformation struct {
 	Version         string
@@ -19,8 +17,8 @@ type ZreplVersionInformation struct {
 	RUNTIMECompiler string
 }
 
-func NewZreplVersionInformation() *ZreplVersionInformation {
-	return &ZreplVersionInformation{
+func NewZreplVersionInformation() ZreplVersionInformation {
+	return ZreplVersionInformation{
 		Version:         zreplVersion,
 		RuntimeGo:       runtime.Version(),
 		RuntimeGOOS:     runtime.GOOS,
@@ -29,9 +27,10 @@ func NewZreplVersionInformation() *ZreplVersionInformation {
 	}
 }
 
-func (i *ZreplVersionInformation) String() string {
+func (self ZreplVersionInformation) String() string {
 	return fmt.Sprintf("zrepl version=%s go=%s GOOS=%s GOARCH=%s Compiler=%s",
-		i.Version, i.RuntimeGo, i.RuntimeGOOS, i.RuntimeGOARCH, i.RUNTIMECompiler)
+		self.Version, self.RuntimeGo, self.RuntimeGOOS, self.RuntimeGOARCH,
+		self.RUNTIMECompiler)
 }
 
 var prometheusMetric = prometheus.NewGauge(

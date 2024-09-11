@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -150,19 +149,17 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 }
 
 func (j *controlJob) mux() *http.ServeMux {
-	mux := http.NewServeMux()
 	logRequest := middleware.RequestLogger(j.log,
 		middleware.WithPrometheusMetrics(j.requestBegin, j.requestFinished))
 
+	mux := http.NewServeMux()
 	mux.Handle(ControlJobEndpointPProf, middleware.New(
 		logRequest,
 		middleware.JsonRequestResponder(j.log, j.pprof)))
 
 	mux.Handle(ControlJobEndpointVersion, middleware.New(
 		logRequest,
-		middleware.JsonResponder(j.log, func() (any, error) {
-			return version.NewZreplVersionInformation(), nil
-		})))
+		middleware.JsonResponder(j.log, j.version)))
 
 	mux.Handle(ControlJobEndpointStatus, middleware.New(
 		// don't log requests to status endpoint, too spammy
@@ -174,40 +171,33 @@ func (j *controlJob) mux() *http.ServeMux {
 	return mux
 }
 
-func (j *controlJob) pprof(decoder middleware.JsonDecoder) (any, error) {
-	var msg PprofServerControlMsg
-	err := decoder(&msg)
-	if err != nil {
-		return nil, errors.New("decode failed")
-	}
-	j.pprofServer.Control(msg)
+func (j *controlJob) pprof(msg *PprofServerControlMsg) (struct{}, error) {
+	j.pprofServer.Control(*msg)
 	return struct{}{}, nil
 }
 
-func (j *controlJob) status() (any, error) {
-	jobs := j.jobs.status()
-	globalZFS := zfscmd.GetReport()
-	envconstReport := envconst.GetReport()
+func (j *controlJob) version() (version.ZreplVersionInformation, error) {
+	return version.NewZreplVersionInformation(), nil
+}
+
+func (j *controlJob) status() (Status, error) {
 	s := Status{
-		Jobs: jobs,
+		Jobs: j.jobs.status(),
 		Global: GlobalStatus{
-			ZFSCmds:   globalZFS,
-			Envconst:  envconstReport,
+			ZFSCmds:   zfscmd.GetReport(),
+			Envconst:  envconst.GetReport(),
 			OsEnviron: os.Environ(),
 		},
 	}
 	return s, nil
 }
 
-func (j *controlJob) signal(decoder middleware.JsonDecoder) (any, error) {
-	req := struct {
-		Op   string
-		Name string
-	}{}
-	if decoder(&req) != nil {
-		return nil, errors.New("decode failed")
-	}
+type signalRequest struct {
+	Op   string
+	Name string
+}
 
+func (j *controlJob) signal(req *signalRequest) (struct{}, error) {
 	log := j.log.WithField("op", req.Op)
 	if req.Name != "" {
 		log.WithField("name", req.Name)

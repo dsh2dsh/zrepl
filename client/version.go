@@ -40,23 +40,22 @@ func runVersionCmd() error {
 		return errors.New("show flag must be 'client' or 'server' or be left empty")
 	}
 
-	var clientVersion, daemonVersion *version.ZreplVersionInformation
+	var clientVersion, daemonVersion version.ZreplVersionInformation
 	if args.Show == "client" || args.Show == "" {
 		clientVersion = version.NewZreplVersionInformation()
 		fmt.Printf("client: %s\n", clientVersion.String())
 	}
+
 	if args.Show == "daemon" || args.Show == "" {
 		if args.ConfigErr != nil {
 			return fmt.Errorf("config parsing error: %s", args.ConfigErr)
 		}
 
-		var info version.ZreplVersionInformation
 		err := jsonRequestResponse(args.Config.Global.Control.SockPath,
-			daemon.ControlJobEndpointVersion, nil, &info)
+			daemon.ControlJobEndpointVersion, nil, &daemonVersion)
 		if err != nil {
 			return fmt.Errorf("server: error: %s\n", err)
 		}
-		daemonVersion = &info
 		fmt.Printf("server: %s\n", daemonVersion.String())
 	}
 

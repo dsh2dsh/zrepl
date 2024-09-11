@@ -8,37 +8,33 @@ import (
 	"github.com/dsh2dsh/zrepl/logger"
 )
 
-func JsonResponder(log logger.Logger, producer func() (any, error),
-) Middleware {
+func JsonResponder[T any](log logger.Logger, h func() (T, error)) Middleware {
 	return func(next http.Handler) http.Handler {
-		return NewJsonResponder(log, producer)
+		return &jsonResponder[T]{log: log, handler: h}
 	}
 }
 
-func NewJsonResponder(log logger.Logger, producer func() (any, error),
-) *jsonResponder {
-	return &jsonResponder{log: log, producer: producer}
+type jsonResponder[T any] struct {
+	log     logger.Logger
+	handler func() (T, error)
 }
 
-type jsonResponder struct {
-	log      logger.Logger
-	producer func() (any, error)
-}
-
-func (self *jsonResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	res, err := self.producer()
+func (self *jsonResponder[T]) ServeHTTP(w http.ResponseWriter,
+	r *http.Request,
+) {
+	res, err := self.handler()
 	if err != nil {
 		self.writeError(err, w, "control handler error")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(res); err != nil {
+	if err := json.NewEncoder(w).Encode(&res); err != nil {
 		self.writeError(err, w, "control handler json marshal error")
 	}
 }
 
-func (self *jsonResponder) writeError(err error, w http.ResponseWriter,
+func (self *jsonResponder[T]) writeError(err error, w http.ResponseWriter,
 	msg string,
 ) {
 	self.log.WithError(err).Error(msg)
@@ -48,56 +44,47 @@ func (self *jsonResponder) writeError(err error, w http.ResponseWriter,
 	}
 }
 
-func JsonRequestResponder(log logger.Logger,
-	producer func(decoder JsonDecoder) (any, error),
+// --------------------------------------------------
+
+func JsonRequestResponder[T1 any, T2 any](log logger.Logger,
+	h func(req *T1) (T2, error),
 ) Middleware {
 	return func(next http.Handler) http.Handler {
-		return NewJsonRequestResponder(log, producer)
+		return &jsonRequestResponder[T1, T2]{log: log, handler: h}
 	}
 }
 
-func NewJsonRequestResponder(log logger.Logger,
-	producer func(decoder JsonDecoder) (any, error),
-) *jsonRequestResponder {
-	return &jsonRequestResponder{log: log, producer: producer}
+type jsonRequestResponder[T1 any, T2 any] struct {
+	log     logger.Logger
+	handler func(req *T1) (T2, error)
 }
 
-type jsonRequestResponder struct {
-	log      logger.Logger
-	producer func(decoder JsonDecoder) (any, error)
-}
-
-type JsonDecoder = func(any) error
-
-func (self *jsonRequestResponder) ServeHTTP(w http.ResponseWriter,
+func (self *jsonRequestResponder[T1, T2]) ServeHTTP(w http.ResponseWriter,
 	r *http.Request,
 ) {
-	var decodeErr error
-	resp, err := self.producer(func(req any) error {
-		decodeErr = json.NewDecoder(r.Body).Decode(&req)
-		return decodeErr
-	})
-
-	// If we had a decode error ignore output of producer and return error
-	if decodeErr != nil {
-		self.writeError(decodeErr, w, "control handler json unmarshal error",
+	var req T1
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		self.writeError(err, w, "control handler json unmarshal error",
 			http.StatusBadRequest)
 		return
-	} else if err != nil {
+	}
+
+	resp, err := self.handler(&req)
+	if err != nil {
 		self.writeError(err, w, "control handler error",
 			http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.NewEncoder(w).Encode(&resp); err != nil {
 		self.writeError(err, w, "control handler json marshal error",
 			http.StatusInternalServerError)
 	}
 }
 
-func (self *jsonRequestResponder) writeError(err error, w http.ResponseWriter,
-	msg string, statusCode int,
+func (self *jsonRequestResponder[T1, T2]) writeError(err error,
+	w http.ResponseWriter, msg string, statusCode int,
 ) {
 	self.log.WithError(err).Error(msg)
 	w.WriteHeader(statusCode)
