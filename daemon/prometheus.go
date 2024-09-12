@@ -68,7 +68,7 @@ func (j *prometheusJob) Run(ctx context.Context, cron *cron.Cron) {
 		panic(err)
 	}
 
-	log := job.GetLogger(ctx)
+	log := logging.GetLogger(ctx, logging.SubsysInternal)
 
 	l, err := tcpsock.Listen(j.listen, j.freeBind)
 	if err != nil {

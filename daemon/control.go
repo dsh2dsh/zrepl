@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/daemon/job"
+	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/daemon/middleware"
 	"github.com/dsh2dsh/zrepl/daemon/nethelpers"
 	"github.com/dsh2dsh/zrepl/endpoint"
@@ -88,7 +89,7 @@ func (j *controlJob) Run(ctx context.Context, cron *cron.Cron) {
 	ctx, j.shutdown = context.WithCancel(ctx)
 	defer j.shutdown()
 
-	j.log = job.GetLogger(ctx)
+	j.log = logging.GetLogger(ctx, logging.SubsysInternal)
 	defer j.log.Info("control job finished")
 
 	l, err := nethelpers.ListenUnixPrivate(j.sockaddr)
