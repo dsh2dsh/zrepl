@@ -103,9 +103,9 @@ func (self *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
 
 func (self *jobs) start(ctx context.Context, j job.Job, internal bool) {
 	jobName := j.Name()
-	if !internal && IsInternalJobName(jobName) {
+	if !internal && internalJobName(jobName) {
 		panic("internal job name used for non-internal job " + jobName)
-	} else if internal && !IsInternalJobName(jobName) {
+	} else if internal && !internalJobName(jobName) {
 		panic("internal job does not use internal job name " + jobName)
 	} else if _, ok := self.jobs[jobName]; ok {
 		panic("duplicate job name " + jobName)
@@ -131,6 +131,6 @@ func (self *jobs) start(ctx context.Context, j job.Job, internal bool) {
 	}()
 }
 
-func IsInternalJobName(s string) bool {
+func internalJobName(s string) bool {
 	return strings.HasPrefix(s, "_")
 }

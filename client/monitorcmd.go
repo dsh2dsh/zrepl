@@ -460,7 +460,7 @@ func (self *monitorAlive) status() (map[string]*job.Status,
 
 	m := make(map[string]*job.Status, len(s.Jobs))
 	for jname, jstatus := range s.Jobs {
-		if !daemon.IsInternalJobName(jname) {
+		if jstatus.Type != job.TypeInternal {
 			m[jname] = jstatus
 		}
 	}

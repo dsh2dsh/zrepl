@@ -62,7 +62,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	})
 
 	for _, job := range confJobs {
-		if IsInternalJobName(job.Name()) {
+		if internalJobName(job.Name()) {
 			panic(fmt.Sprintf("internal job name used for config job '%s'", job.Name())) // FIXME
 		}
 	}

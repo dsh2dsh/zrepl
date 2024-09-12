@@ -18,14 +18,15 @@ type GlobalStatus struct {
 }
 
 func (self *Status) JobCounts() (running, withErr int) {
-	for name, j := range self.Jobs {
-		if !IsInternalJobName(name) {
-			if _, ok := j.Running(); ok {
-				running++
-			}
-			if j.Error() != "" {
-				withErr++
-			}
+	for _, j := range self.Jobs {
+		if j.Type == job.TypeInternal {
+			continue
+		}
+		if _, ok := j.Running(); ok {
+			running++
+		}
+		if j.Error() != "" {
+			withErr++
 		}
 	}
 	return
