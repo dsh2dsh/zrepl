@@ -5,18 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
-	"sync"
 	"syscall"
 	"time"
 
-	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/job"
-	"github.com/dsh2dsh/zrepl/daemon/job/reset"
-	"github.com/dsh2dsh/zrepl/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/endpoint"
@@ -120,121 +115,4 @@ func Run(ctx context.Context, conf *config.Config) error {
 	<-wait.Done()
 	log.Info("daemon exiting")
 	return nil
-}
-
-type jobs struct {
-	wg   sync.WaitGroup
-	cron *cron.Cron
-	log  logger.Logger
-
-	wakeups map[string]wakeup.Func // by Job.Name
-	resets  map[string]reset.Func  // by Job.Name
-	jobs    map[string]job.Job
-
-	cancel context.CancelFunc
-}
-
-func newJobs(ctx context.Context, log logger.Logger,
-	cancel context.CancelFunc,
-) *jobs {
-	return &jobs{
-		log:     log,
-		cron:    newCron(logging.GetLogger(ctx, logging.SubsysCron), true),
-		wakeups: make(map[string]wakeup.Func),
-		resets:  make(map[string]reset.Func),
-		jobs:    make(map[string]job.Job),
-
-		cancel: cancel,
-	}
-}
-
-func (s *jobs) Cancel() {
-	s.log.Info("cancel all jobs")
-	s.cancel()
-}
-
-func (s *jobs) wait() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		s.wg.Wait()
-		s.log.Info("all jobs finished")
-		s.log.Info("waiting for cron exit")
-		<-s.cron.Stop().Done()
-		s.log.Info("cron exited")
-		cancel()
-	}()
-	return ctx
-}
-
-func (s *jobs) Shutdown() {
-	s.log.Info("shutdown all jobs")
-	s.cron.Stop()
-	for _, j := range s.jobs {
-		j.Shutdown()
-	}
-}
-
-func (s *jobs) status() map[string]*job.Status {
-	ret := make(map[string]*job.Status, len(s.jobs))
-	for name, j := range s.jobs {
-		ret[name] = j.Status()
-	}
-	return ret
-}
-
-func (s *jobs) wakeup(job string) error {
-	wu, ok := s.wakeups[job]
-	if !ok {
-		return fmt.Errorf("Job %s does not exist", job)
-	}
-	return wu()
-}
-
-func (s *jobs) reset(job string) error {
-	wu, ok := s.resets[job]
-	if !ok {
-		return fmt.Errorf("Job %s does not exist", job)
-	}
-	return wu()
-}
-
-func (s *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
-	s.cron.Start()
-	for _, j := range confJobs {
-		s.start(ctx, j, false)
-	}
-	s.log.WithField("count", len(s.jobs)).Info("started jobs")
-}
-
-func IsInternalJobName(s string) bool {
-	return strings.HasPrefix(s, "_")
-}
-
-func (s *jobs) start(ctx context.Context, j job.Job, internal bool) {
-	jobName := j.Name()
-	if !internal && IsInternalJobName(jobName) {
-		panic("internal job name used for non-internal job " + jobName)
-	} else if internal && !IsInternalJobName(jobName) {
-		panic("internal job does not use internal job name " + jobName)
-	} else if _, ok := s.jobs[jobName]; ok {
-		panic("duplicate job name " + jobName)
-	}
-
-	j.RegisterMetrics(prometheus.DefaultRegisterer)
-	s.jobs[jobName] = j
-
-	ctx = logging.WithInjectedField(ctx, logging.JobField, j.Name())
-	ctx = zfscmd.WithJobID(ctx, j.Name())
-	ctx, wakeup := wakeup.Context(ctx)
-	ctx, resetFunc := reset.Context(ctx)
-	s.wakeups[jobName] = wakeup
-	s.resets[jobName] = resetFunc
-
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		job.GetLogger(ctx).Info("starting job")
-		defer job.GetLogger(ctx).Info("job exited")
-		j.Run(ctx, s.cron)
-	}()
 }
