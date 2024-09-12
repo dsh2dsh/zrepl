@@ -61,32 +61,6 @@ func Run(ctx context.Context, conf *config.Config) error {
 		},
 	})
 
-	jobs := newJobs(ctx, log, cancel)
-	// start control socket
-	controlJob, err := newControlJob(conf.Global.Control.SockPath, jobs,
-		conf.Global.Control.SockMode)
-	if err != nil {
-		return fmt.Errorf("starting control job: %w", err)
-	}
-	jobs.start(ctx, controlJob, true)
-
-	for i, jc := range conf.Global.Monitoring {
-		var (
-			job job.Job
-			err error
-		)
-		switch v := jc.Ret.(type) {
-		case *config.PrometheusMonitoring:
-			job, err = newPrometheusJobFromConfig(v)
-		default:
-			return fmt.Errorf("unknown monitoring job #%d (type %T)", i, v)
-		}
-		if err != nil {
-			return fmt.Errorf("cannot build monitoring job #%d: %w", i, err)
-		}
-		jobs.start(ctx, job, true)
-	}
-
 	// register global (=non job-local) metrics
 	version.PrometheusRegister(prometheus.DefaultRegisterer)
 	zfscmd.RegisterMetrics(prometheus.DefaultRegisterer)
@@ -94,6 +68,13 @@ func Run(ctx context.Context, conf *config.Config) error {
 	endpoint.RegisterMetrics(prometheus.DefaultRegisterer)
 
 	log.Info("starting daemon")
+	jobs := newJobs(ctx, log, cancel)
+	// start control socket
+	if err := startControlJob(ctx, conf, jobs); err != nil {
+		return err
+	} else if err := startPrometheusJobs(ctx, conf, jobs); err != nil {
+		return err
+	}
 
 	// start regular jobs
 	jobs.startJobsWithCron(ctx, confJobs)
@@ -107,5 +88,32 @@ func Run(ctx context.Context, conf *config.Config) error {
 	log.Info("waiting for jobs to finish")
 	<-wait.Done()
 	log.Info("daemon exiting")
+	return nil
+}
+
+func startControlJob(ctx context.Context, conf *config.Config, jobs *jobs,
+) error {
+	j, err := newControlJob(conf.Global.Control.SockPath,
+		jobs, conf.Global.Control.SockMode)
+	if err != nil {
+		return fmt.Errorf("starting control job: %w", err)
+	}
+	jobs.startInternal(ctx, j)
+	return nil
+}
+
+func startPrometheusJobs(ctx context.Context, conf *config.Config, jobs *jobs,
+) error {
+	for i, jc := range conf.Global.Monitoring {
+		v, ok := jc.Ret.(*config.PrometheusMonitoring)
+		if !ok {
+			return fmt.Errorf("unknown monitoring job #%d (type %T)", i, v)
+		}
+		j, err := newPrometheusJobFromConfig(v)
+		if err != nil {
+			return fmt.Errorf("cannot build monitoring job #%d: %w", i, err)
+		}
+		jobs.startInternal(ctx, j)
+	}
 	return nil
 }
