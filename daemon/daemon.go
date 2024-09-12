@@ -61,14 +61,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		},
 	})
 
-	for _, job := range confJobs {
-		if internalJobName(job.Name()) {
-			panic(fmt.Sprintf("internal job name used for config job '%s'", job.Name())) // FIXME
-		}
-	}
-
 	jobs := newJobs(ctx, log, cancel)
-
 	// start control socket
 	controlJob, err := newControlJob(conf.Global.Control.SockPath, jobs,
 		conf.Global.Control.SockMode)
