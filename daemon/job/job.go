@@ -22,16 +22,21 @@ func GetLogger(ctx context.Context) Logger {
 	return logging.GetLogger(ctx, logging.SubsysJob)
 }
 
-type Job interface {
+type Internal interface {
 	Name() string
 	Run(ctx context.Context, cron *cron.Cron)
-	Status() *Status
 	RegisterMetrics(registerer prometheus.Registerer)
+	Shutdown()
+}
+
+type Job interface {
+	Internal
+
+	Status() *Status
 	// Jobs that return a subtree of the dataset hierarchy
 	// must return the root of that subtree as rfs and ok = true
 	OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool)
 	SenderConfig() *endpoint.SenderConfig
-	Shutdown()
 }
 
 type Type string

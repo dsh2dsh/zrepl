@@ -10,14 +10,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/dsh2dsh/zrepl/config"
-	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
-	"github.com/dsh2dsh/zrepl/endpoint"
 	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/rpc/dataconn/frameconn"
 	"github.com/dsh2dsh/zrepl/util/tcpsock"
 	"github.com/dsh2dsh/zrepl/zfs"
 )
+
+const jobNamePrometheus = "_prometheus"
 
 type prometheusJob struct {
 	listen   string
@@ -47,12 +47,6 @@ func init() {
 }
 
 func (j *prometheusJob) Name() string { return jobNamePrometheus }
-
-func (j *prometheusJob) Status() *job.Status { return &job.Status{Type: job.TypeInternal} }
-
-func (j *prometheusJob) OwnedDatasetSubtreeRoot() (p *zfs.DatasetPath, ok bool) { return nil, false }
-
-func (j *prometheusJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
 func (j *prometheusJob) RegisterMetrics(registerer prometheus.Registerer) {}
 

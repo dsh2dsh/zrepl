@@ -28,7 +28,7 @@ func newJobs(ctx context.Context, log logger.Logger,
 		resets:  make(map[string]reset.Func),
 
 		jobs:         make(map[string]job.Job, 2),
-		internalJobs: make([]job.Job, 0, 1),
+		internalJobs: make([]job.Internal, 0, 1),
 
 		cancel: cancel,
 	}
@@ -43,7 +43,7 @@ type jobs struct {
 	resets  map[string]reset.Func  // by Job.Name
 
 	jobs         map[string]job.Job
-	internalJobs []job.Job
+	internalJobs []job.Internal
 
 	cancel context.CancelFunc
 }
@@ -121,7 +121,7 @@ func (self *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
 
 func internalJobName(s string) bool { return strings.HasPrefix(s, "_") }
 
-func (self *jobs) start(ctx context.Context, j job.Job) {
+func (self *jobs) start(ctx context.Context, j job.Internal) {
 	j.RegisterMetrics(prometheus.DefaultRegisterer)
 	ctx = logging.WithInjectedField(ctx, logging.JobField, j.Name())
 	ctx = zfscmd.WithJobID(ctx, j.Name())
@@ -145,7 +145,7 @@ func (self *jobs) withJobSignals(ctx context.Context, jobName string,
 	return ctx
 }
 
-func (self *jobs) startInternal(ctx context.Context, j job.Job) {
+func (self *jobs) startInternal(ctx context.Context, j job.Internal) {
 	self.start(ctx, j)
 	self.internalJobs = append(self.internalJobs, j)
 }

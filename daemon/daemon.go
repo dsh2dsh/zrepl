@@ -20,11 +20,6 @@ import (
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
-const (
-	jobNamePrometheus = "_prometheus"
-	jobNameControl    = "_control"
-)
-
 func Run(ctx context.Context, conf *config.Config) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -69,10 +64,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	log.Info("starting daemon")
 	jobs := newJobs(ctx, log, cancel)
-	// start control socket
-	if err := startControlJob(ctx, conf, jobs); err != nil {
-		return err
-	} else if err := startPrometheusJobs(ctx, conf, jobs); err != nil {
+	if err := startInternalJobs(ctx, conf, jobs); err != nil {
 		return err
 	}
 
@@ -88,6 +80,17 @@ func Run(ctx context.Context, conf *config.Config) error {
 	log.Info("waiting for jobs to finish")
 	<-wait.Done()
 	log.Info("daemon exiting")
+	return nil
+}
+
+func startInternalJobs(ctx context.Context, conf *config.Config, jobs *jobs,
+) error {
+	// start control socket
+	if err := startControlJob(ctx, conf, jobs); err != nil {
+		return err
+	} else if err := startPrometheusJobs(ctx, conf, jobs); err != nil {
+		return err
+	}
 	return nil
 }
 

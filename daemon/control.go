@@ -11,19 +11,18 @@ import (
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/daemon/middleware"
 	"github.com/dsh2dsh/zrepl/daemon/nethelpers"
-	"github.com/dsh2dsh/zrepl/endpoint"
 	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/util/envconst"
 	"github.com/dsh2dsh/zrepl/version"
-	"github.com/dsh2dsh/zrepl/zfs"
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 const (
+	jobNameControl = "_control"
+
 	ControlJobEndpointPProf   string = "/debug/pprof"
 	ControlJobEndpointVersion string = "/version"
 	ControlJobEndpointStatus  string = "/status"
@@ -59,12 +58,6 @@ func newControlJob(sockpath string, jobs *jobs, mode uint32,
 }
 
 func (j *controlJob) Name() string { return jobNameControl }
-
-func (j *controlJob) Status() *job.Status { return &job.Status{Type: job.TypeInternal} }
-
-func (j *controlJob) OwnedDatasetSubtreeRoot() (p *zfs.DatasetPath, ok bool) { return nil, false }
-
-func (j *controlJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
 func (j *controlJob) RegisterMetrics(registerer prometheus.Registerer) {
 	j.requestBegin = prometheus.NewCounterVec(prometheus.CounterOpts{
