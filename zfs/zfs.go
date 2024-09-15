@@ -26,6 +26,8 @@ import (
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
+var ZfsBin string = "zfs"
+
 type DatasetPath struct {
 	comps []string
 }
@@ -149,66 +151,59 @@ func toDatasetPath(s string) *DatasetPath {
 	return p
 }
 
+func NewZfsError(err error) *ZFSError {
+	zfsErr := &ZFSError{WaitErr: err}
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		zfsErr.Stderr = exitError.Stderr
+	}
+	return zfsErr
+}
+
 type ZFSError struct {
 	Stderr  []byte
 	WaitErr error
 }
 
-func (e *ZFSError) Error() string {
-	return fmt.Sprintf("zfs exited with error: %s\nstderr:\n%s", e.WaitErr.Error(), e.Stderr)
+func (self *ZFSError) Error() string {
+	return fmt.Sprintf("zfs exited with error: %s\nstderr:\n%s",
+		self.WaitErr.Error(), self.Stderr)
 }
 
-var ZfsBin string = "zfs"
-
-func ZFSList(ctx context.Context, properties []string, zfsArgs ...string) (res [][]string, err error) {
-	args := make([]string, 0, 4+len(zfsArgs))
-	args = append(args,
-		"list", "-H", "-p",
-		"-o", strings.Join(properties, ","))
-	args = append(args, zfsArgs...)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
-	stdout, stderrBuf, err := cmd.StdoutPipeWithErrorBuf()
+func ZFSList(ctx context.Context, properties []string, zfsArgs ...string,
+) ([][]string, error) {
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, zfsListArgs(properties, zfsArgs)...)
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return
+		return nil, err
+	} else if err = cmd.Start(); err != nil {
+		return nil, err
 	}
 
-	if err = cmd.Start(); err != nil {
-		return
-	}
-	// in case we return early, we want to kill the zfs list process and wait for it to exit
-	defer func() {
-		_ = cmd.Wait()
-	}()
-	defer cancel()
+	// In case we return early, we want to kill the zfs list process and wait for
+	// it to exit.
+	defer func() { _ = cmd.Wait() }()
 
-	s := bufio.NewScanner(stdout)
-	buf := make([]byte, 1024)
-	s.Buffer(buf, 0)
-
-	res = make([][]string, 0)
-
-	for s.Scan() {
+	var res [][]string
+	for s := bufio.NewScanner(stdout); s.Scan(); {
 		fields := strings.SplitN(s.Text(), "\t", len(properties))
-
 		if len(fields) != len(properties) {
-			err = errors.New("unexpected output")
-			return
+			return nil, fmt.Errorf("unexpected output from zfs list: %q", s.Text())
 		}
-
 		res = append(res, fields)
 	}
 
-	if waitErr := cmd.Wait(); waitErr != nil {
-		err := &ZFSError{
-			Stderr:  stderrBuf.Bytes(),
-			WaitErr: waitErr,
-		}
-		return nil, err
+	if err := cmd.Wait(); err != nil {
+		return nil, NewZfsError(err)
 	}
-	return
+	return res, nil
+}
+
+func zfsListArgs(properties []string, zfsArgs []string) []string {
+	args := make([]string, 0, 4+len(zfsArgs))
+	args = append(args, "list", "-H", "-p", "-o", strings.Join(properties, ","))
+	args = append(args, zfsArgs...)
+	return args
 }
 
 type ZFSListResult struct {
@@ -218,25 +213,24 @@ type ZFSListResult struct {
 
 // ZFSListChan executes `zfs list` and sends the results to the `out` channel.
 // The `out` channel is always closed by ZFSListChan:
-// If an error occurs, it is closed after sending a result with the Err field set.
-// If no error occurs, it is just closed.
-// If the operation is cancelled via context, the channel is just closed.
 //
-// If notExistHint is not nil and zfs exits with an error,
-// the stderr is attempted to be interpreted as a *DatasetDoesNotExist error.
+//	If an error occurs, it is closed after sending a result with the Err field
+//	set.
 //
-// However, if callers do not drain `out` or cancel via `ctx`, the process will leak either running because
-// IO is pending or as a zombie.
-func ZFSListChan(ctx context.Context, out chan ZFSListResult, properties []string, notExistHint *DatasetPath, zfsArgs ...string) {
+//	If no error occurs, it is just closed.
+//
+//	If the operation is cancelled via context, the channel is just closed.
+//
+// If notExistHint is not nil and zfs exits with an error, the stderr is
+// attempted to be interpreted as a *DatasetDoesNotExist error.
+//
+// However, if callers do not drain `out` or cancel via `ctx`, the process will
+// leak either running because IO is pending or as a zombie.
+func ZFSListChan(ctx context.Context, out chan ZFSListResult,
+	properties []string, notExistHint *DatasetPath, zfsArgs ...string,
+) {
 	defer close(out)
-
-	args := make([]string, 0, 4+len(zfsArgs))
-	args = append(args,
-		"list", "-H", "-p",
-		"-o", strings.Join(properties, ","))
-	args = append(args, zfsArgs...)
-
-	sendResult := func(fields []string, err error) (done bool) {
+	sendResult := func(fields []string, err error) bool {
 		select {
 		case <-ctx.Done():
 			return true
@@ -245,61 +239,47 @@ func ZFSListChan(ctx context.Context, out chan ZFSListResult, properties []strin
 		}
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
-	stdout, stderrBuf, err := cmd.StdoutPipeWithErrorBuf()
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, zfsListArgs(properties, zfsArgs)...)
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		sendResult(nil, err)
 		return
-	}
-	if err = cmd.Start(); err != nil {
+	} else if err = cmd.Start(); err != nil {
 		sendResult(nil, err)
 		return
 	}
-	defer func() {
-		// discard the error, this defer is only relevant if we return while parsing the output
-		// in which case we'll return an 'unexpected output' error and not the exit status
-		_ = cmd.Wait()
-	}()
-	defer cancel() // in case we return before our regular call to cmd.Wait(), kill the zfs list process
+
+	// Discard the error, this defer is only relevant if we return while parsing
+	// the output in which case we'll return an 'unexpected output' error and not
+	// the exit status.
+	defer func() { _ = cmd.Wait() }()
 
 	s := bufio.NewScanner(stdout)
-	buf := make([]byte, 1024) // max line length
-	s.Buffer(buf, 0)
-
 	for s.Scan() {
 		fields := strings.SplitN(s.Text(), "\t", len(properties))
 		if len(fields) != len(properties) {
-			sendResult(nil, errors.New("unexpected output"))
+			sendResult(nil, fmt.Errorf(
+				"unexpected output from zfs list: %q", s.Text()))
 			return
-		}
-		if sendResult(fields, nil) {
+		} else if sendResult(fields, nil) {
 			return
 		}
 	}
+
 	if err := cmd.Wait(); err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
-			var enotexist *DatasetDoesNotExist
-			if notExistHint != nil {
-				enotexist = tryDatasetDoesNotExist(notExistHint.ToString(), stderrBuf.Bytes())
-			}
+		zfsErr := NewZfsError(err)
+		if notExistHint != nil && len(zfsErr.Stderr) != 0 {
+			enotexist := tryDatasetDoesNotExist(notExistHint.ToString(),
+				zfsErr.Stderr)
 			if enotexist != nil {
 				sendResult(nil, enotexist)
-			} else {
-				sendResult(nil, &ZFSError{
-					Stderr:  stderrBuf.Bytes(),
-					WaitErr: err,
-				})
+				return
 			}
-		} else {
-			sendResult(nil, &ZFSError{WaitErr: err})
 		}
+		sendResult(nil, zfsErr)
 		return
-	}
-	if s.Err() != nil {
+	} else if s.Err() != nil {
 		sendResult(nil, s.Err())
-		return
 	}
 }
 
@@ -1530,7 +1510,8 @@ type DatasetDoesNotExist struct {
 
 func (d *DatasetDoesNotExist) Error() string { return fmt.Sprintf("dataset %q does not exist", d.Path) }
 
-func tryDatasetDoesNotExist(expectPath string, stderr []byte) *DatasetDoesNotExist {
+func tryDatasetDoesNotExist(expectPath string, stderr []byte,
+) *DatasetDoesNotExist {
 	if sm := zfsGetDatasetDoesNotExistRegexp.FindSubmatch(stderr); sm != nil {
 		if string(sm[1]) == expectPath {
 			return &DatasetDoesNotExist{expectPath}

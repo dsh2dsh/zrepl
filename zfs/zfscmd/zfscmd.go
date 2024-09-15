@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
-	"github.com/dsh2dsh/zrepl/util/circlog"
 )
 
 func CommandContext(ctx context.Context, name string, args ...string) *Cmd {
@@ -80,13 +79,7 @@ func (c *Cmd) Output() (o []byte, err error) {
 	return
 }
 
-// Careful: err.(*exec.ExitError).Stderr will not be set, even if you don't open an StderrPipe
-func (c *Cmd) StdoutPipeWithErrorBuf() (p io.ReadCloser, errBuf *circlog.CircularLog, err error) {
-	p, err = c.cmd.StdoutPipe()
-	errBuf = circlog.MustNewCircularLog(1 << 15)
-	c.cmd.Stderr = errBuf
-	return p, errBuf, err
-}
+func (c *Cmd) StdoutPipe() (io.ReadCloser, error) { return c.cmd.StdoutPipe() }
 
 type Stdio struct {
 	Stdin  io.ReadCloser
