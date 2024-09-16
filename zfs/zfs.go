@@ -205,7 +205,7 @@ func ZFSListIter(ctx context.Context, properties []string,
 	var stderrBuf bytes.Buffer
 	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
 
-	return func(yield func(ZFSListResult) bool) {
+	iter := func(yield func(ZFSListResult) bool) {
 		if err != nil {
 			yield(ZFSListResult{Err: err})
 			return
@@ -216,7 +216,7 @@ func ZFSListIter(ctx context.Context, properties []string,
 
 		err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
 			func(s string) (error, bool) {
-				fields := strings.SplitN(s, "\t", len(properties))
+				fields := strings.SplitN(s, "\t", len(properties)+1)
 				if len(fields) != len(properties) {
 					return fmt.Errorf("unexpected output from zfs list: %q", s), false
 				} else if ctx.Err() != nil {
@@ -224,22 +224,14 @@ func ZFSListIter(ctx context.Context, properties []string,
 				}
 				return nil, yield(ZFSListResult{Fields: fields})
 			})
-
-		if notExistHint != nil && err != nil {
-			var zfsError *ZFSError
-			if errors.As(err, &zfsError) && len(zfsError.Stderr) != 0 {
-				enotexist := tryDatasetDoesNotExist(notExistHint.ToString(),
-					zfsError.Stderr)
-				if enotexist != nil {
-					err = enotexist
-				}
-			}
-		}
-
 		if err != nil {
+			if notExistHint != nil {
+				err = maybeDatasetNotExists(notExistHint.ToString(), err)
+			}
 			yield(ZFSListResult{Err: err})
 		}
 	}
+	return iter
 }
 
 func zfsListArgs(properties []string, zfsArgs []string) []string {
@@ -273,6 +265,17 @@ func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf []byte,
 		err = NewZfsError(cmdErr, stderrBuf)
 	}
 	return
+}
+
+func maybeDatasetNotExists(path string, err error) error {
+	var zfsError *ZFSError
+	if errors.As(err, &zfsError) && len(zfsError.Stderr) != 0 {
+		enotexist := tryDatasetDoesNotExist(path, zfsError.Stderr)
+		if enotexist != nil {
+			return enotexist
+		}
+	}
+	return err
 }
 
 // FIXME replace with EntityNamecheck
@@ -1381,6 +1384,10 @@ func ZFSRecvClearResumeToken(ctx context.Context, fs string) error {
 	return nil
 }
 
+func NewPropertyValue(v string, src PropertySource) PropertyValue {
+	return PropertyValue{Value: v, Source: src}
+}
+
 type PropertyValue struct {
 	Value  string
 	Source PropertySource
@@ -1394,12 +1401,24 @@ func NewZFSProperties() *ZFSProperties {
 	return &ZFSProperties{make(map[string]PropertyValue, 4)}
 }
 
+func (p *ZFSProperties) Valid(props []string) bool {
+	return len(p.m) == len(props)
+}
+
 func (p *ZFSProperties) Get(key string) string {
 	return p.m[key].Value
 }
 
 func (p *ZFSProperties) GetDetails(key string) PropertyValue {
 	return p.m[key]
+}
+
+func (p *ZFSProperties) Add(propName string, propValue PropertyValue) bool {
+	if _, ok := p.m[propName]; ok {
+		return false
+	}
+	p.m[propName] = propValue
+	return true
 }
 
 func zfsSet(ctx context.Context, path string, props map[string]string) error {
@@ -1564,94 +1583,121 @@ func (s PropertySource) zfsGetSourceFieldPrefixes() []string {
 	return prefixes
 }
 
-func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []string, props []string, allowedSources PropertySource) (map[string]*ZFSProperties, error) {
-	args := []string{"get", "-Hp", "-o", "name,property,value,source"}
+func zfsGetRecursive(ctx context.Context, path string, depth int,
+	dstypes []string, props []string, allowedSources PropertySource,
+) (map[string]*ZFSProperties, error) {
+	cmd := zfscmd.CommandContext(ctx, ZfsBin,
+		zfsGetArgs(path, depth, dstypes, props)...)
+	var stderrBuf bytes.Buffer
+	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
+	if err != nil {
+		return nil, err
+	} else if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	propsByFS := map[string]*ZFSProperties{}
+	allowedPrefixes := allowedSources.zfsGetSourceFieldPrefixes()
+
+	err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
+		func(s string) (error, bool) {
+			if err := parsePropsByFs(s, propsByFS, allowedPrefixes); err != nil {
+				return err, false
+			}
+			return nil, true
+		})
+	if err != nil {
+		return nil, maybeDatasetNotExists(path, err)
+	}
+
+	// validate we got expected output
+	return validatePropsByFs(propsByFS, props)
+}
+
+func zfsGetArgs(path string, depth int, dstypes []string,
+	props []string,
+) []string {
+	args := make([]string, 0, 10)
+	args = append(args, "get", "-Hp", "-o", "name,property,value,source")
+
 	if depth != 0 {
 		args = append(args, "-r")
 		if depth != -1 {
 			args = append(args, "-d", strconv.Itoa(depth))
 		}
 	}
+
 	if len(dstypes) > 0 {
 		args = append(args, "-t", strings.Join(dstypes, ","))
 	}
-	args = append(args, strings.Join(props, ","), path)
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
-	stdout, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if exitErr.Exited() {
-				// screen-scrape output
-				if ddne := tryDatasetDoesNotExist(path, exitErr.Stderr); ddne != nil {
-					return nil, ddne
-				}
-			}
-			return nil, NewZfsError(exitErr, exitErr.Stderr)
-		}
-		return nil, err
+	return append(args, strings.Join(props, ","), path)
+}
+
+func parsePropsByFs(s string, propsByFs map[string]*ZFSProperties,
+	prefixes []string,
+) error {
+	fields := strings.SplitN(s, "\t", 5)
+	if len(fields) != 4 {
+		return fmt.Errorf(
+			"zfs get did not return name,property,value,source tuples: %q", s)
 	}
-	o := string(stdout)
-	lines := strings.Split(o, "\n")
-	propsByFS := make(map[string]*ZFSProperties)
-	allowedPrefixes := allowedSources.zfsGetSourceFieldPrefixes()
-	for _, line := range lines[:len(lines)-1] { // last line is an empty line due to how strings.Split works
-		fields := strings.FieldsFunc(line, func(r rune) bool {
-			return r == '\t'
-		})
-		if len(fields) != 4 {
-			return nil, errors.New("zfs get did not return name,property,value,source tuples")
+	fs, prop, value, srcStr := fields[0], fields[1], fields[2], fields[3]
+
+	for _, p := range prefixes {
+		// prefix-match so that SourceAny (= "") works
+		if !strings.HasPrefix(srcStr, p) {
+			continue
 		}
-		for _, p := range allowedPrefixes {
-			// prefix-match so that SourceAny (= "") works
-			if strings.HasPrefix(fields[3], p) {
-				source, err := parsePropertySource(fields[3])
-				if err != nil {
-					return nil, fmt.Errorf("parse property source: %w", err)
-				}
-				fsProps, ok := propsByFS[fields[0]]
-				if !ok {
-					fsProps = &ZFSProperties{
-						make(map[string]PropertyValue),
-					}
-				}
-				if _, ok := fsProps.m[fields[1]]; ok {
-					return nil, fmt.Errorf("duplicate property %q for dataset %q", fields[1], fields[0])
-				}
-				fsProps.m[fields[1]] = PropertyValue{
-					Value:  fields[2],
-					Source: source,
-				}
-				propsByFS[fields[0]] = fsProps
-				break
-			}
+		source, err := parsePropertySource(srcStr)
+		if err != nil {
+			return fmt.Errorf("parse property source %q: %w", srcStr, err)
 		}
+		fsProps, ok := propsByFs[fs]
+		if !ok {
+			fsProps = NewZFSProperties()
+			propsByFs[fs] = fsProps
+		}
+		if !fsProps.Add(prop, NewPropertyValue(value, source)) {
+			return fmt.Errorf(
+				"duplicate property %q for dataset %q", prop, fs)
+		}
+		break
 	}
-	// validate we got expected output
+	return nil
+}
+
+func validatePropsByFs(propsByFS map[string]*ZFSProperties, props []string,
+) (map[string]*ZFSProperties, error) {
 	for fs, fsProps := range propsByFS {
-		if len(fsProps.m) != len(props) {
-			return nil, fmt.Errorf("zfs get did not return all requested values for dataset %q\noutput was:\n%s", fs, o)
+		if !fsProps.Valid(props) {
+			return nil, fmt.Errorf(
+				"zfs get did not return all requested values for dataset %q", fs)
 		}
 	}
 	return propsByFS, nil
 }
 
-func zfsGet(ctx context.Context, path string, props []string, allowedSources PropertySource) (*ZFSProperties, error) {
+func zfsGet(ctx context.Context, path string, props []string,
+	allowedSources PropertySource,
+) (*ZFSProperties, error) {
 	propMap, err := zfsGetRecursive(ctx, path, 0, nil, props, allowedSources)
-	if err != nil {
+	switch {
+	case err != nil:
 		return nil, err
+	case len(propMap) == 0:
+		// XXX callers expect to always get a result here. They will observe
+		// props.Get("propname") == "". We should change .Get to return a tuple, or
+		// an error, or whatever.
+		return NewZFSProperties(), nil
+	case len(propMap) != 1:
+		return nil, errors.New(
+			"zfs get unexpectedly returned properties for multiple datasets")
 	}
-	if len(propMap) == 0 {
-		// XXX callers expect to always get a result here
-		// They will observe props.Get("propname") == ""
-		// We should change .Get to return a tuple, or an error, or whatever.
-		return &ZFSProperties{make(map[string]PropertyValue)}, nil
-	}
-	if len(propMap) != 1 {
-		return nil, errors.New("zfs get unexpectedly returned properties for multiple datasets")
-	}
+
 	res, ok := propMap[path]
 	if !ok {
-		return nil, errors.New("zfs get returned properties for a different dataset that requested")
+		return nil, errors.New(
+			"zfs get returned properties for a different dataset that requested")
 	}
 	return res, nil
 }
