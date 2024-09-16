@@ -3,6 +3,7 @@ package zfs
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
@@ -26,15 +27,19 @@ type noFilter struct{}
 
 var _ DatasetFilter = noFilter{}
 
-func (noFilter) Filter(p *DatasetPath) (pass bool, err error)    { return true, nil }
+func (noFilter) Filter(p *DatasetPath) (bool, error) {
+	return true, nil
+}
+
 func (noFilter) UserSpecifiedDatasets() UserSpecifiedDatasetsSet { return nil }
 
-func ZFSListMapping(ctx context.Context, filter DatasetFilter) (datasets []*DatasetPath, err error) {
+func ZFSListMapping(ctx context.Context, filter DatasetFilter,
+) ([]*DatasetPath, error) {
 	res, err := ZFSListMappingProperties(ctx, filter, nil)
 	if err != nil {
 		return nil, err
 	}
-	datasets = make([]*DatasetPath, len(res))
+	datasets := make([]*DatasetPath, len(res))
 	for i, r := range res {
 		datasets[i] = r.Path
 	}
@@ -48,59 +53,43 @@ type ZFSListMappingPropertiesResult struct {
 }
 
 // properties must not contain 'name'
-func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter, properties []string) (datasets []ZFSListMappingPropertiesResult, err error) {
+func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter,
+	properties []string,
+) ([]ZFSListMappingPropertiesResult, error) {
 	if filter == nil {
 		panic("filter must not be nil")
+	} else if slices.Contains(properties, "name") {
+		panic("properties must not contain 'name'")
 	}
 
-	for _, p := range properties {
-		if p == "name" {
-			panic("properties must not contain 'name'")
-		}
-	}
-	newProps := make([]string, len(properties)+1)
-	newProps[0] = "name"
-	copy(newProps[1:], properties)
-	properties = newProps
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	rchan := make(chan ZFSListResult)
-
-	go ZFSListChan(ctx, rchan, properties, nil, "-r", "-t", "filesystem,volume")
+	properties = slices.Concat([]string{"name"}, properties)
+	zfsList := ZFSListIter(ctx, properties, nil, "-r", "-t",
+		"filesystem,volume")
 
 	unmatchedUserSpecifiedDatasets := filter.UserSpecifiedDatasets()
-	datasets = make([]ZFSListMappingPropertiesResult, 0)
-	for r := range rchan {
-
+	datasets := []ZFSListMappingPropertiesResult{}
+	for r := range zfsList {
 		if r.Err != nil {
-			err = r.Err
-			return
+			return nil, r.Err
 		}
-
-		var path *DatasetPath
-		if path, err = NewDatasetPath(r.Fields[0]); err != nil {
-			return
+		path, err := NewDatasetPath(r.Fields[0])
+		if err != nil {
+			return nil, err
 		}
-
 		delete(unmatchedUserSpecifiedDatasets, path.ToString())
-
-		pass, filterErr := filter.Filter(path)
-		if filterErr != nil {
-			return nil, fmt.Errorf("error calling filter: %s", filterErr)
-		}
-		if pass {
+		if pass, err := filter.Filter(path); err != nil {
+			return nil, fmt.Errorf("error calling filter: %s", err)
+		} else if pass {
 			datasets = append(datasets, ZFSListMappingPropertiesResult{
 				Path:   path,
 				Fields: r.Fields[1:],
 			})
 		}
-
 	}
 
 	jobid := zfscmd.GetJobIDOrDefault(ctx, "__nojobid")
-	metric := prom.ZFSListUnmatchedUserSpecifiedDatasetCount.WithLabelValues(jobid)
+	metric := prom.ZFSListUnmatchedUserSpecifiedDatasetCount.
+		WithLabelValues(jobid)
 	metric.Add(float64(len(unmatchedUserSpecifiedDatasets)))
-
-	return
+	return datasets, nil
 }

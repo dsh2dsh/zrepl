@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"os"
 	"os/exec"
@@ -241,67 +242,51 @@ type ZFSListResult struct {
 	Err    error
 }
 
-// ZFSListChan executes `zfs list` and sends the results to the `out` channel.
-// The `out` channel is always closed by ZFSListChan:
-//
-//	If an error occurs, it is closed after sending a result with the Err field
-//	set.
-//
-//	If no error occurs, it is just closed.
-//
-//	If the operation is cancelled via context, the channel is just closed.
+// ZFSListIter executes `zfs list` and returns an iterator with the results.
 //
 // If notExistHint is not nil and zfs exits with an error, the stderr is
 // attempted to be interpreted as a *DatasetDoesNotExist error.
-//
-// However, if callers do not drain `out` or cancel via `ctx`, the process will
-// leak either running because IO is pending or as a zombie.
-func ZFSListChan(ctx context.Context, out chan ZFSListResult,
-	properties []string, notExistHint *DatasetPath, zfsArgs ...string,
-) {
-	defer close(out)
-	sendResult := func(fields []string, err error) bool {
-		select {
-		case <-ctx.Done():
-			return true
-		case out <- ZFSListResult{fields, err}:
-			return false
-		}
-	}
-
+func ZFSListIter(ctx context.Context, properties []string,
+	notExistHint *DatasetPath, zfsArgs ...string,
+) iter.Seq[ZFSListResult] {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, zfsListArgs(properties, zfsArgs)...)
 	var stderrBuf bytes.Buffer
 	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
-	if err != nil {
-		sendResult(nil, err)
-		return
-	} else if err := cmd.Start(); err != nil {
-		sendResult(nil, err)
-		return
-	}
 
-	err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
-		func(s string) (error, bool) {
-			fields := strings.SplitN(s, "\t", len(properties))
-			if len(fields) != len(properties) {
-				return fmt.Errorf("unexpected output from zfs list: %q", s), false
-			}
-			return nil, !sendResult(fields, nil)
-		})
+	return func(yield func(ZFSListResult) bool) {
+		if err != nil {
+			yield(ZFSListResult{Err: err})
+			return
+		} else if err := cmd.Start(); err != nil {
+			yield(ZFSListResult{Err: err})
+			return
+		}
 
-	if notExistHint != nil && err != nil {
-		var zfsError *ZFSError
-		if errors.As(err, &zfsError) && len(zfsError.Stderr) != 0 {
-			enotexist := tryDatasetDoesNotExist(notExistHint.ToString(),
-				zfsError.Stderr)
-			if enotexist != nil {
-				err = enotexist
+		err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
+			func(s string) (error, bool) {
+				fields := strings.SplitN(s, "\t", len(properties))
+				if len(fields) != len(properties) {
+					return fmt.Errorf("unexpected output from zfs list: %q", s), false
+				} else if ctx.Err() != nil {
+					return nil, false
+				}
+				return nil, yield(ZFSListResult{Fields: fields})
+			})
+
+		if notExistHint != nil && err != nil {
+			var zfsError *ZFSError
+			if errors.As(err, &zfsError) && len(zfsError.Stderr) != 0 {
+				enotexist := tryDatasetDoesNotExist(notExistHint.ToString(),
+					zfsError.Stderr)
+				if enotexist != nil {
+					err = enotexist
+				}
 			}
 		}
-	}
 
-	if err != nil {
-		sendResult(nil, err)
+		if err != nil {
+			yield(ZFSListResult{Err: err})
+		}
 	}
 }
 

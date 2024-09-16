@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -213,62 +212,51 @@ func (o *ListFilesystemVersionsOptions) matches(v FilesystemVersion) bool {
 	return (len(o.Types) == 0 || o.Types[v.Type]) && strings.HasPrefix(v.Name, o.ShortnamePrefix)
 }
 
-// returned versions are sorted by createtxg FIXME drop sort by createtxg requirement
-func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath, options ListFilesystemVersionsOptions) (res []FilesystemVersion, err error) {
-	listResults := make(chan ZFSListResult)
-
-	promTimer := prometheus.NewTimer(prom.ZFSListFilesystemVersionDuration.WithLabelValues(fs.ToString()))
+// ZFSListFilesystemVersions returns versions are sorted by createtxg.
+//
+// FIXME drop sort by createtxg requirement
+func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath,
+	options ListFilesystemVersionsOptions,
+) ([]FilesystemVersion, error) {
+	promTimer := prometheus.NewTimer(
+		prom.ZFSListFilesystemVersionDuration.WithLabelValues(fs.ToString()))
 	defer promTimer.ObserveDuration()
 
-	// Note: we don't create a separate trace.Task here because our loop that consumes
-	// the goroutine's output doesn't use ctx.
-	ctx, cancel := context.WithCancel(ctx)
-	// make sure the goroutine doesn't outlive this function call
-	var wg sync.WaitGroup
-	wg.Add(1)
-	defer wg.Wait()
-	defer cancel() // on exit, cancel list process before waiting for it
-	go func() {
-		defer wg.Done()
-		ZFSListChan(ctx, listResults,
-			[]string{"name", "guid", "createtxg", "creation", "userrefs"},
-			fs,
-			"-r", "-d", "1",
-			"-t", options.typesFlagArgs(),
-			"-s", "createtxg", fs.ToString())
-	}()
+	listResults := ZFSListIter(ctx,
+		[]string{"name", "guid", "createtxg", "creation", "userrefs"},
+		fs,
+		"-r", "-d", "1",
+		"-t", options.typesFlagArgs(),
+		"-s", "createtxg", fs.ToString())
 
-	res = make([]FilesystemVersion, 0)
+	res := []FilesystemVersion{}
 	for listResult := range listResults {
 		if listResult.Err != nil {
 			return nil, listResult.Err
 		}
-
 		line := listResult.Fields
-		args := ParseFilesystemVersionArgs{
+		v, err := ParseFilesystemVersion(ParseFilesystemVersionArgs{
 			fullname:  line[0],
 			guid:      line[1],
 			createtxg: line[2],
 			creation:  line[3],
 			userrefs:  line[4],
-		}
-		v, err := ParseFilesystemVersion(args)
+		})
 		if err != nil {
 			return nil, err
-		}
-
-		if options.matches(v) {
+		} else if options.matches(v) {
 			res = append(res, v)
 		}
-
 	}
-	return
+	return res, nil
 }
 
-func ZFSGetFilesystemVersion(ctx context.Context, ds string) (v FilesystemVersion, _ error) {
-	props, err := zfsGet(ctx, ds, []string{"createtxg", "guid", "creation", "userrefs"}, SourceAny)
+func ZFSGetFilesystemVersion(ctx context.Context, ds string,
+) (v FilesystemVersion, err error) {
+	props, err := zfsGet(ctx, ds,
+		[]string{"createtxg", "guid", "creation", "userrefs"}, SourceAny)
 	if err != nil {
-		return v, err
+		return
 	}
 	return ParseFilesystemVersion(ParseFilesystemVersionArgs{
 		fullname:  ds,
