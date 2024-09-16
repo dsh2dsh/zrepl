@@ -179,62 +179,14 @@ func (self *ZFSError) Unwrap() error {
 
 func ZFSList(ctx context.Context, properties []string, zfsArgs ...string,
 ) ([][]string, error) {
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, zfsListArgs(properties, zfsArgs)...)
-	var stderrBuf bytes.Buffer
-	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
-	if err != nil {
-		return nil, err
-	} else if err = cmd.Start(); err != nil {
-		return nil, err
-	}
-
-	var res [][]string
-	err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
-		func(s string) (error, bool) {
-			fields := strings.SplitN(s, "\t", len(properties))
-			if len(fields) != len(properties) {
-				return fmt.Errorf("unexpected output from zfs list: %q", s), false
-			}
-			res = append(res, fields)
-			return nil, true
-		})
-	if err != nil {
-		return nil, err
+	res := [][]string{}
+	for r := range ZFSListIter(ctx, properties, nil, zfsArgs...) {
+		if r.Err != nil {
+			return nil, r.Err
+		}
+		res = append(res, r.Fields)
 	}
 	return res, nil
-}
-
-func zfsListArgs(properties []string, zfsArgs []string) []string {
-	args := make([]string, 0, 4+len(zfsArgs))
-	args = append(args, "list", "-H", "-p", "-o", strings.Join(properties, ","))
-	args = append(args, zfsArgs...)
-	return args
-}
-
-func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf []byte,
-	fn func(s string) (error, bool),
-) (err error) {
-	var ok bool
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		if err, ok = fn(s.Text()); err != nil || !ok {
-			break
-		}
-	}
-
-	if err != nil || !ok || s.Err() != nil {
-		_, _ = io.Copy(io.Discard, r)
-	}
-	cmdErr := cmd.Wait()
-
-	switch {
-	case err != nil:
-	case s.Err() != nil:
-		err = s.Err()
-	case cmdErr != nil:
-		err = NewZfsError(cmdErr, stderrBuf)
-	}
-	return
 }
 
 type ZFSListResult struct {
@@ -288,6 +240,39 @@ func ZFSListIter(ctx context.Context, properties []string,
 			yield(ZFSListResult{Err: err})
 		}
 	}
+}
+
+func zfsListArgs(properties []string, zfsArgs []string) []string {
+	args := make([]string, 0, 4+len(zfsArgs))
+	args = append(args, "list", "-H", "-p", "-o", strings.Join(properties, ","))
+	args = append(args, zfsArgs...)
+	return args
+}
+
+func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf []byte,
+	fn func(s string) (error, bool),
+) (err error) {
+	var ok bool
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		if err, ok = fn(s.Text()); err != nil || !ok {
+			break
+		}
+	}
+
+	if err != nil || !ok || s.Err() != nil {
+		_, _ = io.Copy(io.Discard, r)
+	}
+	cmdErr := cmd.Wait()
+
+	switch {
+	case err != nil:
+	case s.Err() != nil:
+		err = s.Err()
+	case cmdErr != nil:
+		err = NewZfsError(cmdErr, stderrBuf)
+	}
+	return
 }
 
 // FIXME replace with EntityNamecheck
