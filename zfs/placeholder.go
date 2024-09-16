@@ -114,10 +114,7 @@ func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *DatasetPath, parent
 
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
-		err = &ZFSError{
-			Stderr:  stdio,
-			WaitErr: err,
-		}
+		err = NewZfsError(err, stdio)
 	}
 
 	return

@@ -51,7 +51,7 @@ func ZFSHold(ctx context.Context, fs string, v FilesystemVersion, tag string,
 			return nil
 		}
 		cmd.LogError(err, false)
-		return &ZFSError{output, fmt.Errorf("cannot hold %q: %w", fullPath, err)}
+		return NewZfsError(fmt.Errorf("cannot hold %q: %w", fullPath, err), output)
 	}
 	return nil
 }
@@ -67,7 +67,7 @@ func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "holds", "-H", dp)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, &ZFSError{output, fmt.Errorf("zfs holds failed: %w", err)}
+		return nil, NewZfsError(fmt.Errorf("zfs holds failed: %w", err), output)
 	}
 	scan := bufio.NewScanner(bytes.NewReader(output))
 	var tags []string

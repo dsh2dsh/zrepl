@@ -486,10 +486,7 @@ func (s *SendStream) killAndWait() error {
 
 	if exitErr != nil {
 		// zfs send exited with an error or was killed by a signal.
-		s.exitErr = &ZFSError{
-			Stderr:  []byte(s.stderrBuf.String()),
-			WaitErr: exitErr,
-		}
+		s.exitErr = NewZfsError(exitErr, s.stderrBuf.Bytes())
 	} else {
 		// zfs send exited successfully (we know that since waitErr was either nil or wasn't an *exec.ExitError)
 		s.exitErr = nil
@@ -1116,7 +1113,7 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, &ZFSError{output, err}
+		return nil, NewZfsError(err, output)
 	}
 	var si DrySendInfo
 	if err := si.unmarshalZFSOutput(output); err != nil {
@@ -1307,10 +1304,7 @@ func ZFSRecv(
 		} else if readErr := tryRecvCannotReadFromStreamErr(stderr.Bytes()); readErr != nil {
 			waitErr = readErr
 		} else {
-			waitErr = &ZFSError{
-				Stderr:  stderr.Bytes(),
-				WaitErr: err,
-			}
+			waitErr = NewZfsError(err, stderr.Bytes())
 		}
 	}
 	debug("waitErr: %T %s", waitErr, waitErr)
@@ -1454,10 +1448,7 @@ func zfsSet(ctx context.Context, path string, props map[string]string) error {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
-		err = &ZFSError{
-			Stderr:  stdio,
-			WaitErr: err,
-		}
+		err = NewZfsError(err, stdio)
 	}
 
 	return err
@@ -1625,10 +1616,7 @@ func zfsGetRecursive(ctx context.Context, path string, depth int, dstypes []stri
 					return nil, ddne
 				}
 			}
-			return nil, &ZFSError{
-				Stderr:  exitErr.Stderr,
-				WaitErr: exitErr,
-			}
+			return nil, NewZfsError(exitErr, exitErr.Stderr)
 		}
 		return nil, err
 	}
@@ -1782,10 +1770,7 @@ func ZFSDestroy(ctx context.Context, arg string) (err error) {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "destroy", arg)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
-		err = &ZFSError{
-			Stderr:  stdio,
-			WaitErr: err,
-		}
+		err = NewZfsError(err, stdio)
 
 		if destroyOneOrMoreSnapshotsNoneExistedErrorRegexp.Match(stdio) {
 			err = &DatasetDoesNotExist{arg}
@@ -1822,10 +1807,7 @@ func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string, recursive bo
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "snapshot", snapname)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
-		err = &ZFSError{
-			Stderr:  stdio,
-			WaitErr: err,
-		}
+		err = NewZfsError(err, stdio)
 	}
 
 	return
@@ -1915,10 +1897,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 			}
 
 		} else {
-			return bm, &ZFSError{
-				Stderr:  stdio,
-				WaitErr: err,
-			}
+			return bm, NewZfsError(err, stdio)
 		}
 	}
 
@@ -1938,10 +1917,7 @@ func ZFSRollback(ctx context.Context, fs *DatasetPath, snapshot FilesystemVersio
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
-		err = &ZFSError{
-			Stderr:  stdio,
-			WaitErr: err,
-		}
+		err = NewZfsError(err, stdio)
 	}
 
 	return err
