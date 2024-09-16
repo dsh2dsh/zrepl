@@ -79,7 +79,10 @@ func (c *Cmd) Output() (o []byte, err error) {
 	return
 }
 
-func (c *Cmd) StdoutPipe() (io.ReadCloser, error) { return c.cmd.StdoutPipe() }
+func (c *Cmd) StdoutPipeWithErrorBuf(w io.Writer) (io.ReadCloser, error) {
+	c.cmd.Stderr = w
+	return c.cmd.StdoutPipe()
+}
 
 type Stdio struct {
 	Stdin  io.ReadCloser
@@ -333,9 +336,8 @@ func (c *Cmd) WaitPipe() error {
 	for _, cmd := range c.cmds {
 		if cmd.Process == nil {
 			break
-		}
-		if err := cmd.Wait(); err != nil {
-			pipeErr = errors.Join(fmt.Errorf("wait %q: %w", cmd.String(), err))
+		} else if err := cmd.Wait(); err != nil && pipeErr == nil {
+			pipeErr = fmt.Errorf("wait %q: %w", cmd.String(), err)
 		}
 	}
 	return pipeErr
