@@ -1422,25 +1422,24 @@ func (p *ZFSProperties) Add(propName string, propValue PropertyValue) bool {
 }
 
 func zfsSet(ctx context.Context, path string, props map[string]string) error {
-	args := make([]string, 0)
+	args := make([]string, 0, len(props)+2)
 	args = append(args, "set")
 
 	for prop, val := range props {
 		if strings.Contains(prop, "=") {
-			return errors.New("prop contains rune '=' which is the delimiter between property name and value")
+			return errors.New(
+				"prop contains rune '=' which is the delimiter between property name and value")
 		}
 		args = append(args, fmt.Sprintf("%s=%s", prop, val))
 	}
-
 	args = append(args, path)
 
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	stdio, err := cmd.CombinedOutput()
 	if err != nil {
-		err = NewZfsError(err, stdio)
+		return NewZfsError(err, stdio)
 	}
-
-	return err
+	return nil
 }
 
 func ZFSSet(ctx context.Context, fs *DatasetPath, props map[string]string) error {
@@ -1765,7 +1764,7 @@ func tryParseDestroySnapshotsError(arg string, stderr []byte) *DestroySnapshotsE
 	}
 }
 
-func ZFSDestroy(ctx context.Context, arg string) (err error) {
+func ZFSDestroy(ctx context.Context, arg string) error {
 	var dstype, filesystem string
 	idx := strings.IndexAny(arg, "@#")
 	if idx == -1 {
@@ -1781,26 +1780,23 @@ func ZFSDestroy(ctx context.Context, arg string) (err error) {
 		filesystem = arg[:idx]
 	}
 
-	defer prometheus.NewTimer(prom.ZFSDestroyDuration.WithLabelValues(dstype, filesystem))
+	defer prometheus.NewTimer(
+		prom.ZFSDestroyDuration.WithLabelValues(dstype, filesystem))
 
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "destroy", arg)
-	stdio, err := cmd.CombinedOutput()
-	if err != nil {
-		err = NewZfsError(err, stdio)
-
+	if stdio, err := cmd.CombinedOutput(); err != nil {
 		if destroyOneOrMoreSnapshotsNoneExistedErrorRegexp.Match(stdio) {
-			err = &DatasetDoesNotExist{arg}
+			return &DatasetDoesNotExist{arg}
 		} else if match := destroyBookmarkDoesNotExist.FindStringSubmatch(string(stdio)); match != nil && match[1] == arg {
-			err = &DatasetDoesNotExist{arg}
+			return &DatasetDoesNotExist{arg}
 		} else if dsNotExistErr := tryDatasetDoesNotExist(filesystem, stdio); dsNotExistErr != nil {
-			err = dsNotExistErr
+			return dsNotExistErr
 		} else if dserr := tryParseDestroySnapshotsError(arg, stdio); dserr != nil {
-			err = dserr
+			return dserr
 		}
-
+		return NewZfsError(err, stdio)
 	}
-
-	return
+	return nil
 }
 
 func ZFSDestroyIdempotent(ctx context.Context, path string) error {
@@ -1811,22 +1807,23 @@ func ZFSDestroyIdempotent(ctx context.Context, path string) error {
 	return err
 }
 
-func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string, recursive bool) (err error) {
-	promTimer := prometheus.NewTimer(prom.ZFSSnapshotDuration.WithLabelValues(fs.ToString()))
+func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string,
+	recursive bool,
+) error {
+	promTimer := prometheus.NewTimer(
+		prom.ZFSSnapshotDuration.WithLabelValues(fs.ToString()))
 	defer promTimer.ObserveDuration()
 
-	snapname := fmt.Sprintf("%s@%s", fs.ToString(), name)
+	snapname := fs.ToString() + "@" + name
 	if err := EntityNamecheck(snapname, EntityTypeSnapshot); err != nil {
 		return fmt.Errorf("zfs snapshot: %w", err)
 	}
 
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "snapshot", snapname)
-	stdio, err := cmd.CombinedOutput()
-	if err != nil {
-		err = NewZfsError(err, stdio)
+	if stdio, err := cmd.CombinedOutput(); err != nil {
+		return NewZfsError(err, stdio)
 	}
-
-	return
+	return nil
 }
 
 var zfsBookmarkExistsRegex = regexp.MustCompile("^cannot create bookmark '[^']+': bookmark exists")
@@ -1848,12 +1845,15 @@ var ErrBookmarkCloningNotSupported = errors.New("bookmark cloning feature is not
 
 // idempotently create bookmark of the given version v
 //
-// if `v` is a bookmark, returns ErrBookmarkCloningNotSupported
-// unless a bookmark with the name `bookmark` exists and has the same idenitty (zfs.FilesystemVersionEqualIdentity)
+// if `v` is a bookmark, returns ErrBookmarkCloningNotSupported unless a
+// bookmark with the name `bookmark` exists and has the same idenitty
+// (zfs.FilesystemVersionEqualIdentity)
 //
 // v must be validated by the caller
-func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark string) (bm FilesystemVersion, err error) {
-	bm = FilesystemVersion{
+func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion,
+	bookmark string,
+) (FilesystemVersion, error) {
+	bm := FilesystemVersion{
 		Type:     Bookmark,
 		Name:     bookmark,
 		UserRefs: OptionUint64{Valid: false},
@@ -1863,25 +1863,31 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 		Creation:  v.Creation,
 	}
 
-	promTimer := prometheus.NewTimer(prom.ZFSBookmarkDuration.WithLabelValues(fs))
+	promTimer := prometheus.NewTimer(
+		prom.ZFSBookmarkDuration.WithLabelValues(fs))
 	defer promTimer.ObserveDuration()
 
-	bookmarkname := fmt.Sprintf("%s#%s", fs, bookmark)
+	bookmarkname := fs + "#" + bookmark
 	if err := EntityNamecheck(bookmarkname, EntityTypeBookmark); err != nil {
 		return bm, err
 	}
 
 	if v.IsBookmark() {
 		existingBm, err := ZFSGetFilesystemVersion(ctx, bookmarkname)
-		if _, ok := err.(*DatasetDoesNotExist); ok {
-			return bm, ErrBookmarkCloningNotSupported
-		} else if err != nil {
-			return bm, fmt.Errorf("bookmark: idempotency check for bookmark cloning: %w", err)
+		if err != nil {
+			var notExistsErr *DatasetDoesNotExist
+			if errors.As(err, &notExistsErr) {
+				return bm, ErrBookmarkCloningNotSupported
+			}
+			return bm, fmt.Errorf(
+				"bookmark: idempotency check for bookmark cloning: %w", err)
 		}
 		if FilesystemVersionEqualIdentity(bm, existingBm) {
 			return existingBm, nil
 		}
-		return bm, ErrBookmarkCloningNotSupported // TODO This is work in progress: https://github.com/zfsonlinux/zfs/pull/9571
+		// TODO This is work in progress:
+		// https://github.com/zfsonlinux/zfs/pull/9571
+		return bm, ErrBookmarkCloningNotSupported
 	}
 
 	snapname := v.FullPath(fs)
@@ -1890,51 +1896,53 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion, bookmark s
 	}
 
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "bookmark", snapname, bookmarkname)
-	stdio, err := cmd.CombinedOutput()
-	if err != nil {
-		if ddne := tryDatasetDoesNotExist(snapname, stdio); ddne != nil {
+	if stdio, err := cmd.CombinedOutput(); err != nil {
+		ddne := tryDatasetDoesNotExist(snapname, stdio)
+		switch {
+		case ddne != nil:
 			return bm, ddne
-		} else if zfsBookmarkExistsRegex.Match(stdio) {
-
+		case zfsBookmarkExistsRegex.Match(stdio):
 			// check if this was idempotent
 			bookGuid, err := ZFSGetGUID(ctx, fs, "#"+bookmark)
-			if err != nil {
-				return bm, fmt.Errorf("bookmark: idempotency check for bookmark creation: %w", err) // guid error expressive enough
-			}
-
-			if v.Guid == bookGuid {
-				debug("bookmark: %q %q was idempotent: {snap,book}guid %d == %d", snapname, bookmarkname, v.Guid, bookGuid)
+			switch {
+			case err != nil:
+				// guid error expressive enough
+				return bm, fmt.Errorf(
+					"bookmark: idempotency check for bookmark creation: %w", err)
+			case v.Guid == bookGuid:
+				debug("bookmark: %q %q was idempotent: {snap,book}guid %d == %d",
+					snapname, bookmarkname, v.Guid, bookGuid)
 				return bm, nil
 			}
 			return bm, &BookmarkExists{
-				fs: fs, bookmarkOrigin: v.ToSendArgVersion(), bookmark: bookmark,
-				zfsMsg:   string(stdio),
-				bookGuid: bookGuid,
+				fs:             fs,
+				bookmarkOrigin: v.ToSendArgVersion(),
+				bookmark:       bookmark,
+				zfsMsg:         string(stdio),
+				bookGuid:       bookGuid,
 			}
-
-		} else {
-			return bm, NewZfsError(err, stdio)
 		}
+		return bm, NewZfsError(err, stdio)
 	}
-
 	return bm, nil
 }
 
-func ZFSRollback(ctx context.Context, fs *DatasetPath, snapshot FilesystemVersion, rollbackArgs ...string) (err error) {
+func ZFSRollback(ctx context.Context, fs *DatasetPath,
+	snapshot FilesystemVersion, rollbackArgs ...string,
+) error {
 	snapabs := snapshot.ToAbsPath(fs)
 	if snapshot.Type != Snapshot {
 		return fmt.Errorf("can only rollback to snapshots, got %s", snapabs)
 	}
 
-	args := []string{"rollback"}
+	args := make([]string, 0, len(rollbackArgs)+2)
+	args = append(args, "rollback")
 	args = append(args, rollbackArgs...)
 	args = append(args, snapabs)
 
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
-	stdio, err := cmd.CombinedOutput()
-	if err != nil {
-		err = NewZfsError(err, stdio)
+	if stdio, err := cmd.CombinedOutput(); err != nil {
+		return NewZfsError(err, stdio)
 	}
-
-	return err
+	return nil
 }

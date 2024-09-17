@@ -52,9 +52,12 @@ func ResumeSendSupported(ctx context.Context) (bool, error) {
 		// "feature discovery"
 		cmd := zfscmd.CommandContext(ctx, ZfsBin, "send").WithLogError(false)
 		output, err := cmd.CombinedOutput()
-		if ee, ok := err.(*exec.ExitError); !ok || ok && !ee.Exited() {
-			resumeSendSupportedCheck.err = fmt.Errorf(
-				"resumable send cli support feature check failed: %w", err)
+		if err != nil {
+			var exitError *exec.ExitError
+			if !errors.As(err, &exitError) || !exitError.Exited() {
+				resumeSendSupportedCheck.err = fmt.Errorf(
+					"resumable send cli support feature check failed: %w", err)
+			}
 		}
 		def := bytes.Contains(output, []byte("receive_resume_token"))
 		if err != nil {
@@ -104,14 +107,18 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 		output, err := cmd.CombinedOutput()
 		upgradeWhile(func() {
 			sup.flagSupport.checked = true
-			if ee, ok := err.(*exec.ExitError); err != nil && (!ok || ok && !ee.Exited()) {
-				sup.flagSupport.err = err
+			if err != nil {
+				var exitError *exec.ExitError
+				if !errors.As(err, &exitError) || !exitError.Exited() {
+					sup.flagSupport.err = err
+				} else {
+					sup.flagSupport.supported = bytes.Contains(output,
+						[]byte("-A <filesystem|volume>"))
+				}
+				cmd.LogError(err, sup.flagSupport.supported)
 			} else {
 				sup.flagSupport.supported = bytes.Contains(output,
 					[]byte("-A <filesystem|volume>"))
-			}
-			if err != nil {
-				cmd.LogError(err, sup.flagSupport.supported)
 			}
 			debug("resume recv cli flag feature check result: %#v", sup.flagSupport)
 		})
@@ -119,17 +126,19 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 	}
 
 	if sup.flagSupport.err != nil {
-		return false, fmt.Errorf("zfs recv feature check for resumable send & recv failed: %w", sup.flagSupport.err)
+		return false, fmt.Errorf(
+			"zfs recv feature check for resumable send & recv failed: %w",
+			sup.flagSupport.err)
 	} else if !sup.flagSupport.supported || fs == nil {
 		return sup.flagSupport.supported, nil
 	}
 
 	// Flag is supported and pool-support is request
 	// Now check for pool support
-
 	pool, err := fs.Pool()
 	if err != nil {
-		return false, fmt.Errorf("resume recv check requires pool of dataset: %w", err)
+		return false, fmt.Errorf(
+			"resume recv check requires pool of dataset: %w", err)
 	}
 
 	if sup.poolSupported == nil {
@@ -138,40 +147,63 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 		})
 	}
 
-	var poolSup resumeRecvPoolSupportedResult
-	var ok bool
-	if poolSup, ok = sup.poolSupported[pool]; !ok || // shadow
-		(!poolSup.supported && time.Since(poolSup.lastCheck) > resumeRecvPoolSupportRecheckTimeout) {
+	poolSup, ok := sup.poolSupported[pool]
+	if !ok || (!poolSup.supported &&
+		time.Since(poolSup.lastCheck) > resumeRecvPoolSupportRecheckTimeout) {
 
-		output, err := zfscmd.CommandContext(ctx, "zpool", "get", "-H", "-p", "-o", "value", "feature@extensible_dataset", pool).CombinedOutput()
+		cmd := zfscmd.CommandContext(ctx, "zpool", "get", "-H", "-p",
+			"-o", "value", "feature@extensible_dataset", pool)
+		output, err := cmd.CombinedOutput()
 		if err != nil {
 			debug("resume recv pool support check result: %#v", sup.flagSupport)
-			poolSup.supported = false
-			poolSup.err = err
+			poolSup.supported, poolSup.err = false, err
 		} else {
 			poolSup.err = nil
 			o := strings.TrimSpace(string(output))
 			poolSup.supported = o == "active" || o == "enabled"
 		}
 		poolSup.lastCheck = time.Now()
-
-		// we take the lock late, so two updaters might check simultaneously, but that shouldn't hurt
-		upgradeWhile(func() {
-			sup.poolSupported[pool] = poolSup
-		})
+		// we take the lock late, so two updaters might check simultaneously, but
+		// that shouldn't hurt
+		upgradeWhile(func() { sup.poolSupported[pool] = poolSup })
 		// fallthrough
 	}
 
 	if poolSup.err != nil {
-		return false, fmt.Errorf("pool %q check for feature@extensible_dataset feature failed: %w", pool, poolSup.err)
+		return false, fmt.Errorf(
+			"pool %q check for feature@extensible_dataset feature failed: %w",
+			pool, poolSup.err)
 	}
-
 	return poolSup.supported, nil
 }
 
 // Abuse 'zfs send' to decode the resume token
 //
 // FIXME: implement nvlist unpacking in Go and read through libzfs_sendrecv.c
+//
+// Example resume tokens:
+//
+// # From a non-incremental send
+//
+// 1-bf31b879a-b8-789c636064000310a500c4ec50360710e72765a5269740f80cd8e4d3d28a534b18e00024cf86249f5459925acc802a8facbf243fbd3433858161f5ddb9ab1ae7c7466a20c97382e5f312735319180af2f3730cf58166953824c2cc0200cde81651
+//
+// # From an incremental send
+//
+// 1-c49b979a2-e0-789c636064000310a501c49c50360710a715e5e7a69766a63040c1eabb735735ce8f8d5400b2d991d4e52765a5269740f82080219f96569c5ac2000720793624f9a4ca92d46206547964fd25f91057f09e37babb88c9bf5503499e132c9f97989bcac050909f9f63a80f34abc421096616007c881d4c
+//
+// Resulting output of zfs send -nvt <token>
+//
+// resume token contents:
+// nvlist version: 0
+//
+//	fromguid = 0x595d9f81aa9dddab
+//	object = 0x1
+//	offset = 0x0
+//	bytes = 0x0
+//	toguid = 0x854f02a2dd32cf0d
+//	toname = pool1/test@b
+//
+// cannot resume send: 'pool1/test@b' used in the initial send no longer exists
 func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	if supported, err := ResumeSendSupported(ctx); err != nil {
 		return nil, err
@@ -179,39 +211,17 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 		return nil, ResumeTokenDecodingNotSupported
 	}
 
-	// Example resume tokens:
-	//
-	// From a non-incremental send
-	// 1-bf31b879a-b8-789c636064000310a500c4ec50360710e72765a5269740f80cd8e4d3d28a534b18e00024cf86249f5459925acc802a8facbf243fbd3433858161f5ddb9ab1ae7c7466a20c97382e5f312735319180af2f3730cf58166953824c2cc0200cde81651
-
-	// From an incremental send
-	// 1-c49b979a2-e0-789c636064000310a501c49c50360710a715e5e7a69766a63040c1eabb735735ce8f8d5400b2d991d4e52765a5269740f82080219f96569c5ac2000720793624f9a4ca92d46206547964fd25f91057f09e37babb88c9bf5503499e132c9f97989bcac050909f9f63a80f34abc421096616007c881d4c
-
-	// Resulting output of zfs send -nvt <token>
-	//
-	//resume token contents:
-	//nvlist version: 0
-	//	fromguid = 0x595d9f81aa9dddab
-	//	object = 0x1
-	//	offset = 0x0
-	//	bytes = 0x0
-	//	toguid = 0x854f02a2dd32cf0d
-	//	toname = pool1/test@b
-	//cannot resume send: 'pool1/test@b' used in the initial send no longer exists
-
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, "send", "-nvt", string(token))
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "send", "-nvt", token)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if !exitErr.Exited() {
-				return nil, err
-			}
-			// we abuse zfs send for decoding, the exit error may be due to
-			// a) the token being from a third machine
-			// b) it no longer exists on the machine where
-		} else {
+		var exitError *exec.ExitError
+		if !errors.As(err, &exitError) || !exitError.Exited() {
 			return nil, err
 		}
+		// we abuse zfs send for decoding, the exit error may be due to
+		//
+		//  a) the token being from a third machine
+		//  b) it no longer exists on the machine where
 	}
 
 	if !resumeTokenContentsRE.Match(output) {
@@ -227,7 +237,6 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	}
 
 	rt := &ResumeToken{}
-
 	for _, m := range matches {
 		attr, val := m[1], m[2]
 		switch attr {
@@ -281,7 +290,6 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	if !rt.HasToGUID {
 		return nil, ResumeTokenDecodingNotSupported
 	}
-
 	return rt, nil
 }
 

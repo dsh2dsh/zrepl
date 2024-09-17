@@ -229,9 +229,12 @@ func (d destroyerImpl) DestroySnapshotsCommaSyntaxSupported(ctx context.Context,
 		cmd := zfscmd.CommandContext(ctx, ZfsBin, "destroy").
 			WithLogError(false)
 		output, err := cmd.CombinedOutput()
-		if _, ok := err.(*exec.ExitError); !ok {
-			debug("destroy feature check failed: %T %s", err, err)
-			batchDestroyFeatureCheck.err = err
+		if err != nil {
+			var exitError *exec.ExitError
+			if !errors.As(err, &exitError) {
+				debug("destroy feature check failed: %T %s", err, err)
+				batchDestroyFeatureCheck.err = err
+			}
 		}
 		def := bytes.Contains(output,
 			[]byte("<filesystem|volume>@<snap>[%<snap>][,...]"))

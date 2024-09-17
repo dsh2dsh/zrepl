@@ -86,38 +86,37 @@ const (
 	FilesystemPlaceholderCreateEncryptionOff
 )
 
-func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *DatasetPath, parent *DatasetPath, encryption FilesystemPlaceholderCreateEncryptionValue) (err error) {
+func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *DatasetPath,
+	parent *DatasetPath, encryption FilesystemPlaceholderCreateEncryptionValue,
+) error {
 	if fs.Length() == 1 {
-		return fmt.Errorf("cannot create %q: pools cannot be created with zfs create", fs.ToString())
-	}
-
-	cmdline := []string{
-		"create",
-		"-o", fmt.Sprintf("%s=%s", PlaceholderPropertyName, placeholderPropertyOn),
-		"-o", "mountpoint=none",
-	}
-
-	if !encryption.IsAFilesystemPlaceholderCreateEncryptionValue() {
+		return fmt.Errorf(
+			"cannot create %q: pools cannot be created with zfs create",
+			fs.ToString())
+	} else if !encryption.IsAFilesystemPlaceholderCreateEncryptionValue() {
 		panic(encryption)
 	}
+
+	cmdline := make([]string, 0, 7)
+	cmdline = append(cmdline,
+		"create",
+		"-o", PlaceholderPropertyName+"="+placeholderPropertyOn,
+		"-o", "mountpoint=none",
+	)
+
 	switch encryption {
-	case FilesystemPlaceholderCreateEncryptionInherit:
-		// no-op
+	case FilesystemPlaceholderCreateEncryptionInherit: // no-op
 	case FilesystemPlaceholderCreateEncryptionOff:
 		cmdline = append(cmdline, "-o", "encryption=off")
 	default:
 		panic(encryption)
 	}
 
-	cmdline = append(cmdline, fs.ToString())
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, cmdline...)
-
-	stdio, err := cmd.CombinedOutput()
-	if err != nil {
-		err = NewZfsError(err, stdio)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, append(cmdline, fs.ToString())...)
+	if stdio, err := cmd.CombinedOutput(); err != nil {
+		return NewZfsError(err, stdio)
 	}
-
-	return
+	return nil
 }
 
 func ZFSSetPlaceholder(ctx context.Context, p *DatasetPath, isPlaceholder bool) error {
