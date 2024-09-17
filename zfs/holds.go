@@ -6,9 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
-	"syscall"
 
 	"github.com/dsh2dsh/zrepl/util/envconst"
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
@@ -90,58 +88,29 @@ func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 }
 
 // Idempotent: if the hold doesn't exist, this is not an error
-func ZFSRelease(ctx context.Context, tag string, snaps ...string) error {
-	cumLens := make([]int, len(snaps))
-	for i := 1; i < len(snaps); i++ {
-		cumLens[i] = cumLens[i-1] + len(snaps[i])
-	}
-
-	maxInvocationLen := 12 * os.Getpagesize()
+func ZFSRelease(ctx context.Context, tag string, snap string) error {
 	var noSuchTagLines, otherLines []string
-	for i := 0; i < len(snaps); {
-		j := i
-		for ; j < len(snaps); j++ {
-			if cumLens[j]-cumLens[i] > maxInvocationLen {
-				break
-			}
-		}
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "release", tag, snap).
+		WithLogError(false)
+	output, err := cmd.CombinedOutput()
+	// further error handling part of error scraper below
 
-		args := make([]string, 0, len(snaps[i:j])+2)
-		args = append(args, "release", tag)
-		args = append(args, snaps[i:j]...)
-
-		cmd := zfscmd.CommandContext(ctx, ZfsBin, args...).WithLogError(false)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			var pe *os.PathError
-			if errors.As(err, &pe); pe.Err == syscall.E2BIG {
-				maxInvocationLen = maxInvocationLen / 2
-				cmd.LogError(err, true)
-				continue
-			}
+	// Even if release fails for datasets where there's no hold with the tag the
+	// hold is still released on datasets which have a hold with the tag.
+	//
+	// FIXME verify this in a platformtest => screen-scrape
+	var hasOtherLines bool
+	for scan := bufio.NewScanner(bytes.NewReader(output)); scan.Scan(); {
+		line := scan.Text()
+		if strings.Contains(line, "no such tag on this dataset") {
+			noSuchTagLines = append(noSuchTagLines, line)
+		} else {
+			otherLines = append(otherLines, line)
+			hasOtherLines = true
 		}
-		// further error handling part of error scraper below
-
-		maxInvocationLen = maxInvocationLen + os.Getpagesize()
-		i = j
-
-		// Even if release fails for datasets where there's no hold with the tag the
-		// hold is still released on datasets which have a hold with the tag.
-		//
-		// FIXME verify this in a platformtest => screen-scrape
-		var hasOtherLines bool
-		for scan := bufio.NewScanner(bytes.NewReader(output)); scan.Scan(); {
-			line := scan.Text()
-			if strings.Contains(line, "no such tag on this dataset") {
-				noSuchTagLines = append(noSuchTagLines, line)
-			} else {
-				otherLines = append(otherLines, line)
-				hasOtherLines = true
-			}
-		}
-		if err != nil {
-			cmd.LogError(err, !hasOtherLines)
-		}
+	}
+	if err != nil {
+		cmd.LogError(err, !hasOtherLines)
 	}
 
 	if debugEnabled {
