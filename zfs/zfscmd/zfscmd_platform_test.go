@@ -179,37 +179,32 @@ func TestCmd_Pipe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w, err := os.Pipe()
-			require.NoError(t, err)
-			t.Cleanup(func() { w.Close(); r.Close() })
-
 			cmd := New(ctx).WithPipeLen(len(tt.pipe)).
 				WithCommand(tt.cmd[0], tt.cmd[1:])
 
-			var stdout io.ReadCloser
+			var stdout bytes.Buffer
 			var stderr bytes.Buffer
+			var pipeReader io.Reader
+			var err error
+
 			if tt.pipeFrom {
-				var b bytes.Buffer
-				require.NoError(t, cmd.PipeFrom(r, &b, &stderr, tt.pipe))
-				stdout = io.NopCloser(&b)
+				require.NoError(t, cmd.PipeFrom(tt.pipe, nil, &stdout, &stderr))
+				pipeReader = &stdout
 			} else {
-				stdout, err = cmd.Pipe(r, w, &stderr, tt.pipe)
+				pipeReader, err = cmd.PipeTo(tt.pipe, nil, &stderr)
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantCmdStr, cmd.String())
 
 			if tt.startErr {
-				require.Error(t, cmd.startPipe())
+				require.Error(t, cmd.StartPipe())
 				require.NoError(t, cmd.WaitPipe())
 				return
 			}
+			require.NoError(t, cmd.StartPipe())
 
-			require.NoError(t, cmd.startPipe())
-			require.NoError(t, w.Close())
-
-			b, err := io.ReadAll(stdout)
+			b, err := io.ReadAll(pipeReader)
 			require.NoError(t, err)
-			require.NoError(t, r.Close())
 
 			if tt.waitErr {
 				require.Error(t, cmd.WaitPipe())

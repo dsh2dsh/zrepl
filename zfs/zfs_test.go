@@ -1,7 +1,9 @@
 package zfs
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/util/nodefault"
 	zfsprop "github.com/dsh2dsh/zrepl/zfs/property"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 // FIXME make this a platformtest
@@ -401,7 +404,6 @@ size	1500
 
 func TestTryRecvDestroyOrOverwriteEncryptedErr(t *testing.T) {
 	msg := "cannot receive new filesystem stream: zfs receive -F cannot be used to destroy an encrypted filesystem or overwrite an unencrypted one with an encrypted one\n"
-	assert.GreaterOrEqual(t, RecvStderrBufSiz, len(msg))
 
 	err := tryRecvDestroyOrOverwriteEncryptedErr([]byte(msg))
 	require.NotNil(t, err)
@@ -533,4 +535,47 @@ func TestZFSCommonRecvArgsBuild(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSendStream_Close_afterRead(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const foobar = "foobar"
+	cmd := zfscmd.CommandContext(ctx, "echo", "-n", foobar)
+	var stderrBuf bytes.Buffer
+	pipeReader, err := cmd.PipeTo(nil, nil, &stderrBuf)
+	require.NoError(t, err)
+	require.NoError(t, cmd.StartPipe())
+
+	stream := NewSendStream(cmd, pipeReader, &stderrBuf, cancel)
+	stream.testMode = true
+	var stdout bytes.Buffer
+	n, err := io.Copy(&stdout, stream)
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(foobar)), n)
+	assert.Equal(t, foobar, stdout.String())
+
+	require.NoError(t, stream.Close())
+	assert.Empty(t, stderrBuf.Bytes())
+}
+
+func TestSendStream_Close_noRead(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	const foobar = "foobar"
+	cmd := zfscmd.CommandContext(ctx, "echo", "-n", foobar)
+	var stderrBuf bytes.Buffer
+	pipeReader, err := cmd.PipeTo(nil, nil, &stderrBuf)
+	require.NoError(t, err)
+	require.NoError(t, cmd.StartPipe())
+
+	stream := NewSendStream(cmd, pipeReader, &stderrBuf, cancel)
+	stream.testMode = true
+	var zfsError *ZFSError
+	require.ErrorAs(t, stream.Close(), &zfsError)
+	t.Log(zfsError)
+	assert.Contains(t, zfsError.Error(), "signal: broken pipe")
+	assert.Empty(t, stderrBuf.Bytes())
 }

@@ -107,15 +107,17 @@ func (c *Cmd) String() string {
 	return s.String()
 }
 
-func (c *Cmd) log() Logger {
-	return getLogger(c.ctx)
-}
+func (c *Cmd) Log() Logger { return c.logWithCmd() }
 
 func (c *Cmd) logWithCmd() Logger {
 	if c.cmdLogger == nil {
 		c.cmdLogger = c.log().WithField("cmd", c.String())
 	}
 	return c.cmdLogger
+}
+
+func (c *Cmd) log() Logger {
+	return getLogger(c.ctx)
 }
 
 // Start the command.
@@ -129,7 +131,7 @@ func (c *Cmd) logWithCmd() Logger {
 // be called repeatedly.
 func (c *Cmd) Start() error {
 	c.startPre(true)
-	err := c.startPipe()
+	err := c.StartPipe()
 	if err != nil {
 		_ = c.WaitPipe()
 	}
@@ -266,29 +268,20 @@ func (c *Cmd) TestOnly_ExecCmd() *exec.Cmd {
 	return c.cmd
 }
 
-func (c *Cmd) Pipe(
-	stdin io.ReadCloser, stdout, stderr io.Writer, cmds [][]string,
+func (c *Cmd) PipeTo(cmds [][]string, stdout io.ReadCloser, stderr io.Writer,
 ) (io.ReadCloser, error) {
-	if len(c.cmds) > 0 && c.cmds[0] == c.cmd {
-		c.SetStdio(Stdio{
-			Stdin:  nil,
-			Stdout: stdout,
-			Stderr: stderr,
-		})
-	}
-
-	for _, pipeCmd := range c.buildPipe(cmds) {
-		r, err := pipeCmd.StdoutPipe()
+	c.cmds = append(c.cmds, c.buildPipe(cmds)...)
+	for _, cmd := range c.cmds {
+		r, err := cmd.StdoutPipe()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"create stdout pipe from %q: %w", pipeCmd.String(), err)
+				"create stdout pipe from %q: %w", cmd.String(), err)
 		}
-		pipeCmd.Stdin = stdin
-		pipeCmd.Stderr = stderr
-		c.cmds = append(c.cmds, pipeCmd)
-		stdin = r
+		cmd.Stderr = stderr
+		cmd.Stdin = stdout
+		stdout = r
 	}
-	return stdin, nil
+	return stdout, nil
 }
 
 func (c *Cmd) buildPipe(cmds [][]string) []*exec.Cmd {
@@ -304,25 +297,25 @@ func (c *Cmd) buildPipe(cmds [][]string) []*exec.Cmd {
 	return pipeCmds
 }
 
-func (c *Cmd) PipeFrom(stdin io.ReadCloser, stdout, stderr io.Writer,
-	cmds [][]string,
+func (c *Cmd) PipeFrom(cmds [][]string, stdin io.ReadCloser, stdout,
+	stderr io.Writer,
 ) error {
 	c.cmds = c.cmds[:0]
-	stdin, err := c.Pipe(stdin, stdout, stderr, cmds)
+	r, err := c.PipeTo(cmds, stdin, stderr)
 	if err != nil {
 		return err
 	}
 
 	c.cmds = append(c.cmds, c.cmd)
 	c.SetStdio(Stdio{
-		Stdin:  stdin,
+		Stdin:  r,
 		Stdout: stdout,
 		Stderr: stderr,
 	})
 	return nil
 }
 
-func (c *Cmd) startPipe() error {
+func (c *Cmd) StartPipe() error {
 	for _, cmd := range c.cmds {
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("start %q: %w", cmd.String(), err)
