@@ -232,3 +232,29 @@ jobs:
 	require.NotNil(t, snap)
 	assert.True(t, snap.TimestampLocal)
 }
+
+func TestSendOptions_Raw_defaultTrue(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "push"
+    connect:
+      type: "local"
+      listener_name: "foo"
+      client_identity: "bar"
+    filesystems:
+      "<": true
+    snapshotting:
+      type: "periodic"
+      prefix: "zrepl_"
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+`)
+
+	require.NotEmpty(t, c.Jobs)
+	require.IsType(t, new(PushJob), c.Jobs[0].Ret)
+	job := c.Jobs[0].Ret.(*PushJob)
+	require.NotNil(t, job)
+	assert.True(t, job.Send.Raw)
+}

@@ -125,7 +125,7 @@ type SnapJob struct {
 
 type SendOptions struct {
 	Encrypted        bool `yaml:"encrypted"`
-	Raw              bool `yaml:"raw"`
+	Raw              bool `yaml:"raw" default:"true"`
 	SendProperties   bool `yaml:"send_properties"`
 	BackupProperties bool `yaml:"backup_properties"`
 	LargeBlocks      bool `yaml:"large_blocks"`

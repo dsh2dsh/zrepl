@@ -293,6 +293,13 @@ pkg install zrepl-dsh2dsh
 
   * Redesigned `zrepl status`
 
+  * `zfs send -w` is default now. Example how to change it back:
+
+  ``` yaml
+  send:
+    raw: false
+  ```
+
   * Small cosmetic changes
 
 ## Upstream user documentation
