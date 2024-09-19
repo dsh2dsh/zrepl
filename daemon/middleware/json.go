@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/dsh2dsh/zrepl/logger"
@@ -38,10 +37,7 @@ func (self *jsonResponder[T]) writeError(err error, w http.ResponseWriter,
 	msg string,
 ) {
 	self.log.WithError(err).Error(msg)
-	w.WriteHeader(http.StatusInternalServerError)
-	if _, err = io.WriteString(w, err.Error()); err != nil {
-		self.log.WithError(err).Error("control handler io error")
-	}
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
 // --------------------------------------------------
@@ -87,8 +83,5 @@ func (self *jsonRequestResponder[T1, T2]) writeError(err error,
 	w http.ResponseWriter, msg string, statusCode int,
 ) {
 	self.log.WithError(err).Error(msg)
-	w.WriteHeader(statusCode)
-	if _, err = io.WriteString(w, err.Error()); err != nil {
-		self.log.WithError(err).Error("control handler io error")
-	}
+	http.Error(w, err.Error(), statusCode)
 }
