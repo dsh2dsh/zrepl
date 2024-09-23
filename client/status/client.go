@@ -7,6 +7,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/client/jsonclient"
 	"github.com/dsh2dsh/zrepl/daemon"
+	"github.com/dsh2dsh/zrepl/version"
 )
 
 func NewClient(network, addr string) (*Client, error) {
@@ -63,4 +64,13 @@ func (self *Client) signal(job, sig string) error {
 		return fmt.Errorf("daemon signal %q to job %q: %w", sig, job, err)
 	}
 	return nil
+}
+
+func (self *Client) Version() (v version.ZreplVersionInformation, err error) {
+	err = self.control.Get(context.Background(),
+		daemon.ControlJobEndpointVersion, &v)
+	if err != nil {
+		err = fmt.Errorf("daemon version: %w", err)
+	}
+	return
 }
