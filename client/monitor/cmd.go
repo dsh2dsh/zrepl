@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dsh2dsh/go-monitoringplugin/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/zrepl/cli"
@@ -73,6 +74,26 @@ var snapshotsCmd = &cli.Subcommand{
 		_ = c.MarkPersistentFlagRequired("job")
 		c.MarkFlagsRequiredTogether("prefix", "crit")
 	},
+
+	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
+	) error {
+		return withJobConfig(cmd, func(j *config.JobEnum) error {
+			ctx := context.Background()
+			resp := monitoringplugin.NewResponse(fmt.Sprintf(
+				"job %q: monitor snapshots", j.Name()))
+
+			check := NewSnapCheck(resp).
+				WithPrefix(snapPrefix).
+				WithThresholds(snapWarn, snapCrit).
+				UpdateStatus(ctx, j)
+			if resp.GetStatusCode() != monitoringplugin.UNKNOWN {
+				check.Reset().WithOldest(true).UpdateStatus(ctx, j)
+			}
+
+			resp.OutputAndExit()
+			return nil
+		})
+	},
 }
 
 var latestCmd = &cli.Subcommand{
@@ -86,7 +107,9 @@ var latestCmd = &cli.Subcommand{
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
 		return withJobConfig(cmd, func(j *config.JobEnum) error {
-			return NewSnapCheck().
+			resp := monitoringplugin.NewResponse(fmt.Sprintf(
+				"job %q: latest snapshots", j.Name()))
+			return NewSnapCheck(resp).
 				WithPrefix(snapPrefix).
 				WithThresholds(snapWarn, snapCrit).
 				OutputAndExit(context.Background(), j)
@@ -105,7 +128,9 @@ var oldestCmd = &cli.Subcommand{
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
 		return withJobConfig(cmd, func(j *config.JobEnum) error {
-			return NewSnapCheck().WithOldest(true).
+			resp := monitoringplugin.NewResponse(fmt.Sprintf(
+				"job %q: oldest snapshots", j.Name()))
+			return NewSnapCheck(resp).WithOldest(true).
 				WithPrefix(snapPrefix).
 				WithThresholds(snapWarn, snapCrit).
 				OutputAndExit(context.Background(), j)

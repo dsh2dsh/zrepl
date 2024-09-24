@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,32 +14,30 @@ import (
 	"github.com/dsh2dsh/zrepl/zfs"
 )
 
-const snapshotsOkMsg = "job %q: %s snapshot: %q (%v)"
-
-func NewSnapCheck() *SnapCheck {
-	check := &SnapCheck{}
-	return check.applyOptions()
+func NewSnapCheck(resp *monitoringplugin.Response) *SnapCheck {
+	check := &SnapCheck{resp: resp}
+	return check.init()
 }
 
 type SnapCheck struct {
 	oldest bool
-
 	job    string
 	prefix string
+	warn   time.Duration
+	crit   time.Duration
 
-	warn time.Duration
-	crit time.Duration
-
-	resp *monitoringplugin.Response
+	resp         *monitoringplugin.Response
+	statusPrefix string
 
 	age      time.Duration
 	snapName string
+
+	datasets []string
+	cache    map[string][]zfs.FilesystemVersion
 }
 
-func (self *SnapCheck) applyOptions() *SnapCheck {
-	if self.resp == nil {
-		self.resp = monitoringplugin.NewResponse(snapshotsOkMsg)
-	}
+func (self *SnapCheck) init() *SnapCheck {
+	self.cache = make(map[string][]zfs.FilesystemVersion)
 	return self
 }
 
@@ -58,30 +57,55 @@ func (self *SnapCheck) WithOldest(v bool) *SnapCheck {
 	return self
 }
 
+func (self *SnapCheck) WithResponse(resp *monitoringplugin.Response,
+) *SnapCheck {
+	self.resp = resp
+	return self
+}
+
+func (self *SnapCheck) WithStatusPrefix(s string) *SnapCheck {
+	self.statusPrefix = s
+	return self
+}
+
 func (self *SnapCheck) OutputAndExit(ctx context.Context,
 	jobConfig *config.JobEnum,
 ) error {
-	if err := self.run(ctx, jobConfig); err != nil {
-		self.resp.UpdateStatusOnError(fmt.Errorf("job %q: %w", self.job, err),
-			monitoringplugin.UNKNOWN, "", true)
-	} else {
-		self.resp.WithDefaultOkMessage(fmt.Sprintf(snapshotsOkMsg,
-			self.job, self.snapshotType(), self.snapName, self.age))
-	}
+	self.UpdateStatus(ctx, jobConfig)
 	self.resp.OutputAndExit()
 	return nil
 }
 
-func (self *SnapCheck) run(ctx context.Context, jobConfig *config.JobEnum,
+func (self *SnapCheck) UpdateStatus(ctx context.Context,
+	jobConfig *config.JobEnum,
+) *SnapCheck {
+	if err := self.Run(ctx, jobConfig); err != nil {
+		self.resp.UpdateStatusOnError(err, monitoringplugin.UNKNOWN,
+			fmt.Sprintf("job %q", self.job), true)
+	} else if self.resp.GetStatusCode() == monitoringplugin.OK {
+		self.resp.UpdateStatus(monitoringplugin.OK, self.statusf(
+			"%s %q: %v",
+			self.snapshotType(), self.snapName, self.age))
+	}
+	return self
+}
+
+func (self *SnapCheck) Run(ctx context.Context, jobConfig *config.JobEnum,
 ) error {
 	self.job = jobConfig.Name()
-	datasets, rules, err := self.datasetsRules(ctx, jobConfig)
+	datasets, rules, err := self.datasetRules(ctx, jobConfig)
 	if err != nil {
 		return err
 	} else if rules, err = self.overrideRules(rules); err != nil {
 		return err
 	}
-	return self.checkSnapshots(ctx, datasets, rules)
+
+	for _, dataset := range datasets {
+		if err := self.checkDataset(ctx, dataset, rules); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (self *SnapCheck) overrideRules(rules []config.MonitorSnapshot,
@@ -97,17 +121,16 @@ func (self *SnapCheck) overrideRules(rules []config.MonitorSnapshot,
 	}
 
 	if len(rules) == 0 {
-		return nil, fmt.Errorf(
-			"no monitor rules or cli args defined for job %q", self.job)
+		return nil, errors.New("no monitor rules or cli args defined")
 	}
-
 	return rules, nil
 }
 
-func (self *SnapCheck) datasetsRules(
+func (self *SnapCheck) datasetRules(
 	ctx context.Context, jobConfig *config.JobEnum,
 ) (datasets []string, rules []config.MonitorSnapshot, err error) {
 	var cfg config.MonitorSnapshots
+
 	switch job := jobConfig.Ret.(type) {
 	case *config.PushJob:
 		cfg = job.MonitorSnapshots
@@ -135,16 +158,19 @@ func (self *SnapCheck) datasetsRules(
 			rules = cfg.Latest
 		}
 	}
-
 	return
 }
 
 func (self *SnapCheck) datasetsFromFilter(
 	ctx context.Context, ff config.FilesystemsFilter,
 ) ([]string, error) {
+	if self.datasets != nil {
+		return self.datasets, nil
+	}
+
 	filesystems, err := filters.DatasetMapFilterFromConfig(ff)
 	if err != nil {
-		return nil, fmt.Errorf("job %q has invalid filesystems: %w", self.job, err)
+		return nil, fmt.Errorf("invalid filesystems: %w", err)
 	}
 
 	zfsProps, err := zfs.ZFSList(ctx, []string{"name"})
@@ -152,7 +178,7 @@ func (self *SnapCheck) datasetsFromFilter(
 		return nil, err
 	}
 
-	filtered := make([]string, 0, len(zfsProps))
+	filtered := []string{}
 	for _, item := range zfsProps {
 		path, err := zfs.NewDatasetPath(item[0])
 		if err != nil {
@@ -165,12 +191,17 @@ func (self *SnapCheck) datasetsFromFilter(
 		}
 	}
 
+	self.datasets = filtered
 	return filtered, nil
 }
 
 func (self *SnapCheck) datasetsFromRootFs(
 	ctx context.Context, rootFs string, skipN int,
 ) ([]string, error) {
+	if self.datasets != nil {
+		return self.datasets, nil
+	}
+
 	rootPath, err := zfs.NewDatasetPath(rootFs)
 	if err != nil {
 		return nil, err
@@ -196,98 +227,73 @@ func (self *SnapCheck) datasetsFromRootFs(
 		}
 	}
 
+	self.datasets = filtered
 	return filtered, nil
 }
 
-func (self *SnapCheck) checkSnapshots(
-	ctx context.Context, datasets []string, rules []config.MonitorSnapshot,
+func (self *SnapCheck) checkDataset(
+	ctx context.Context, fsName string, rules []config.MonitorSnapshot,
 ) error {
-	for _, dataset := range datasets {
-		if err := self.checkDataset(ctx, dataset, rules); err != nil {
-			return err
+	snaps, err := self.snapshots(ctx, fsName)
+	if err != nil {
+		return err
+	}
+
+	latest := self.byCreation(snaps, rules)
+	for i := range rules {
+		if !self.applyRule(&rules[i], latest[i], fsName) {
+			return nil
 		}
 	}
 	return nil
 }
 
-func (self *SnapCheck) checkDataset(
-	ctx context.Context, name string, rules []config.MonitorSnapshot,
-) error {
-	path, err := zfs.NewDatasetPath(name)
-	if err != nil {
-		return err
+func (self *SnapCheck) snapshots(ctx context.Context, fsName string,
+) ([]zfs.FilesystemVersion, error) {
+	if snap, ok := self.cache[fsName]; ok {
+		return snap, nil
 	}
 
-	snaps, err := zfs.ZFSListFilesystemVersions(ctx, path,
+	fs, err := zfs.NewDatasetPath(fsName)
+	if err != nil {
+		return nil, err
+	}
+
+	snap, err := zfs.ZFSListFilesystemVersions(ctx, fs,
 		zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	latest := self.groupSnapshots(snaps, rules)
-	for i, rule := range rules {
-		d := time.Since(latest[i].Creation).Truncate(time.Second)
-		const tooOldFmt = "%s %q too old: %q > %q"
-		switch {
-		case rule.Prefix == "" && latest[i].Creation.IsZero():
-		case latest[i].Creation.IsZero():
-			self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
-				"%q has no snapshots with prefix %q", name, rule.Prefix))
-			return nil
-		case d >= rule.Critical:
-			self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
-				tooOldFmt,
-				self.snapshotType(), latest[i].FullPath(name), d, rule.Critical))
-			return nil
-		case rule.Warning > 0 && d >= rule.Warning:
-			self.resp.UpdateStatus(monitoringplugin.WARNING, fmt.Sprintf(
-				tooOldFmt,
-				self.snapshotType(), latest[i].FullPath(name), d, rule.Warning))
-			return nil
-		case self.age == 0:
-			fallthrough
-		case self.oldest && d > self.age:
-			fallthrough
-		case !self.oldest && d < self.age:
-			self.age = d
-			self.snapName = latest[i].Name
-		}
-	}
-	return nil
+	self.cache[fsName] = snap
+	return snap, err
 }
 
-func (self *SnapCheck) groupSnapshots(
-	snaps []zfs.FilesystemVersion, rules []config.MonitorSnapshot,
-) []zfs.FilesystemVersion {
-	latest := make([]zfs.FilesystemVersion, len(rules))
-	unknownSnaps := snaps[:0]
-
-	for i, rule := range rules {
-		for _, snap := range snaps {
-			if rule.Prefix == "" || strings.HasPrefix(snap.GetName(), rule.Prefix) {
-				if latest[i].Creation.IsZero() || self.cmpSnapshots(snap, latest[i]) {
-					latest[i] = snap
+func (self *SnapCheck) byCreation(snaps []zfs.FilesystemVersion,
+	rules []config.MonitorSnapshot,
+) []*zfs.FilesystemVersion {
+	grouped := make([]*zfs.FilesystemVersion, len(rules))
+	for i := range snaps {
+		s := &snaps[i]
+		for j := range rules {
+			r := &rules[j]
+			if r.Prefix == "" || strings.HasPrefix(s.Name, r.Prefix) {
+				if grouped[j] == nil || self.cmpSnapshots(s, grouped[j]) {
+					grouped[j] = s
 				}
-			} else {
-				unknownSnaps = append(unknownSnaps, snap)
+				break
 			}
 		}
-		snaps = unknownSnaps
-		unknownSnaps = snaps[:0]
-		if len(snaps) == 0 {
-			break
-		}
 	}
-	return latest
+	return grouped
 }
 
 func (self *SnapCheck) cmpSnapshots(
-	new zfs.FilesystemVersion, old zfs.FilesystemVersion,
+	newSnap *zfs.FilesystemVersion, oldSnap *zfs.FilesystemVersion,
 ) bool {
 	if self.oldest {
-		return new.Creation.Before(old.Creation)
+		return newSnap.Creation.Before(oldSnap.Creation)
 	}
-	return new.Creation.After(old.Creation)
+	return newSnap.Creation.After(oldSnap.Creation)
 }
 
 func (self *SnapCheck) snapshotType() string {
@@ -295,4 +301,57 @@ func (self *SnapCheck) snapshotType() string {
 		return "oldest"
 	}
 	return "latest"
+}
+
+func (self *SnapCheck) applyRule(rule *config.MonitorSnapshot,
+	snap *zfs.FilesystemVersion, fsName string,
+) bool {
+	if snap == nil && rule.Prefix == "" {
+		return true
+	} else if snap == nil {
+		self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
+			"%q has no snapshots with prefix %q", fsName, rule.Prefix))
+		return false
+	}
+
+	const tooOldFmt = "%s %q too old: %q > %q"
+	d := time.Since(snap.Creation).Truncate(time.Second)
+
+	switch {
+	case d >= rule.Critical:
+		self.resp.UpdateStatus(monitoringplugin.CRITICAL, self.statusf(
+			tooOldFmt,
+			self.snapshotType(), snap.FullPath(fsName), d, rule.Critical))
+		return false
+	case rule.Warning > 0 && d >= rule.Warning:
+		self.resp.UpdateStatus(monitoringplugin.WARNING, self.statusf(
+			tooOldFmt,
+			self.snapshotType(), snap.FullPath(fsName), d, rule.Warning))
+		return false
+	case self.age == 0:
+		fallthrough
+	case self.oldest && d > self.age:
+		fallthrough
+	case !self.oldest && d < self.age:
+		self.age = d
+		self.snapName = snap.Name
+	}
+	return true
+}
+
+func (self *SnapCheck) statusf(format string, a ...any) string {
+	return self.status(fmt.Sprintf(format, a...))
+}
+
+func (self *SnapCheck) status(s string) string {
+	if self.statusPrefix == "" {
+		return s
+	}
+	return self.statusPrefix + s
+}
+
+func (self *SnapCheck) Reset() *SnapCheck {
+	self.age = 0
+	self.snapName = ""
+	return self
 }
