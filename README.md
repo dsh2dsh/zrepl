@@ -150,10 +150,7 @@ pkg install zrepl-dsh2dsh
     echo
     echo "zrepl status:"
     zrepl monitor alive
-    zrepl monitor snapshots latest --job zdisk
-    zrepl monitor snapshots oldest --job zdisk
-    zrepl monitor snapshots latest --job zroot-to-zdisk
-    zrepl monitor snapshots oldest --job zroot-to-zdisk
+    zrepl monitor snapshots
     ```
 
   * Removed support of `postgres-checkpoint` and `mysql-lock-tables` hooks.

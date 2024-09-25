@@ -40,9 +40,10 @@ func (c *Config) lateInit() {
 }
 
 func (c *Config) Job(name string) (*JobEnum, error) {
-	for _, j := range c.Jobs {
+	for i := range c.Jobs {
+		j := &c.Jobs[i]
 		if j.Name() == name {
-			return &j, nil
+			return j, nil
 		}
 	}
 	return nil, fmt.Errorf("job %q not defined in config", name)
@@ -69,6 +70,23 @@ func (j JobEnum) Name() string {
 		panic(fmt.Sprintf("unknown job type %T", v))
 	}
 	return name
+}
+
+func (j JobEnum) MonitorSnapshots() MonitorSnapshots {
+	var m MonitorSnapshots
+	switch v := j.Ret.(type) {
+	case *SnapJob:
+		m = v.MonitorSnapshots
+	case *PushJob:
+		m = v.MonitorSnapshots
+	case *SinkJob:
+		m = v.MonitorSnapshots
+	case *PullJob:
+		m = v.MonitorSnapshots
+	case *SourceJob:
+		m = v.MonitorSnapshots
+	}
+	return m
 }
 
 type ActiveJob struct {
@@ -105,6 +123,10 @@ type MonitorSnapshot struct {
 	Prefix   string        `yaml:"prefix"`
 	Warning  time.Duration `yaml:"warning"`
 	Critical time.Duration `yaml:"critical" validate:"required"`
+}
+
+func (self MonitorSnapshots) Valid() bool {
+	return len(self.Latest) > 0 || len(self.Oldest) > 0
 }
 
 type PassiveJob struct {

@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/dsh2dsh/go-monitoringplugin/v2"
@@ -66,33 +67,16 @@ var snapshotsCmd = &cli.Subcommand{
 	SetupCobra: func(c *cobra.Command) {
 		c.Args = cobra.ExactArgs(0)
 		f := c.PersistentFlags()
-		f.StringVarP(&snapJob, "job", "j", "", "the name of the job")
+		f.StringVarP(&snapJob, "job", "j", "", "name of the job")
 		f.StringVarP(&snapPrefix, "prefix", "p", "", "snapshot prefix")
 		f.DurationVarP(&snapCrit, "crit", "c", 0, "critical snapshot age")
 		f.DurationVarP(&snapWarn, "warn", "w", 0, "warning snapshot age")
-
-		_ = c.MarkPersistentFlagRequired("job")
 		c.MarkFlagsRequiredTogether("prefix", "crit")
 	},
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
-		return withJobConfig(cmd, func(j *config.JobEnum) error {
-			ctx := context.Background()
-			resp := monitoringplugin.NewResponse(fmt.Sprintf(
-				"job %q: monitor snapshots", j.Name()))
-
-			check := NewSnapCheck(resp).
-				WithPrefix(snapPrefix).
-				WithThresholds(snapWarn, snapCrit).
-				UpdateStatus(ctx, j)
-			if resp.GetStatusCode() != monitoringplugin.UNKNOWN {
-				check.Reset().WithOldest(true).UpdateStatus(ctx, j)
-			}
-
-			resp.OutputAndExit()
-			return nil
-		})
+		return withJobConfig(cmd, checkSnapshots)
 	},
 }
 
@@ -106,14 +90,7 @@ var latestCmd = &cli.Subcommand{
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
-		return withJobConfig(cmd, func(j *config.JobEnum) error {
-			resp := monitoringplugin.NewResponse(fmt.Sprintf(
-				"job %q: latest snapshots", j.Name()))
-			return NewSnapCheck(resp).
-				WithPrefix(snapPrefix).
-				WithThresholds(snapWarn, snapCrit).
-				OutputAndExit(context.Background(), j)
-		})
+		return withJobConfig(cmd, checkLatest)
 	},
 }
 
@@ -127,14 +104,7 @@ var oldestCmd = &cli.Subcommand{
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
-		return withJobConfig(cmd, func(j *config.JobEnum) error {
-			resp := monitoringplugin.NewResponse(fmt.Sprintf(
-				"job %q: oldest snapshots", j.Name()))
-			return NewSnapCheck(resp).WithOldest(true).
-				WithPrefix(snapPrefix).
-				WithThresholds(snapWarn, snapCrit).
-				OutputAndExit(context.Background(), j)
-		})
+		return withJobConfig(cmd, checkOldest)
 	},
 }
 
@@ -148,12 +118,65 @@ func withStatusClient(cmd *cli.Subcommand, fn func(c *status.Client) error,
 	return fn(statusClient)
 }
 
-func withJobConfig(cmd *cli.Subcommand, fn func(j *config.JobEnum,
-) error,
-) error {
-	jobConfig, err := cmd.Config().Job(snapJob)
+func withJobConfig(cmd *cli.Subcommand,
+	fn func(j *config.JobEnum, resp *monitoringplugin.Response) error,
+) (err error) {
+	resp := monitoringplugin.NewResponse("monitor snapshots")
+
+	var foundJob bool
+	for j := range jobs(cmd.Config(), snapJob) {
+		foundJob = true
+		if err = fn(j, resp); err != nil {
+			err = fmt.Errorf("job %q: %w", j.Name(), err)
+			break
+		}
+	}
+
+	if !foundJob {
+		err = fmt.Errorf("job %q: not defined in config", snapJob)
+	}
 	if err != nil {
+		resp.UpdateStatusOnError(err, monitoringplugin.UNKNOWN, "", true)
+	}
+
+	resp.OutputAndExit()
+	return nil
+}
+
+func jobs(c *config.Config, jobName string) iter.Seq[*config.JobEnum] {
+	fn := func(yield func(j *config.JobEnum) bool) {
+		for i := range c.Jobs {
+			j := &c.Jobs[i]
+			ok := (jobName == "" && j.MonitorSnapshots().Valid()) ||
+				(jobName != "" && j.Name() == jobName)
+			if ok && !yield(j) {
+				break
+			}
+		}
+	}
+	return fn
+}
+
+func checkSnapshots(j *config.JobEnum, resp *monitoringplugin.Response) error {
+	check := NewSnapCheck(resp).
+		WithPrefix(snapPrefix).
+		WithThresholds(snapWarn, snapCrit)
+	if err := check.UpdateStatus(j); err != nil {
 		return err
 	}
-	return fn(jobConfig)
+	return check.Reset().WithOldest(true).UpdateStatus(j)
+}
+
+func checkLatest(j *config.JobEnum, resp *monitoringplugin.Response) error {
+	return NewSnapCheck(resp).
+		WithPrefix(snapPrefix).
+		WithThresholds(snapWarn, snapCrit).
+		UpdateStatus(j)
+}
+
+func checkOldest(j *config.JobEnum, resp *monitoringplugin.Response) error {
+	return NewSnapCheck(resp).WithOldest(true).
+		WithPrefix(snapPrefix).
+		WithThresholds(snapWarn, snapCrit).
+		UpdateStatus(j)
 }

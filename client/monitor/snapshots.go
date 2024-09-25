@@ -15,8 +15,7 @@ import (
 )
 
 func NewSnapCheck(resp *monitoringplugin.Response) *SnapCheck {
-	check := &SnapCheck{resp: resp}
-	return check.init()
+	return &SnapCheck{resp: resp}
 }
 
 type SnapCheck struct {
@@ -26,19 +25,13 @@ type SnapCheck struct {
 	warn   time.Duration
 	crit   time.Duration
 
-	resp         *monitoringplugin.Response
-	statusPrefix string
+	resp *monitoringplugin.Response
 
 	age      time.Duration
 	snapName string
 
-	datasets []string
-	cache    map[string][]zfs.FilesystemVersion
-}
-
-func (self *SnapCheck) init() *SnapCheck {
-	self.cache = make(map[string][]zfs.FilesystemVersion)
-	return self
+	datasets        map[string][]zfs.FilesystemVersion
+	orderedDatasets []string
 }
 
 func (self *SnapCheck) WithPrefix(s string) *SnapCheck {
@@ -63,31 +56,15 @@ func (self *SnapCheck) WithResponse(resp *monitoringplugin.Response,
 	return self
 }
 
-func (self *SnapCheck) WithStatusPrefix(s string) *SnapCheck {
-	self.statusPrefix = s
-	return self
-}
-
-func (self *SnapCheck) OutputAndExit(ctx context.Context,
-	jobConfig *config.JobEnum,
-) error {
-	self.UpdateStatus(ctx, jobConfig)
-	self.resp.OutputAndExit()
-	return nil
-}
-
-func (self *SnapCheck) UpdateStatus(ctx context.Context,
-	jobConfig *config.JobEnum,
-) *SnapCheck {
-	if err := self.Run(ctx, jobConfig); err != nil {
-		self.resp.UpdateStatusOnError(err, monitoringplugin.UNKNOWN,
-			fmt.Sprintf("job %q", self.job), true)
+func (self *SnapCheck) UpdateStatus(jobConfig *config.JobEnum) error {
+	if err := self.Run(context.Background(), jobConfig); err != nil {
+		return err
 	} else if self.resp.GetStatusCode() == monitoringplugin.OK {
 		self.resp.UpdateStatus(monitoringplugin.OK, self.statusf(
 			"%s %q: %v",
 			self.snapshotType(), self.snapName, self.age))
 	}
-	return self
+	return nil
 }
 
 func (self *SnapCheck) Run(ctx context.Context, jobConfig *config.JobEnum,
@@ -129,43 +106,41 @@ func (self *SnapCheck) overrideRules(rules []config.MonitorSnapshot,
 func (self *SnapCheck) datasetRules(
 	ctx context.Context, jobConfig *config.JobEnum,
 ) (datasets []string, rules []config.MonitorSnapshot, err error) {
-	var cfg config.MonitorSnapshots
-
-	switch job := jobConfig.Ret.(type) {
+	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
-		cfg = job.MonitorSnapshots
-		datasets, err = self.datasetsFromFilter(ctx, job.Filesystems)
+		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
 	case *config.SnapJob:
-		cfg = job.MonitorSnapshots
-		datasets, err = self.datasetsFromFilter(ctx, job.Filesystems)
+		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
 	case *config.SourceJob:
-		cfg = job.MonitorSnapshots
-		datasets, err = self.datasetsFromFilter(ctx, job.Filesystems)
+		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
 	case *config.PullJob:
-		cfg = job.MonitorSnapshots
-		datasets, err = self.datasetsFromRootFs(ctx, job.RootFS, 0)
+		datasets, err = self.datasetsFromRootFs(ctx, j.RootFS, 0)
 	case *config.SinkJob:
-		cfg = job.MonitorSnapshots
-		datasets, err = self.datasetsFromRootFs(ctx, job.RootFS, 1)
+		datasets, err = self.datasetsFromRootFs(ctx, j.RootFS, 1)
 	default:
-		err = fmt.Errorf("unknown job type %T", job)
+		err = fmt.Errorf("unknown job type %T", j)
 	}
 
-	if err == nil {
-		if self.oldest {
-			rules = cfg.Oldest
-		} else {
-			rules = cfg.Latest
-		}
+	if err != nil {
+		return
 	}
+
+	cfg := jobConfig.MonitorSnapshots()
+	if self.oldest {
+		rules = cfg.Oldest
+	} else {
+		rules = cfg.Latest
+	}
+
+	self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
 	return
 }
 
 func (self *SnapCheck) datasetsFromFilter(
 	ctx context.Context, ff config.FilesystemsFilter,
 ) ([]string, error) {
-	if self.datasets != nil {
-		return self.datasets, nil
+	if self.orderedDatasets != nil {
+		return self.orderedDatasets, nil
 	}
 
 	filesystems, err := filters.DatasetMapFilterFromConfig(ff)
@@ -191,15 +166,15 @@ func (self *SnapCheck) datasetsFromFilter(
 		}
 	}
 
-	self.datasets = filtered
+	self.orderedDatasets = filtered
 	return filtered, nil
 }
 
 func (self *SnapCheck) datasetsFromRootFs(
 	ctx context.Context, rootFs string, skipN int,
 ) ([]string, error) {
-	if self.datasets != nil {
-		return self.datasets, nil
+	if self.orderedDatasets != nil {
+		return self.orderedDatasets, nil
 	}
 
 	rootPath, err := zfs.NewDatasetPath(rootFs)
@@ -227,7 +202,7 @@ func (self *SnapCheck) datasetsFromRootFs(
 		}
 	}
 
-	self.datasets = filtered
+	self.orderedDatasets = filtered
 	return filtered, nil
 }
 
@@ -250,8 +225,8 @@ func (self *SnapCheck) checkDataset(
 
 func (self *SnapCheck) snapshots(ctx context.Context, fsName string,
 ) ([]zfs.FilesystemVersion, error) {
-	if snap, ok := self.cache[fsName]; ok {
-		return snap, nil
+	if snaps, ok := self.datasets[fsName]; ok {
+		return snaps, nil
 	}
 
 	fs, err := zfs.NewDatasetPath(fsName)
@@ -259,13 +234,13 @@ func (self *SnapCheck) snapshots(ctx context.Context, fsName string,
 		return nil, err
 	}
 
-	snap, err := zfs.ZFSListFilesystemVersions(ctx, fs,
+	snaps, err := zfs.ZFSListFilesystemVersions(ctx, fs,
 		zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
 	if err != nil {
 		return nil, err
 	}
-	self.cache[fsName] = snap
-	return snap, err
+	self.datasets[fsName] = snaps
+	return snaps, err
 }
 
 func (self *SnapCheck) byCreation(snaps []zfs.FilesystemVersion,
@@ -344,10 +319,11 @@ func (self *SnapCheck) statusf(format string, a ...any) string {
 }
 
 func (self *SnapCheck) status(s string) string {
-	if self.statusPrefix == "" {
-		return s
+	prefix := fmt.Sprintf("job %q", self.job)
+	if s == "" {
+		return prefix
 	}
-	return self.statusPrefix + s
+	return prefix + ": " + s
 }
 
 func (self *SnapCheck) Reset() *SnapCheck {
