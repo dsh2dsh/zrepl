@@ -115,18 +115,26 @@ type ConflictResolution struct {
 }
 
 type MonitorSnapshots struct {
-	Latest []MonitorSnapshot `yaml:"latest" validate:"dive"`
-	Oldest []MonitorSnapshot `yaml:"oldest" validate:"dive"`
+	Count  []MonitorCount    `yaml:"count" validate:"dive"`
+	Latest []MonitorCreation `yaml:"latest" validate:"dive"`
+	Oldest []MonitorCreation `yaml:"oldest" validate:"dive"`
 }
 
-type MonitorSnapshot struct {
+type MonitorCount struct {
+	Prefix   string `yaml:"prefix"`
+	Warning  uint   `yaml:"warning"`
+	Critical uint   `yaml:"critical" validate:"required"`
+}
+
+type MonitorCreation struct {
 	Prefix   string        `yaml:"prefix"`
 	Warning  time.Duration `yaml:"warning"`
 	Critical time.Duration `yaml:"critical" validate:"required"`
 }
 
-func (self MonitorSnapshots) Valid() bool {
-	return len(self.Latest) > 0 || len(self.Oldest) > 0
+func (self *MonitorSnapshots) Valid() bool {
+	return len(self.Count) > 0 || len(self.Latest) > 0 ||
+		len(self.Oldest) > 0
 }
 
 type PassiveJob struct {

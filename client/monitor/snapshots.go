@@ -19,7 +19,9 @@ func NewSnapCheck(resp *monitoringplugin.Response) *SnapCheck {
 }
 
 type SnapCheck struct {
+	counts bool
 	oldest bool
+
 	job    string
 	prefix string
 	warn   time.Duration
@@ -27,8 +29,10 @@ type SnapCheck struct {
 
 	resp *monitoringplugin.Response
 
-	age      time.Duration
-	snapName string
+	age       time.Duration
+	snapCount uint
+	snapName  string
+	failed    bool
 
 	datasets        map[string][]zfs.FilesystemVersion
 	orderedDatasets []string
@@ -56,56 +60,44 @@ func (self *SnapCheck) WithResponse(resp *monitoringplugin.Response,
 	return self
 }
 
+func (self *SnapCheck) WithCounts(v bool) *SnapCheck {
+	self.counts = v
+	return self
+}
+
 func (self *SnapCheck) UpdateStatus(jobConfig *config.JobEnum) error {
 	if err := self.Run(context.Background(), jobConfig); err != nil {
 		return err
-	} else if self.resp.GetStatusCode() == monitoringplugin.OK {
-		self.resp.UpdateStatus(monitoringplugin.OK, self.statusf(
-			"%s %q: %v",
-			self.snapshotType(), self.snapName, self.age))
+	}
+
+	switch {
+	case self.failed:
+	case self.counts:
+		self.updateStatus(monitoringplugin.OK,
+			"all snapshots count: %d", self.snapCount)
+	default:
+		self.updateStatus(monitoringplugin.OK, "%s %q: %v",
+			self.snapshotType(), self.snapName, self.age)
 	}
 	return nil
 }
 
-func (self *SnapCheck) Run(ctx context.Context, jobConfig *config.JobEnum,
-) error {
-	self.job = jobConfig.Name()
-	datasets, rules, err := self.datasetRules(ctx, jobConfig)
+func (self *SnapCheck) Run(ctx context.Context, j *config.JobEnum) error {
+	self.job = j.Name()
+	datasets, err := self.jobDatasets(ctx, j)
 	if err != nil {
 		return err
-	} else if rules, err = self.overrideRules(rules); err != nil {
-		return err
 	}
 
-	for _, dataset := range datasets {
-		if err := self.checkDataset(ctx, dataset, rules); err != nil {
-			return err
-		}
+	if self.counts {
+		return self.checkCounts(ctx, j, datasets)
 	}
-	return nil
+	return self.checkCreation(ctx, j, datasets)
 }
 
-func (self *SnapCheck) overrideRules(rules []config.MonitorSnapshot,
-) ([]config.MonitorSnapshot, error) {
-	if self.prefix != "" {
-		rules = []config.MonitorSnapshot{
-			{
-				Prefix:   self.prefix,
-				Warning:  self.warn,
-				Critical: self.crit,
-			},
-		}
-	}
-
-	if len(rules) == 0 {
-		return nil, errors.New("no monitor rules or cli args defined")
-	}
-	return rules, nil
-}
-
-func (self *SnapCheck) datasetRules(
+func (self *SnapCheck) jobDatasets(
 	ctx context.Context, jobConfig *config.JobEnum,
-) (datasets []string, rules []config.MonitorSnapshot, err error) {
+) (datasets []string, err error) {
 	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
 		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
@@ -121,18 +113,9 @@ func (self *SnapCheck) datasetRules(
 		err = fmt.Errorf("unknown job type %T", j)
 	}
 
-	if err != nil {
-		return
+	if err == nil {
+		self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
 	}
-
-	cfg := jobConfig.MonitorSnapshots()
-	if self.oldest {
-		rules = cfg.Oldest
-	} else {
-		rules = cfg.Latest
-	}
-
-	self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
 	return
 }
 
@@ -206,18 +189,34 @@ func (self *SnapCheck) datasetsFromRootFs(
 	return filtered, nil
 }
 
-func (self *SnapCheck) checkDataset(
-	ctx context.Context, fsName string, rules []config.MonitorSnapshot,
+func (self *SnapCheck) checkCounts(ctx context.Context, j *config.JobEnum,
+	datasets []string,
+) error {
+	rules := j.MonitorSnapshots().Count
+	if len(rules) == 0 {
+		return errors.New("no monitor rules defined")
+	}
+
+	for _, dataset := range datasets {
+		if err := self.checkSnapsCounts(ctx, dataset, rules); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (self *SnapCheck) checkSnapsCounts(ctx context.Context, fsName string,
+	rules []config.MonitorCount,
 ) error {
 	snaps, err := self.snapshots(ctx, fsName)
 	if err != nil {
 		return err
 	}
 
-	latest := self.byCreation(snaps, rules)
+	grouped := self.byCount(snaps, rules)
 	for i := range rules {
-		if !self.applyRule(&rules[i], latest[i], fsName) {
-			return nil
+		if !self.applyCountRule(&rules[i], fsName, grouped[i]) {
+			break
 		}
 	}
 	return nil
@@ -243,8 +242,112 @@ func (self *SnapCheck) snapshots(ctx context.Context, fsName string,
 	return snaps, err
 }
 
+func (self *SnapCheck) byCount(snaps []zfs.FilesystemVersion,
+	rules []config.MonitorCount,
+) []uint {
+	grouped := make([]uint, len(rules))
+	for i := range snaps {
+		s := &snaps[i]
+		for j := range rules {
+			r := &rules[j]
+			if r.Prefix == "" || strings.HasPrefix(s.Name, r.Prefix) {
+				grouped[j]++
+				break
+			}
+		}
+	}
+	return grouped
+}
+
+func (self *SnapCheck) applyCountRule(rule *config.MonitorCount, fsName string,
+	cnt uint,
+) bool {
+	if cnt == 0 && rule.Prefix == "" {
+		return true
+	} else if cnt == 0 {
+		self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
+			"%q has no snapshots with prefix %q", fsName, rule.Prefix))
+		return false
+	}
+
+	const msg = "%s: %q snapshots count: %d (%d)"
+	switch {
+	case cnt >= rule.Critical:
+		self.updateStatus(monitoringplugin.CRITICAL, msg,
+			fsName, rule.Prefix, cnt, rule.Critical)
+		return false
+	case rule.Warning > 0 && cnt >= rule.Warning:
+		self.updateStatus(monitoringplugin.WARNING, msg,
+			fsName, rule.Prefix, cnt, rule.Warning)
+		return false
+	default:
+		self.snapCount += cnt
+	}
+	return true
+}
+
+func (self *SnapCheck) checkCreation(ctx context.Context, j *config.JobEnum,
+	datasets []string,
+) error {
+	rules, err := self.overrideRules(self.rulesByCreation(j))
+	if err != nil {
+		return err
+	}
+
+	for _, dataset := range datasets {
+		if err := self.checkSnapsCreation(ctx, dataset, rules); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (self *SnapCheck) overrideRules(rules []config.MonitorCreation,
+) ([]config.MonitorCreation, error) {
+	if self.prefix != "" {
+		rules = []config.MonitorCreation{
+			{
+				Prefix:   self.prefix,
+				Warning:  self.warn,
+				Critical: self.crit,
+			},
+		}
+	}
+
+	if len(rules) == 0 {
+		return nil, errors.New("no monitor rules or cli args defined")
+	}
+	return rules, nil
+}
+
+func (self *SnapCheck) rulesByCreation(j *config.JobEnum,
+) []config.MonitorCreation {
+	cfg := j.MonitorSnapshots()
+	if self.oldest {
+		return cfg.Oldest
+	}
+	return cfg.Latest
+}
+
+func (self *SnapCheck) checkSnapsCreation(
+	ctx context.Context, fsName string, rules []config.MonitorCreation,
+) error {
+	snaps, err := self.snapshots(ctx, fsName)
+	if err != nil {
+		return err
+	}
+
+	latest := self.byCreation(snaps, rules)
+	for i := range rules {
+		if !self.applyCreationRule(&rules[i], latest[i], fsName) {
+			return nil
+		}
+	}
+	return nil
+}
+
 func (self *SnapCheck) byCreation(snaps []zfs.FilesystemVersion,
-	rules []config.MonitorSnapshot,
+	rules []config.MonitorCreation,
 ) []*zfs.FilesystemVersion {
 	grouped := make([]*zfs.FilesystemVersion, len(rules))
 	for i := range snaps {
@@ -278,7 +381,7 @@ func (self *SnapCheck) snapshotType() string {
 	return "latest"
 }
 
-func (self *SnapCheck) applyRule(rule *config.MonitorSnapshot,
+func (self *SnapCheck) applyCreationRule(rule *config.MonitorCreation,
 	snap *zfs.FilesystemVersion, fsName string,
 ) bool {
 	if snap == nil && rule.Prefix == "" {
@@ -294,14 +397,12 @@ func (self *SnapCheck) applyRule(rule *config.MonitorSnapshot,
 
 	switch {
 	case d >= rule.Critical:
-		self.resp.UpdateStatus(monitoringplugin.CRITICAL, self.statusf(
-			tooOldFmt,
-			self.snapshotType(), snap.FullPath(fsName), d, rule.Critical))
+		self.updateStatus(monitoringplugin.CRITICAL, tooOldFmt,
+			self.snapshotType(), snap.FullPath(fsName), d, rule.Critical)
 		return false
 	case rule.Warning > 0 && d >= rule.Warning:
-		self.resp.UpdateStatus(monitoringplugin.WARNING, self.statusf(
-			tooOldFmt,
-			self.snapshotType(), snap.FullPath(fsName), d, rule.Warning))
+		self.updateStatus(monitoringplugin.WARNING, tooOldFmt,
+			self.snapshotType(), snap.FullPath(fsName), d, rule.Warning)
 		return false
 	case self.age == 0:
 		fallthrough
@@ -314,20 +415,17 @@ func (self *SnapCheck) applyRule(rule *config.MonitorSnapshot,
 	return true
 }
 
-func (self *SnapCheck) statusf(format string, a ...any) string {
-	return self.status(fmt.Sprintf(format, a...))
-}
-
-func (self *SnapCheck) status(s string) string {
-	prefix := fmt.Sprintf("job %q", self.job)
-	if s == "" {
-		return prefix
-	}
-	return prefix + ": " + s
+func (self *SnapCheck) updateStatus(statusCode int, format string, a ...any) {
+	self.failed = self.failed || statusCode != monitoringplugin.OK
+	statusMessage := fmt.Sprintf("job %q: ", self.job) +
+		fmt.Sprintf(format, a...)
+	self.resp.UpdateStatus(statusCode, statusMessage)
 }
 
 func (self *SnapCheck) Reset() *SnapCheck {
 	self.age = 0
+	self.snapCount = 0
 	self.snapName = ""
+	self.failed = false
 	return self
 }

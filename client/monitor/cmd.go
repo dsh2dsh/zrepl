@@ -58,10 +58,10 @@ var aliveCmd = &cli.Subcommand{
 
 var snapshotsCmd = &cli.Subcommand{
 	Use:   "snapshots",
-	Short: "check snapshots age",
+	Short: "check snapshots according to rules",
 
 	SetupSubcommands: func() []*cli.Subcommand {
-		return []*cli.Subcommand{latestCmd, oldestCmd}
+		return []*cli.Subcommand{countsCmd, latestCmd, oldestCmd}
 	},
 
 	SetupCobra: func(c *cobra.Command) {
@@ -76,7 +76,27 @@ var snapshotsCmd = &cli.Subcommand{
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
-		return withJobConfig(cmd, checkSnapshots)
+		return withJobConfig(cmd, checkSnapshots,
+			func(m *config.MonitorSnapshots) bool {
+				return m.Valid()
+			})
+	},
+}
+
+var countsCmd = &cli.Subcommand{
+	Use:   "count",
+	Short: "check snapshots count according to rules",
+
+	SetupCobra: func(c *cobra.Command) {
+		c.Args = cobra.ExactArgs(0)
+	},
+
+	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
+	) error {
+		return withJobConfig(cmd, checkCounts,
+			func(m *config.MonitorSnapshots) bool {
+				return len(m.Count) > 0
+			})
 	},
 }
 
@@ -90,7 +110,10 @@ var latestCmd = &cli.Subcommand{
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
-		return withJobConfig(cmd, checkLatest)
+		return withJobConfig(cmd, checkLatest,
+			func(m *config.MonitorSnapshots) bool {
+				return len(m.Latest) > 0
+			})
 	},
 }
 
@@ -104,7 +127,10 @@ var oldestCmd = &cli.Subcommand{
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
 	) error {
-		return withJobConfig(cmd, checkOldest)
+		return withJobConfig(cmd, checkOldest,
+			func(m *config.MonitorSnapshots) bool {
+				return len(m.Oldest) > 0
+			})
 	},
 }
 
@@ -120,11 +146,12 @@ func withStatusClient(cmd *cli.Subcommand, fn func(c *status.Client) error,
 
 func withJobConfig(cmd *cli.Subcommand,
 	fn func(j *config.JobEnum, resp *monitoringplugin.Response) error,
+	filterJob func(m *config.MonitorSnapshots) bool,
 ) (err error) {
 	resp := monitoringplugin.NewResponse("monitor snapshots")
 
 	var foundJob bool
-	for j := range jobs(cmd.Config(), snapJob) {
+	for j := range jobs(cmd.Config(), snapJob, filterJob) {
 		foundJob = true
 		if err = fn(j, resp); err != nil {
 			err = fmt.Errorf("job %q: %w", j.Name(), err)
@@ -143,11 +170,14 @@ func withJobConfig(cmd *cli.Subcommand,
 	return nil
 }
 
-func jobs(c *config.Config, jobName string) iter.Seq[*config.JobEnum] {
+func jobs(c *config.Config, jobName string,
+	filterJob func(m *config.MonitorSnapshots) bool,
+) iter.Seq[*config.JobEnum] {
 	fn := func(yield func(j *config.JobEnum) bool) {
 		for i := range c.Jobs {
 			j := &c.Jobs[i]
-			ok := (jobName == "" && j.MonitorSnapshots().Valid()) ||
+			m := j.MonitorSnapshots()
+			ok := (jobName == "" && filterJob(&m)) ||
 				(jobName != "" && j.Name() == jobName)
 			if ok && !yield(j) {
 				break
@@ -161,10 +191,28 @@ func checkSnapshots(j *config.JobEnum, resp *monitoringplugin.Response) error {
 	check := NewSnapCheck(resp).
 		WithPrefix(snapPrefix).
 		WithThresholds(snapWarn, snapCrit)
-	if err := check.UpdateStatus(j); err != nil {
-		return err
+	m := j.MonitorSnapshots()
+
+	if len(m.Count) > 0 {
+		if err := check.WithCounts(true).UpdateStatus(j); err != nil {
+			return err
+		}
 	}
-	return check.Reset().WithOldest(true).UpdateStatus(j)
+
+	if len(m.Latest) > 0 {
+		if err := check.Reset().WithCounts(false).UpdateStatus(j); err != nil {
+			return err
+		}
+	}
+
+	if len(m.Oldest) > 0 {
+		return check.Reset().WithOldest(true).UpdateStatus(j)
+	}
+	return nil
+}
+
+func checkCounts(j *config.JobEnum, resp *monitoringplugin.Response) error {
+	return NewSnapCheck(resp).WithCounts(true).UpdateStatus(j)
 }
 
 func checkLatest(j *config.JobEnum, resp *monitoringplugin.Response) error {

@@ -116,12 +116,28 @@ pkg install zrepl-dsh2dsh
         - [ "unzstd" ]
     ```
 
-  * Added Icinga/Nagios checks for checking the daemon is alive, latest or
-    oldest snapshots are not too old. See
+  * Added Icinga/Nagios checks for checking the daemon is alive, snapshots count
+    is ok, latest or oldest snapshots are not too old. See
     [#765](https://github.com/zrepl/zrepl/pull/765). Configuration example:
 
     ``` yaml
     monitor:
+      count:
+        - prefix: "zrepl_frequently_"
+          warning: 20
+          critical: 30
+        - prefix: "zrepl_hourly_"
+          warning: 31
+          critical: 50
+        - prefix: "zrepl_daily_"
+          warning: 91
+          critical: 92
+        - prefix: "zrepl_monthly_"
+          warning: 13
+          critical: 14
+        - prefix: ""            # everything else
+          warning: 2
+          critical: 10
       latest:
         - prefix: "zrepl_frequently_"
           critical: "48h"       # 2d
