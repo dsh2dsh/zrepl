@@ -1467,7 +1467,7 @@ func (s PropertySource) zfsGetSourceFieldPrefixes() []string {
 	return prefixes
 }
 
-func zfsGetRecursive(ctx context.Context, path string, depth int,
+func ZFSGetRecursive(ctx context.Context, path string, depth int,
 	dstypes []string, props []string, allowedSources PropertySource,
 ) (map[string]*ZFSProperties, error) {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin,
@@ -1564,7 +1564,7 @@ func validatePropsByFs(propsByFS map[string]*ZFSProperties, props []string,
 func zfsGet(ctx context.Context, path string, props []string,
 	allowedSources PropertySource,
 ) (*ZFSProperties, error) {
-	propMap, err := zfsGetRecursive(ctx, path, 0, nil, props, allowedSources)
+	propMap, err := ZFSGetRecursive(ctx, path, 0, nil, props, allowedSources)
 	switch {
 	case err != nil:
 		return nil, err

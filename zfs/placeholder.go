@@ -165,7 +165,7 @@ func ZFSListPlaceholderFilesystemsWithAdditionalProps(ctx context.Context, root 
 		props = append(props, additionalProps...)
 	}
 
-	propsByFS, err := zfsGetRecursive(ctx, root, -1, []string{"filesystem", "volume"}, props, SourceAny)
+	propsByFS, err := ZFSGetRecursive(ctx, root, -1, []string{"filesystem", "volume"}, props, SourceAny)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get placeholder filesystems under %q: %w", root, err)
 	}

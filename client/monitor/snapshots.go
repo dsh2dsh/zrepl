@@ -155,22 +155,26 @@ func (self *SnapCheck) datasetsFromRootFs(
 		return nil, err
 	}
 
-	filtered := []string{}
-	for item := range zfs.ZFSListIter(ctx, []string{"name"}, nil, "-r", rootFs) {
-		if item.Err != nil {
-			return nil, item.Err
-		}
-		path, err := zfs.NewDatasetPath(item.Fields[0])
+	propsByFS, err := zfs.ZFSGetRecursive(ctx,
+		rootFs, -1, []string{"filesystem"},
+		[]string{zfs.PlaceholderPropertyName}, zfs.SourceAny)
+	if err != nil {
+		return nil, fmt.Errorf("properties of %q: %w", rootFs, err)
+	}
+
+	filtered := make([]string, 0, len(propsByFS))
+	for fs, props := range propsByFS {
+		path, err := zfs.NewDatasetPath(fs)
 		if err != nil {
 			return nil, err
 		} else if path.Length() < rootPath.Length()+1+skipN {
 			continue
 		}
-		if ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, path); err != nil {
-			return nil, err
-		} else if ph.FSExists && !ph.IsPlaceholder {
-			filtered = append(filtered, item.Fields[0])
+		p := props.GetDetails(zfs.PlaceholderPropertyName)
+		if p.Source == zfs.SourceLocal && p.Value == "on" {
+			continue
 		}
+		filtered = append(filtered, fs)
 	}
 	return filtered, nil
 }
