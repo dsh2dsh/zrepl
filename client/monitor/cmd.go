@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"runtime"
 	"time"
 
 	"github.com/dsh2dsh/go-monitoringplugin/v2"
@@ -22,6 +23,8 @@ var (
 	snapPrefix string
 	snapCrit   time.Duration
 	snapWarn   time.Duration
+
+	maxProcs int
 )
 
 var Subcommand = &cli.Subcommand{
@@ -71,6 +74,7 @@ var snapshotsCmd = &cli.Subcommand{
 		f.StringVarP(&snapPrefix, "prefix", "p", "", "snapshot prefix")
 		f.DurationVarP(&snapCrit, "crit", "c", 0, "critical snapshot age")
 		f.DurationVarP(&snapWarn, "warn", "w", 0, "warning snapshot age")
+		f.IntVarP(&maxProcs, "procs", "n", runtime.GOMAXPROCS(0), "concurrency")
 		c.MarkFlagsRequiredTogether("prefix", "crit")
 	},
 
@@ -188,9 +192,7 @@ func jobs(c *config.Config, jobName string,
 }
 
 func checkSnapshots(j *config.JobEnum, resp *monitoringplugin.Response) error {
-	check := NewSnapCheck(resp).
-		WithPrefix(snapPrefix).
-		WithThresholds(snapWarn, snapCrit)
+	check := snapCheck(resp)
 	m := j.MonitorSnapshots()
 
 	if len(m.Count) > 0 {
@@ -211,20 +213,21 @@ func checkSnapshots(j *config.JobEnum, resp *monitoringplugin.Response) error {
 	return nil
 }
 
+func snapCheck(resp *monitoringplugin.Response) *SnapCheck {
+	return NewSnapCheck(resp).
+		WithMaxProcs(maxProcs).
+		WithPrefix(snapPrefix).
+		WithThresholds(snapWarn, snapCrit)
+}
+
 func checkCounts(j *config.JobEnum, resp *monitoringplugin.Response) error {
-	return NewSnapCheck(resp).WithCounts(true).UpdateStatus(j)
+	return snapCheck(resp).WithCounts(true).UpdateStatus(j)
 }
 
 func checkLatest(j *config.JobEnum, resp *monitoringplugin.Response) error {
-	return NewSnapCheck(resp).
-		WithPrefix(snapPrefix).
-		WithThresholds(snapWarn, snapCrit).
-		UpdateStatus(j)
+	return snapCheck(resp).UpdateStatus(j)
 }
 
 func checkOldest(j *config.JobEnum, resp *monitoringplugin.Response) error {
-	return NewSnapCheck(resp).WithOldest(true).
-		WithPrefix(snapPrefix).
-		WithThresholds(snapWarn, snapCrit).
-		UpdateStatus(j)
+	return snapCheck(resp).WithOldest(true).UpdateStatus(j)
 }

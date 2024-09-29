@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dsh2dsh/go-monitoringplugin/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/filters"
@@ -15,7 +19,8 @@ import (
 )
 
 func NewSnapCheck(resp *monitoringplugin.Response) *SnapCheck {
-	return &SnapCheck{resp: resp}
+	check := &SnapCheck{resp: resp}
+	return check.WithMaxProcs(0)
 }
 
 type SnapCheck struct {
@@ -36,6 +41,7 @@ type SnapCheck struct {
 
 	datasets        map[string][]zfs.FilesystemVersion
 	orderedDatasets []string
+	maxProcs        int
 }
 
 func (self *SnapCheck) WithPrefix(s string) *SnapCheck {
@@ -65,6 +71,14 @@ func (self *SnapCheck) WithCounts(v bool) *SnapCheck {
 	return self
 }
 
+func (self *SnapCheck) WithMaxProcs(n int) *SnapCheck {
+	if n == 0 {
+		n = runtime.GOMAXPROCS(0)
+	}
+	self.maxProcs = n
+	return self
+}
+
 func (self *SnapCheck) UpdateStatus(jobConfig *config.JobEnum) error {
 	if err := self.Run(context.Background(), jobConfig); err != nil {
 		return err
@@ -84,24 +98,24 @@ func (self *SnapCheck) UpdateStatus(jobConfig *config.JobEnum) error {
 
 func (self *SnapCheck) Run(ctx context.Context, j *config.JobEnum) error {
 	self.job = j.Name()
-	datasets, err := self.jobDatasets(ctx, j)
-	if err != nil {
+	if err := self.jobDatasets(ctx, j); err != nil {
 		return err
 	}
 
 	if self.counts {
-		return self.checkCounts(ctx, j, datasets)
+		return self.checkCounts(ctx, j)
 	}
-	return self.checkCreation(ctx, j, datasets)
+	return self.checkCreation(ctx, j)
 }
 
-func (self *SnapCheck) jobDatasets(
-	ctx context.Context, jobConfig *config.JobEnum,
-) (datasets []string, err error) {
+func (self *SnapCheck) jobDatasets(ctx context.Context,
+	jobConfig *config.JobEnum,
+) (err error) {
 	if self.orderedDatasets != nil {
-		return self.orderedDatasets, nil
+		return
 	}
 
+	var datasets []string
 	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
 		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
@@ -116,12 +130,14 @@ func (self *SnapCheck) jobDatasets(
 	default:
 		err = fmt.Errorf("unknown job type %T", j)
 	}
-
-	if err == nil {
-		self.orderedDatasets = datasets
-		self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
+	if err != nil {
+		return
 	}
-	return
+
+	slices.Sort(datasets)
+	self.orderedDatasets = datasets
+	self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
+	return self.preloadSnapshots(ctx)
 }
 
 func (self *SnapCheck) datasetsFromFilter(
@@ -179,15 +195,52 @@ func (self *SnapCheck) datasetsFromRootFs(
 	return filtered, nil
 }
 
+func (self *SnapCheck) preloadSnapshots(ctx context.Context) error {
+	var mu sync.Mutex
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(self.maxProcs)
+
+	for _, dataset := range self.orderedDatasets {
+		if ctx.Err() != nil {
+			break
+		}
+		g.Go(func() error {
+			snapshots, err := zfsListSnapshots(ctx, dataset)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			self.datasets[dataset] = snapshots
+			mu.Unlock()
+			return nil
+		})
+	}
+	return g.Wait()
+}
+
+func zfsListSnapshots(ctx context.Context, dataset string,
+) ([]zfs.FilesystemVersion, error) {
+	fs, err := zfs.NewDatasetPath(dataset)
+	if err != nil {
+		return nil, err
+	}
+
+	snaps, err := zfs.ZFSListFilesystemVersions(ctx, fs,
+		zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
+	if err != nil {
+		return nil, err
+	}
+	return snaps, err
+}
+
 func (self *SnapCheck) checkCounts(ctx context.Context, j *config.JobEnum,
-	datasets []string,
 ) error {
 	rules := j.MonitorSnapshots().Count
 	if len(rules) == 0 {
 		return errors.New("no monitor rules defined")
 	}
 
-	for _, dataset := range datasets {
+	for _, dataset := range self.orderedDatasets {
 		if err := self.checkSnapsCounts(ctx, dataset, rules); err != nil {
 			return err
 		}
@@ -223,13 +276,7 @@ func (self *SnapCheck) snapshots(ctx context.Context, fsName string,
 		return snaps, nil
 	}
 
-	fs, err := zfs.NewDatasetPath(fsName)
-	if err != nil {
-		return nil, err
-	}
-
-	snaps, err := zfs.ZFSListFilesystemVersions(ctx, fs,
-		zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
+	snaps, err := zfsListSnapshots(ctx, fsName)
 	if err != nil {
 		return nil, err
 	}
@@ -300,14 +347,13 @@ func (self *SnapCheck) applyCountRule(rule *config.MonitorCount, fsName string,
 }
 
 func (self *SnapCheck) checkCreation(ctx context.Context, j *config.JobEnum,
-	datasets []string,
 ) error {
 	rules, err := self.overrideRules(self.rulesByCreation(j))
 	if err != nil {
 		return err
 	}
 
-	for _, dataset := range datasets {
+	for _, dataset := range self.orderedDatasets {
 		if err := self.checkSnapsCreation(ctx, dataset, rules); err != nil {
 			return err
 		}
@@ -400,9 +446,18 @@ func (self *SnapCheck) applyCreationRule(rule *config.MonitorCreation,
 }
 
 func (self *SnapCheck) updateStatus(statusCode int, format string, a ...any) {
+	var statusMessage string
+	if len(a) == 0 {
+		statusMessage = fmt.Sprintf("job %q: %s", self.job, format)
+	} else {
+		statusMessage = fmt.Sprintf("job %q: ", self.job) +
+			fmt.Sprintf(format, a...)
+	}
+	self.updateResponse(statusCode, statusMessage)
+}
+
+func (self *SnapCheck) updateResponse(statusCode int, statusMessage string) {
 	self.failed = self.failed || statusCode != monitoringplugin.OK
-	statusMessage := fmt.Sprintf("job %q: ", self.job) +
-		fmt.Sprintf(format, a...)
 	self.resp.UpdateStatus(statusCode, statusMessage)
 }
 
