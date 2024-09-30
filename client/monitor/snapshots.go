@@ -116,8 +116,6 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 	}
 
 	var datasets []string
-	var rootFs string
-
 	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
 		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
@@ -126,10 +124,8 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 	case *config.SourceJob:
 		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
 	case *config.PullJob:
-		rootFs = j.RootFS
 		datasets, err = self.datasetsFromRootFs(ctx, j.RootFS, 0)
 	case *config.SinkJob:
-		rootFs = j.RootFS
 		datasets, err = self.datasetsFromRootFs(ctx, j.RootFS, 1)
 	default:
 		err = fmt.Errorf("unknown job type %T", j)
@@ -141,7 +137,7 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 	slices.Sort(datasets)
 	self.orderedDatasets = datasets
 	self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
-	return self.preloadSnapshots(ctx, rootFs)
+	return self.preloadSnapshots(ctx)
 }
 
 func (self *SnapCheck) datasetsFromFilter(
@@ -199,16 +195,8 @@ func (self *SnapCheck) datasetsFromRootFs(
 	return filtered, nil
 }
 
-func (self *SnapCheck) preloadSnapshots(ctx context.Context, rootFs string,
+func (self *SnapCheck) preloadSnapshots(ctx context.Context,
 ) error {
-	if rootFs != "" {
-		return zfs.ZFSRecursiveVersions(ctx, rootFs,
-			zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots},
-			func(fsName string, snapshot zfs.FilesystemVersion) {
-				self.datasets[fsName] = append(self.datasets[fsName], snapshot)
-			})
-	}
-
 	var mu sync.Mutex
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(self.maxProcs)

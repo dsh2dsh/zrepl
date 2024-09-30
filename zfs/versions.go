@@ -303,36 +303,3 @@ func ZFSGetFilesystemVersion(ctx context.Context, ds string,
 		WithUserRefs(props.Get("userrefs")).
 		Parse()
 }
-
-func ZFSRecursiveVersions(ctx context.Context, rootFs string,
-	options ListFilesystemVersionsOptions,
-	fn func(fsName string, snapshot FilesystemVersion),
-) error {
-	listResults := ZFSListIter(ctx,
-		[]string{"name", "guid", "createtxg", "creation", "userrefs"},
-		nil, "-r", "-t", options.typesFlagArgs(), rootFs)
-
-	for r := range listResults {
-		if r.Err != nil {
-			return r.Err
-		}
-		line := r.Fields
-		var args ParseFilesystemVersionArgs
-		args = args.
-			WithFullName(line[0]).
-			WithGuid(line[1]).
-			WithCreateTxg(line[2]).
-			WithCreation(line[3]).
-			WithUserRefs(line[4])
-		if v, err := args.Parse(); err != nil {
-			return err
-		} else if options.matches(v) {
-			fsName, _, _, err := DecomposeVersionString(args.fullname)
-			if err != nil {
-				return err
-			}
-			fn(fsName, v)
-		}
-	}
-	return nil
-}
