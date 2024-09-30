@@ -32,6 +32,9 @@ type SnapCheck struct {
 	warn   time.Duration
 	crit   time.Duration
 
+	countWarn uint
+	countCrit uint
+
 	resp *monitoringplugin.Response
 
 	age       time.Duration
@@ -76,6 +79,12 @@ func (self *SnapCheck) WithMaxProcs(n int) *SnapCheck {
 		n = runtime.GOMAXPROCS(0)
 	}
 	self.maxProcs = n
+	return self
+}
+
+func (self *SnapCheck) WithCountThresholds(warn, crit uint) *SnapCheck {
+	self.countWarn = warn
+	self.countCrit = crit
 	return self
 }
 
@@ -236,9 +245,9 @@ func zfsListSnapshots(ctx context.Context, dataset string,
 
 func (self *SnapCheck) checkCounts(ctx context.Context, j *config.JobEnum,
 ) error {
-	rules := j.MonitorSnapshots().Count
-	if len(rules) == 0 {
-		return errors.New("no monitor rules defined")
+	rules, err := self.overrideCountRules(j)
+	if err != nil {
+		return err
 	}
 
 	for _, dataset := range self.orderedDatasets {
@@ -247,6 +256,25 @@ func (self *SnapCheck) checkCounts(ctx context.Context, j *config.JobEnum,
 		}
 	}
 	return nil
+}
+
+func (self *SnapCheck) overrideCountRules(j *config.JobEnum,
+) ([]config.MonitorCount, error) {
+	if self.prefix != "" {
+		return []config.MonitorCount{
+			{
+				Prefix:   self.prefix,
+				Warning:  self.countWarn,
+				Critical: self.countCrit,
+			},
+		}, nil
+	}
+
+	rules := j.MonitorSnapshots().Count
+	if len(rules) == 0 {
+		return nil, errors.New("no monitor rules or cli args defined")
+	}
+	return rules, nil
 }
 
 func (self *SnapCheck) checkSnapsCounts(ctx context.Context, fsName string,
@@ -349,7 +377,7 @@ func (self *SnapCheck) applyCountRule(rule *config.MonitorCount, fsName string,
 
 func (self *SnapCheck) checkCreation(ctx context.Context, j *config.JobEnum,
 ) error {
-	rules, err := self.overrideRules(self.rulesByCreation(j))
+	rules, err := self.overrideAgeRules(self.rulesByCreation(j))
 	if err != nil {
 		return err
 	}
@@ -362,16 +390,16 @@ func (self *SnapCheck) checkCreation(ctx context.Context, j *config.JobEnum,
 	return nil
 }
 
-func (self *SnapCheck) overrideRules(rules []config.MonitorCreation,
+func (self *SnapCheck) overrideAgeRules(rules []config.MonitorCreation,
 ) ([]config.MonitorCreation, error) {
 	if self.prefix != "" {
-		rules = []config.MonitorCreation{
+		return []config.MonitorCreation{
 			{
 				Prefix:   self.prefix,
 				Warning:  self.warn,
 				Critical: self.crit,
 			},
-		}
+		}, nil
 	}
 
 	if len(rules) == 0 {

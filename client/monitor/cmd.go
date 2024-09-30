@@ -24,6 +24,9 @@ var (
 	snapCrit   time.Duration
 	snapWarn   time.Duration
 
+	countWarn uint
+	countCrit uint
+
 	maxProcs int
 )
 
@@ -75,7 +78,8 @@ var snapshotsCmd = &cli.Subcommand{
 		f.DurationVarP(&snapCrit, "crit", "c", 0, "critical snapshot age")
 		f.DurationVarP(&snapWarn, "warn", "w", 0, "warning snapshot age")
 		f.IntVarP(&maxProcs, "procs", "n", runtime.GOMAXPROCS(0), "concurrency")
-		c.MarkFlagsRequiredTogether("prefix", "crit")
+		f.UintVar(&countWarn, "count-warn", 0, "warning count thareshold")
+		f.UintVar(&countCrit, "count-crit", 0, "critical count thareshold")
 	},
 
 	Run: func(ctx context.Context, cmd *cli.Subcommand, args []string,
@@ -217,7 +221,8 @@ func snapCheck(resp *monitoringplugin.Response) *SnapCheck {
 	return NewSnapCheck(resp).
 		WithMaxProcs(maxProcs).
 		WithPrefix(snapPrefix).
-		WithThresholds(snapWarn, snapCrit)
+		WithThresholds(snapWarn, snapCrit).
+		WithCountThresholds(countWarn, countCrit)
 }
 
 func checkCounts(j *config.JobEnum, resp *monitoringplugin.Response) error {
