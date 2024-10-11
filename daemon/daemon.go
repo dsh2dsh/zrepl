@@ -8,16 +8,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
-	"github.com/dsh2dsh/zrepl/endpoint"
 	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/version"
-	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
 func Run(ctx context.Context, conf *config.Config) error {
@@ -33,39 +29,24 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	outlets, err := logging.OutletsFromConfig(conf.Global.Logging)
 	if err != nil {
-		return fmt.Errorf("cannot build logging from config: %w", err)
+		return fmt.Errorf("daemon: cannot build logging from config: %w", err)
 	}
-	outlets.Add(newPrometheusLogOutlet(), logger.Debug)
 
 	confJobs, err := job.JobsFromConfig(conf, config.ParseFlagsNone)
 	if err != nil {
-		return fmt.Errorf("cannot build jobs from config: %w", err)
+		return fmt.Errorf("daemon: cannot build jobs from config: %w", err)
 	}
 
 	log := logger.NewLogger(outlets, 1*time.Second)
 	log.Info(version.NewZreplVersionInformation().String())
-
-	ctx = logging.WithLoggers(ctx, logging.SubsystemLoggersWithUniversalLogger(log))
-	trace.RegisterCallback(trace.Callback{
-		OnBegin: func(ctx context.Context) { logging.GetLogger(ctx, logging.SubsysTraceData).Debug("begin span") },
-		OnEnd: func(ctx context.Context, spanInfo trace.SpanInfo) {
-			logging.
-				GetLogger(ctx, logging.SubsysTraceData).
-				WithField("duration_s", spanInfo.EndedAt().Sub(spanInfo.StartedAt()).Seconds()).
-				Debug("finished span " + spanInfo.TaskAndSpanStack(trace.SpanStackKindAnnotation))
-		},
-	})
-
-	// register global (=non job-local) metrics
-	version.PrometheusRegister(prometheus.DefaultRegisterer)
-	zfscmd.RegisterMetrics(prometheus.DefaultRegisterer)
-	trace.RegisterMetrics(prometheus.DefaultRegisterer)
-	endpoint.RegisterMetrics(prometheus.DefaultRegisterer)
+	ctx = logging.WithLoggers(ctx,
+		logging.SubsystemLoggersWithUniversalLogger(log))
+	registerTraceCallbacks()
 
 	log.Info("starting daemon")
 	jobs := newJobs(ctx, log, cancel)
-	if err := startInternalJobs(ctx, conf, jobs); err != nil {
-		return err
+	if err := startInternalJobs(ctx, conf, jobs, outlets); err != nil {
+		return fmt.Errorf("daemon: %w", err)
 	}
 
 	// start regular jobs
@@ -83,40 +64,83 @@ func Run(ctx context.Context, conf *config.Config) error {
 	return nil
 }
 
+func registerTraceCallbacks() {
+	trace.RegisterCallback(trace.Callback{
+		OnBegin: func(ctx context.Context) {
+			logging.GetLogger(ctx, logging.SubsysTraceData).Debug("begin span")
+		},
+		OnEnd: func(ctx context.Context, spanInfo trace.SpanInfo) {
+			logging.
+				GetLogger(ctx, logging.SubsysTraceData).
+				WithField("duration_s",
+					spanInfo.EndedAt().Sub(spanInfo.StartedAt()).Seconds()).
+				Debug("finished span " +
+					spanInfo.TaskAndSpanStack(trace.SpanStackKindAnnotation))
+		},
+	})
+}
+
 func startInternalJobs(ctx context.Context, conf *config.Config, jobs *jobs,
+	logOutlets *logger.Outlets,
 ) error {
-	// start control socket
-	if err := startControlJob(ctx, conf, jobs); err != nil {
+	log := logging.GetLogger(ctx, logging.SubsysInternal)
+	api := newServerJob(log, newControlJob(jobs, log))
+
+	var hasControl, hasMetrics bool
+	for i := range conf.Listen {
+		listen := &conf.Listen[i]
+		if err := api.AddServer(listen); err != nil {
+			return fmt.Errorf("add server from listen[%d]: %w", i, err)
+		}
+		hasControl = hasControl || listen.Control
+		hasMetrics = hasMetrics || listen.Metrics
+	}
+
+	if err := defaultControl(hasControl, api, conf); err != nil {
 		return err
-	} else if err := startPrometheusJobs(ctx, conf, jobs); err != nil {
+	}
+
+	if has, err := defaultMetrics(hasMetrics, api, conf); err != nil {
 		return err
+	} else if has {
+		logOutlets.Add(newPrometheusLogOutlet(), logger.Debug)
+	}
+
+	jobs.startInternal(ctx, api)
+	return nil
+}
+
+func defaultControl(exists bool, api *serverJob, conf *config.Config) error {
+	if exists {
+		return nil
+	}
+
+	listen := config.Listen{
+		Unix:     conf.Global.Control.SockPath,
+		UnixMode: conf.Global.Control.SockMode,
+		Control:  true,
+	}
+
+	if err := api.AddServer(&listen); err != nil {
+		return fmt.Errorf("add default control server: %w", err)
 	}
 	return nil
 }
 
-func startControlJob(ctx context.Context, conf *config.Config, jobs *jobs,
-) error {
-	j, err := newControlJob(conf.Global.Control.SockPath,
-		jobs, conf.Global.Control.SockMode)
-	if err != nil {
-		return fmt.Errorf("starting control job: %w", err)
+func defaultMetrics(exists bool, api *serverJob, conf *config.Config,
+) (bool, error) {
+	if exists {
+		return exists, nil
 	}
-	jobs.startInternal(ctx, j)
-	return nil
-}
 
-func startPrometheusJobs(ctx context.Context, conf *config.Config, jobs *jobs,
-) error {
-	for i, jc := range conf.Global.Monitoring {
-		v, ok := jc.Ret.(*config.PrometheusMonitoring)
-		if !ok {
-			return fmt.Errorf("unknown monitoring job #%d (type %T)", i, v)
+	for i := range conf.Global.Monitoring {
+		item := &conf.Global.Monitoring[i]
+		listen := config.Listen{Addr: item.Listen, Metrics: true}
+		if err := api.AddServer(&listen); err != nil {
+			return false, fmt.Errorf(
+				"add metrics from global.monitoring[%d]: %w", i, err)
 		}
-		j, err := newPrometheusJobFromConfig(v)
-		if err != nil {
-			return fmt.Errorf("cannot build monitoring job #%d: %w", i, err)
-		}
-		jobs.startInternal(ctx, j)
+		exists = true
 	}
-	return nil
+	return exists, nil
 }

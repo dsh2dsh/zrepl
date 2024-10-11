@@ -1,89 +1,55 @@
 package daemon
 
 import (
-	"context"
-	"net"
 	"net/http"
 
-	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/dsh2dsh/zrepl/config"
 	"github.com/dsh2dsh/zrepl/daemon/logging"
+	"github.com/dsh2dsh/zrepl/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/daemon/middleware"
+	"github.com/dsh2dsh/zrepl/endpoint"
 	"github.com/dsh2dsh/zrepl/logger"
 	"github.com/dsh2dsh/zrepl/rpc/dataconn/frameconn"
-	"github.com/dsh2dsh/zrepl/util/tcpsock"
+	"github.com/dsh2dsh/zrepl/version"
 	"github.com/dsh2dsh/zrepl/zfs"
+	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
-const jobNamePrometheus = "_prometheus"
+const endpointMetrics = "/metrics"
 
-type prometheusJob struct {
-	listen   string
-	freeBind bool
-	shutdown context.CancelFunc
-}
-
-func newPrometheusJobFromConfig(in *config.PrometheusMonitoring) (*prometheusJob, error) {
-	if _, _, err := net.SplitHostPort(in.Listen); err != nil {
-		return nil, err
-	}
-	return &prometheusJob{listen: in.Listen, freeBind: in.ListenFreeBind}, nil
-}
-
-var prom struct {
-	taskLogEntries *prometheus.CounterVec
-}
+var metricLogEntries *prometheus.CounterVec
 
 func init() {
-	prom.taskLogEntries = prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricLogEntries = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "zrepl",
 		Subsystem: "daemon",
 		Name:      "log_entries",
 		Help:      "number of log entries per job task and level",
 	}, []string{"zrepl_job", "level"})
-	prometheus.MustRegister(prom.taskLogEntries)
 }
 
-func (j *prometheusJob) Name() string { return jobNamePrometheus }
+func mustRegisterMetrics(registerer prometheus.Registerer) {
+	// register global (=non job-local) metrics
+	version.PrometheusRegister(registerer)
+	zfscmd.RegisterMetrics(registerer)
+	trace.RegisterMetrics(registerer)
+	endpoint.RegisterMetrics(registerer)
 
-func (j *prometheusJob) RegisterMetrics(registerer prometheus.Registerer) {}
-
-func (j *prometheusJob) Run(ctx context.Context, cron *cron.Cron) {
-	ctx, j.shutdown = context.WithCancel(ctx)
-	defer j.shutdown()
-
-	if err := zfs.PrometheusRegister(prometheus.DefaultRegisterer); err != nil {
+	registerer.MustRegister(metricLogEntries)
+	if err := zfs.PrometheusRegister(registerer); err != nil {
 		panic(err)
-	}
-
-	if err := frameconn.PrometheusRegister(prometheus.DefaultRegisterer); err != nil {
+	} else if err := frameconn.PrometheusRegister(registerer); err != nil {
 		panic(err)
-	}
-
-	log := logging.GetLogger(ctx, logging.SubsysInternal)
-
-	l, err := tcpsock.Listen(j.listen, j.freeBind)
-	if err != nil {
-		log.WithError(err).Error("cannot listen")
-		return
-	}
-	go func() {
-		<-ctx.Done()
-		l.Close()
-	}()
-
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-
-	err = http.Serve(l, mux)
-	if err != nil && ctx.Err() == nil {
-		log.WithError(err).Error("error while serving")
 	}
 }
 
-func (j *prometheusJob) Shutdown() { j.shutdown() }
+func metricsEndpoints(mux *http.ServeMux, m ...middleware.Middleware) {
+	mux.Handle(endpointMetrics, middleware.AppendHandler(m, promhttp.Handler()))
+}
+
+// --------------------------------------------------
 
 type prometheusJobOutlet struct{}
 
@@ -98,6 +64,6 @@ func (o prometheusJobOutlet) WriteEntry(entry logger.Entry) error {
 	if !ok {
 		jobFieldVal = "_nojobid"
 	}
-	prom.taskLogEntries.WithLabelValues(jobFieldVal, entry.Level.String()).Inc()
+	metricLogEntries.WithLabelValues(jobFieldVal, entry.Level.String()).Inc()
 	return nil
 }

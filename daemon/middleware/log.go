@@ -9,9 +9,11 @@ import (
 	"github.com/dsh2dsh/zrepl/logger"
 )
 
-func RequestLogger(log logger.Logger, opts ...loggerOption) Middleware {
-	l := &requestLogger{
-		log:            log,
+func RequestLogger(log logger.Logger, opts ...LoggerOption) Middleware {
+	l := &LogReq{
+		log:    log,
+		levels: make(map[string]logger.Level, 1),
+
 		completedLevel: logger.Debug,
 	}
 
@@ -21,49 +23,39 @@ func RequestLogger(log logger.Logger, opts ...loggerOption) Middleware {
 	return l.middleware
 }
 
-type loggerOption func(l *requestLogger)
+type LoggerOption func(l *LogReq)
 
-func WithCompletedInfo() loggerOption {
-	return func(self *requestLogger) { self.completedLevel = logger.Info }
+func WithCompletedInfo() LoggerOption {
+	return func(self *LogReq) { self.completedLevel = logger.Info }
 }
 
-func WithPrometheusMetrics(requestBegin *prometheus.CounterVec,
-	requestFinished *prometheus.HistogramVec,
-) loggerOption {
-	return func(self *requestLogger) {
-		self.requestBegin = requestBegin
-		self.requestFinished = requestFinished
-	}
+func WithCustomLevel(url string, level logger.Level) LoggerOption {
+	return func(self *LogReq) { self.WithCustomLevel(url, level) }
 }
 
-type requestLogger struct {
-	log logger.Logger
+type LogReq struct {
+	log    logger.Logger
+	levels map[string]logger.Level
 
 	completedLevel logger.Level
-
-	requestBegin    *prometheus.CounterVec
-	requestFinished *prometheus.HistogramVec
 }
 
-func (self *requestLogger) middleware(next http.Handler) http.Handler {
+func (self *LogReq) WithCustomLevel(url string, level logger.Level) *LogReq {
+	self.levels[url] = level
+	return self
+}
+
+func (self *LogReq) middleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		log := self.log
+		logLevel := self.requestLevel(r)
 		if requestId := GetRequestId(r.Context()); requestId != "" {
 			log = log.WithField("rid", requestId)
 		}
 
 		methodURL := r.Method + " " + r.URL.String()
-		log.Info("\"" + methodURL + "\"")
+		log.Log(logLevel, "\""+methodURL+"\"")
 		log = log.WithField("req", methodURL)
-
-		if self.requestBegin != nil {
-			self.requestBegin.WithLabelValues(r.URL.Path).Inc()
-		}
-		if self.requestFinished != nil {
-			defer prometheus.
-				NewTimer(self.requestFinished.WithLabelValues(r.URL.Path)).
-				ObserveDuration()
-		}
 
 		if next == nil {
 			log.Error("no next handler configured")
@@ -72,9 +64,32 @@ func (self *requestLogger) middleware(next http.Handler) http.Handler {
 
 		t := time.Now()
 		next.ServeHTTP(w, r)
-		log.WithField("duration", time.Since(t)).
-			Log(self.completedLevel, "request completed")
+		log.WithField("duration", time.Since(t)).Log(
+			min(logLevel, self.completedLevel), "request completed")
 	}
-
 	return http.HandlerFunc(fn)
+}
+
+func (self *LogReq) requestLevel(r *http.Request) logger.Level {
+	if level, ok := self.levels[r.URL.String()]; ok {
+		return level
+	}
+	return logger.Info
+}
+
+// --------------------------------------------------
+
+func PrometheusMetrics(begin *prometheus.CounterVec,
+	finished *prometheus.HistogramVec,
+) Middleware {
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			begin.WithLabelValues(r.URL.Path).Inc()
+			defer prometheus.
+				NewTimer(finished.WithLabelValues(r.URL.Path)).
+				ObserveDuration()
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fn)
+	}
 }

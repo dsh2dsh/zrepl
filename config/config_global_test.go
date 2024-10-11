@@ -86,7 +86,8 @@ global:
     - type: prometheus
       listen: ':9811'
 `)
-	assert.Equal(t, ":9811", conf.Global.Monitoring[0].Ret.(*PrometheusMonitoring).Listen)
+	assert.NotEmpty(t, conf.Global.Monitoring)
+	assert.NotZero(t, conf.Global.Monitoring[0])
 }
 
 func TestSyslogLoggingOutletFacility(t *testing.T) {

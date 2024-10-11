@@ -23,7 +23,6 @@ func GetLogger(ctx context.Context) Logger {
 }
 
 type Internal interface {
-	Name() string
 	Run(ctx context.Context, cron *cron.Cron)
 	RegisterMetrics(registerer prometheus.Registerer)
 	Shutdown()
@@ -32,6 +31,7 @@ type Internal interface {
 type Job interface {
 	Internal
 
+	Name() string
 	Status() *Status
 	// Jobs that return a subtree of the dataset hierarchy
 	// must return the root of that subtree as rfs and ok = true

@@ -17,7 +17,7 @@ pkg install zrepl-dsh2dsh
 
 ## Changes from [upstream](https://github.com/zrepl/zrepl):
 
-  * Go 1.22 and updated dependencies
+  * Fresh dependencies
 
   * ~~`last_n` keep rule fixed. See
     [#691](https://github.com/zrepl/zrepl/pull/750)~~ Merged.
@@ -293,17 +293,6 @@ pkg install zrepl-dsh2dsh
     soon as it'll be safe. It interrupts any operation, except replication
     steps. The daemon will wait for all replication steps completed and exit.
 
-  * Added a configuration of file permissions for control socket. Example:
-
-    ``` yaml
-    global:
-      control:
-        # sockpath: "/var/run/zrepl/control"
-        sockmode: 0o660             # write perm for group
-    ```
-
-    This configuration allows using of `zrepl status` for the group.
-
   * Redesigned `zrepl status`
 
   * `zfs send -w` is default now. Example how to change it back:
@@ -313,7 +302,26 @@ pkg install zrepl-dsh2dsh
     raw: false
   ```
 
-  * Small cosmetic changes
+  * New configuration for control and prometheus services. Example:
+
+  ``` yaml
+  listen:
+    # control socket for zrepl client, like `zrepl signal` or `zrepl status`.
+    - unix: "/var/run/zrepl/control"
+      # unix_mode: 0o660            # write perm for group
+      control: true
+
+    # Export Prometheus metrics on http://127.0.0.1:8000/metrics
+    - addr: "127.0.0.1:8000"
+      # tls_cert: "/usr/local/etc/zrepl/cert.pem"
+      # tls_key: "/usr/local/etc/zrepl/key.pem"
+      metrics: true
+  ```
+
+  One of `addr` or `unix` is required or both of them can be configured. One of
+  `control` or `metrics` is required or both of them can be configured too.
+  Everything else is optional. For backward compatibility old style
+  configuration works too.
 
 ## Upstream user documentation
 

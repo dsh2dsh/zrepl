@@ -103,6 +103,7 @@ func (self *jobs) reset(job string) error {
 
 func (self *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
 	self.cron.Start()
+	log := job.GetLogger(ctx)
 	for _, j := range confJobs {
 		jobName := j.Name()
 		if internalJobName(jobName) {
@@ -110,7 +111,8 @@ func (self *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
 		} else if _, ok := self.jobs[jobName]; ok {
 			panic("duplicate job name " + jobName)
 		}
-		self.start(self.withJobSignals(ctx, jobName), j)
+		self.start(self.withJobSignals(ctx, jobName), j,
+			log.WithField(logging.JobField, jobName))
 		self.jobs[jobName] = j
 	}
 	self.log.
@@ -121,14 +123,11 @@ func (self *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
 
 func internalJobName(s string) bool { return strings.HasPrefix(s, "_") }
 
-func (self *jobs) start(ctx context.Context, j job.Internal) {
+func (self *jobs) start(ctx context.Context, j job.Internal, log logger.Logger,
+) {
 	j.RegisterMetrics(prometheus.DefaultRegisterer)
-	ctx = logging.WithInjectedField(ctx, logging.JobField, j.Name())
-	ctx = zfscmd.WithJobID(ctx, j.Name())
-
 	self.wg.Add(1)
 	go func() {
-		log := job.GetLogger(ctx)
 		log.Info("starting job")
 		j.Run(ctx, self.cron)
 		log.Info("job exited")
@@ -138,6 +137,7 @@ func (self *jobs) start(ctx context.Context, j job.Internal) {
 
 func (self *jobs) withJobSignals(ctx context.Context, jobName string,
 ) context.Context {
+	ctx = self.context(ctx, jobName)
 	ctx, wakeup := wakeup.Context(ctx)
 	self.wakeups[jobName] = wakeup
 	ctx, resetFunc := reset.Context(ctx)
@@ -145,7 +145,14 @@ func (self *jobs) withJobSignals(ctx context.Context, jobName string,
 	return ctx
 }
 
+func (self *jobs) context(ctx context.Context, jobName string) context.Context {
+	ctx = logging.WithInjectedField(ctx, logging.JobField, jobName)
+	ctx = zfscmd.WithJobID(ctx, jobName)
+	return ctx
+}
+
 func (self *jobs) startInternal(ctx context.Context, j job.Internal) {
-	self.start(ctx, j)
+	log := job.GetLogger(ctx)
+	self.start(ctx, j, log.WithField("internal", true))
 	self.internalJobs = append(self.internalJobs, j)
 }

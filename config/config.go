@@ -31,6 +31,7 @@ func New() *Config {
 type Config struct {
 	Jobs   []JobEnum `yaml:"jobs" validate:"min=1,dive"`
 	Global Global    `yaml:"global"`
+	Listen []Listen  `yaml:"listen" validate:"dive"`
 }
 
 func (c *Config) lateInit() {
@@ -341,10 +342,10 @@ type Global struct {
 	RpcTimeout time.Duration `yaml:"rpc_timeout" default:"1m" validate:"gt=0s"`
 	ZfsBin     string        `yaml:"zfs_bin" default:"zfs" validate:"required"`
 
-	Logging    LoggingOutletEnumList `yaml:"logging" validate:"min=1"`
-	Monitoring []MonitoringEnum      `yaml:"monitoring"`
-	Control    GlobalControl         `yaml:"control"`
-	Serve      GlobalServe           `yaml:"serve"`
+	Logging    LoggingOutletEnumList  `yaml:"logging" validate:"min=1"`
+	Monitoring []PrometheusMonitoring `yaml:"monitoring" validate:"dive"`
+	Control    GlobalControl          `yaml:"control"`
+	Serve      GlobalServe            `yaml:"serve"`
 }
 
 type ConnectEnum struct {
@@ -484,10 +485,6 @@ type TCPLoggingOutletTLS struct {
 	Key  string `yaml:"key" validate:"required"`
 }
 
-type MonitoringEnum struct {
-	Ret any `validate:"required"`
-}
-
 type PrometheusMonitoring struct {
 	Type           string `yaml:"type" validate:"required"`
 	Listen         string `yaml:"listen" validate:"required,hostname_port"`
@@ -554,7 +551,7 @@ func (f *SyslogFacility) SetDefaults() {
 var _ defaults.Setter = (*SyslogFacility)(nil)
 
 type GlobalControl struct {
-	SockPath string `yaml:"sockpath" default:"/var/run/zrepl/control" validate:"required"`
+	SockPath string `yaml:"sockpath" default:"/var/run/zrepl/control" validate:"filepath"`
 	SockMode uint32 `yaml:"sockmode" validate:"lte=0o777"`
 }
 
@@ -677,15 +674,6 @@ func (t *LoggingOutletEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 		"stdout": new(FileLoggingOutlet),
 		"syslog": new(SyslogLoggingOutlet),
 		"tcp":    new(TCPLoggingOutlet),
-	})
-	return
-}
-
-var _ yaml.Unmarshaler = (*MonitoringEnum)(nil)
-
-func (t *MonitoringEnum) UnmarshalYAML(value *yaml.Node) (err error) {
-	t.Ret, err = enumUnmarshal(value, map[string]any{
-		"prometheus": new(PrometheusMonitoring),
 	})
 	return
 }
