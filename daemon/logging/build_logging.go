@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"iter"
 	"log/syslog"
 	"os"
 
@@ -15,9 +16,9 @@ import (
 	"github.com/dsh2dsh/zrepl/tlsconf"
 )
 
-func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error) {
+func OutletsFromConfig(in config.LoggingOutletEnumList,
+) (*logger.Outlets, error) {
 	outlets := logger.NewOutlets()
-
 	if len(in) == 0 {
 		// Default config
 		out := WriterOutlet{NewSlogFormatter(), os.Stdout}
@@ -27,7 +28,6 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 
 	var syslogOutlets, stdoutOutlets int
 	for lei, le := range in {
-
 		outlet, minLevel, err := ParseOutlet(le)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse outlet #%d: %w", lei, err)
@@ -40,9 +40,7 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 		case WriterOutlet:
 			stdoutOutlets++
 		}
-
 		outlets.Add(outlet, minLevel)
-
 	}
 
 	if syslogOutlets > 1 {
@@ -51,7 +49,6 @@ func OutletsFromConfig(in config.LoggingOutletEnumList) (*logger.Outlets, error)
 	if stdoutOutlets > 1 {
 		return nil, errors.New("can only define one 'stdout' outlet")
 	}
-
 	return outlets, nil
 }
 
@@ -95,80 +92,48 @@ var AllSubsystems = []Subsystem{
 	SubsysPlatformtest,
 }
 
+func WithInjectedField(ctx context.Context, field string, value any,
+) context.Context {
+	parent, _ := ctx.Value(contextKeyInjectedField).(*injectedField)
+	// TODO sanity-check `field` now
+	return context.WithValue(ctx, contextKeyInjectedField,
+		&injectedField{field, value, parent})
+}
+
 type injectedField struct {
 	field  string
-	value  interface{}
+	value  any
 	parent *injectedField
 }
 
-func WithInjectedField(ctx context.Context, field string, value interface{}) context.Context {
-	var parent *injectedField
-	parentI := ctx.Value(contextKeyInjectedField)
-	if parentI != nil {
-		parent = parentI.(*injectedField)
+func iterInjectedFields(ctx context.Context) iter.Seq2[string, any] {
+	inj, _ := ctx.Value(contextKeyInjectedField).(*injectedField)
+	fn := func(yield func(field string, value any) bool) {
+		for ; inj != nil; inj = inj.parent {
+			if !yield(inj.field, inj.value) {
+				return
+			}
+		}
 	}
-	// TODO sanity-check `field` now
-	this := &injectedField{field, value, parent}
-	return context.WithValue(ctx, contextKeyInjectedField, this)
+	return fn
 }
 
-func iterInjectedFields(ctx context.Context, cb func(field string, value interface{})) {
-	injI := ctx.Value(contextKeyInjectedField)
-	if injI == nil {
-		return
-	}
-	inj := injI.(*injectedField)
-	for ; inj != nil; inj = inj.parent {
-		cb(inj.field, inj.value)
-	}
-}
-
-type SubsystemLoggers map[Subsystem]logger.Logger
-
-func SubsystemLoggersWithUniversalLogger(l logger.Logger) SubsystemLoggers {
-	loggers := make(SubsystemLoggers)
-	for _, s := range AllSubsystems {
-		loggers[s] = l
-	}
-	return loggers
-}
-
-func WithLoggers(ctx context.Context, loggers SubsystemLoggers) context.Context {
-	return context.WithValue(ctx, contextKeyLoggers, loggers)
-}
-
-func GetLoggers(ctx context.Context) SubsystemLoggers {
-	loggers, ok := ctx.Value(contextKeyLoggers).(SubsystemLoggers)
-	if !ok {
-		return nil
-	}
-	return loggers
+func WithLogger(ctx context.Context, l logger.Logger) context.Context {
+	return context.WithValue(ctx, contextKeyLoggers, l)
 }
 
 func GetLogger(ctx context.Context, subsys Subsystem) logger.Logger {
-	return getLoggerImpl(ctx, subsys)
-}
-
-func getLoggerImpl(ctx context.Context, subsys Subsystem) logger.Logger {
-	loggers, ok := ctx.Value(contextKeyLoggers).(SubsystemLoggers)
-	if !ok || loggers == nil {
-		return logger.NewNullLogger()
-	}
-	l, ok := loggers[subsys]
-	if !ok {
+	l, _ := ctx.Value(contextKeyLoggers).(logger.Logger)
+	if l == nil {
 		return logger.NewNullLogger()
 	}
 
-	l = l.WithField(SubsysField, subsys)
+	l = l.WithField(SubsysField, subsys).WithField(SpanField,
+		trace.GetSpanStackOrDefault(ctx, *trace.StackKindId, "NOSPAN"))
 
-	l = l.WithField(SpanField, trace.GetSpanStackOrDefault(ctx, *trace.StackKindId, "NOSPAN"))
-
-	fields := make(logger.Fields)
-	iterInjectedFields(ctx, func(field string, value interface{}) {
-		fields[field] = value
-	})
-	l = l.WithFields(fields)
-
+	for field, v := range iterInjectedFields(ctx) {
+		l = l.WithField(field, v)
+	}
 	return l
 }
 

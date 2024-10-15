@@ -39,8 +39,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	log := logger.NewLogger(outlets, 1*time.Second)
 	log.Info(version.NewZreplVersionInformation().String())
-	ctx = logging.WithLoggers(ctx,
-		logging.SubsystemLoggersWithUniversalLogger(log))
+	ctx = logging.WithLogger(ctx, log)
 	registerTraceCallbacks()
 
 	log.Info("starting daemon")

@@ -111,7 +111,7 @@ func HarnessRun(args HarnessArgs) error {
 	}
 	ctx := context.Background()
 	defer trace.WithTaskFromStackUpdateCtx(&ctx)()
-	ctx = logging.WithLoggers(ctx, logging.SubsystemLoggersWithUniversalLogger(logger))
+	ctx = logging.WithLogger(ctx, logger)
 	ex := platformtest.NewEx(logger)
 
 	testQueue := list.New()

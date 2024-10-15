@@ -426,7 +426,7 @@ jobs:
 			cbReached = false
 
 			if testing.Verbose() && !tt.SuppressOutput {
-				ctx = logging.WithLoggers(ctx, logging.SubsystemLoggersWithUniversalLogger(log))
+				ctx = logging.WithLogger(ctx, log)
 			}
 			plan.Run(ctx, false)
 			report := plan.Report()
