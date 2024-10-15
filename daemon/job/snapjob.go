@@ -190,7 +190,7 @@ func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 
 func (j *SnapJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
-func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) {
+func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) error {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "snap-job", j.Name())
 	defer endTask()
 
@@ -217,6 +217,7 @@ forLoop:
 		j.prune(ctx, cnt)
 	}
 	j.wait(log)
+	return nil
 }
 
 func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {

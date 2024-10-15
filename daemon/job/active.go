@@ -665,7 +665,7 @@ func FakeActiveSideDirectMethodInvocationClientIdentity(jobId endpoint.JobID) st
 	return fmt.Sprintf("<local><active><job><client><identity><job=%q>", jobId.String())
 }
 
-func (j *ActiveSide) Run(ctx context.Context, cron *cron.Cron) {
+func (j *ActiveSide) Run(ctx context.Context, cron *cron.Cron) error {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "active-side-job", j.Name())
 	defer endTask()
 	ctx = context.WithValue(ctx, endpoint.ClientIdentityKey,
@@ -702,6 +702,7 @@ forLoop:
 		j.do(ctx, cnt)
 	}
 	j.wait(log)
+	return nil
 }
 
 func (j *ActiveSide) runPeriodic(ctx context.Context,

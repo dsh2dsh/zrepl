@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/daemon/job"
 	"github.com/dsh2dsh/zrepl/daemon/job/reset"
@@ -20,7 +20,11 @@ import (
 func newJobs(ctx context.Context, log logger.Logger,
 	cancel context.CancelFunc,
 ) *jobs {
+	g, ctx := errgroup.WithContext(ctx)
 	return &jobs{
+		g:   g,
+		ctx: ctx,
+
 		log:  log,
 		cron: newCron(logging.GetLogger(ctx, logging.SubsysCron), true),
 
@@ -35,7 +39,9 @@ func newJobs(ctx context.Context, log logger.Logger,
 }
 
 type jobs struct {
-	wg   sync.WaitGroup
+	g   *errgroup.Group
+	ctx context.Context
+
 	cron *cron.Cron
 	log  logger.Logger
 
@@ -49,14 +55,16 @@ type jobs struct {
 }
 
 func (self *jobs) Cancel() {
-	self.log.Info("cancel all jobs")
+	self.log.Info("stop all jobs")
 	self.cancel()
 }
 
 func (self *jobs) wait() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		self.wg.Wait()
+		if err := self.g.Wait(); err != nil {
+			self.log.WithError(err).Error("some jobs finished with error")
+		}
 		self.log.Info("all jobs finished")
 		self.log.Info("waiting for cron exit")
 		<-self.cron.Stop().Done()
@@ -96,22 +104,28 @@ func (self *jobs) wakeup(job string) error {
 func (self *jobs) reset(job string) error {
 	wu, ok := self.resets[job]
 	if !ok {
-		return fmt.Errorf("Job %q does not exist", job)
+		return fmt.Errorf("job %q does not exist", job)
 	}
 	return wu()
 }
 
-func (self *jobs) startJobsWithCron(ctx context.Context, confJobs []job.Job) {
+func (self *jobs) startJobsWithCron(confJobs []job.Job) {
 	self.cron.Start()
-	log := job.GetLogger(ctx)
+	log := job.GetLogger(self.ctx)
 	for _, j := range confJobs {
+		if self.ctx.Err() != nil {
+			self.log.WithError(context.Cause(self.ctx)).
+				WithField("next_job", j.Name()).
+				Error("break starting jobs")
+			break
+		}
 		jobName := j.Name()
 		if internalJobName(jobName) {
 			panic("internal job name used for non-internal job " + jobName)
 		} else if _, ok := self.jobs[jobName]; ok {
 			panic("duplicate job name " + jobName)
 		}
-		self.start(self.withJobSignals(ctx, jobName), j,
+		self.start(self.withJobSignals(jobName), j,
 			log.WithField(logging.JobField, jobName))
 		self.jobs[jobName] = j
 	}
@@ -126,18 +140,19 @@ func internalJobName(s string) bool { return strings.HasPrefix(s, "_") }
 func (self *jobs) start(ctx context.Context, j job.Internal, log logger.Logger,
 ) {
 	j.RegisterMetrics(prometheus.DefaultRegisterer)
-	self.wg.Add(1)
-	go func() {
+	self.g.Go(func() error {
 		log.Info("starting job")
-		j.Run(ctx, self.cron)
+		if err := j.Run(ctx, self.cron); err != nil {
+			log.WithError(err).Error("job exited with error")
+			return err
+		}
 		log.Info("job exited")
-		self.wg.Done()
-	}()
+		return nil
+	})
 }
 
-func (self *jobs) withJobSignals(ctx context.Context, jobName string,
-) context.Context {
-	ctx = self.context(ctx, jobName)
+func (self *jobs) withJobSignals(jobName string) context.Context {
+	ctx := self.context(jobName)
 	ctx, wakeup := wakeup.Context(ctx)
 	self.wakeups[jobName] = wakeup
 	ctx, resetFunc := reset.Context(ctx)
@@ -145,14 +160,14 @@ func (self *jobs) withJobSignals(ctx context.Context, jobName string,
 	return ctx
 }
 
-func (self *jobs) context(ctx context.Context, jobName string) context.Context {
-	ctx = logging.WithInjectedField(ctx, logging.JobField, jobName)
+func (self *jobs) context(jobName string) context.Context {
+	ctx := logging.WithInjectedField(self.ctx, logging.JobField, jobName)
 	ctx = zfscmd.WithJobID(ctx, jobName)
 	return ctx
 }
 
-func (self *jobs) startInternal(ctx context.Context, j job.Internal) {
-	log := job.GetLogger(ctx)
-	self.start(ctx, j, log.WithField("internal", true))
+func (self *jobs) startInternal(j job.Internal) {
+	log := job.GetLogger(self.ctx)
+	self.start(self.ctx, j, log.WithField("server", true))
 	self.internalJobs = append(self.internalJobs, j)
 }

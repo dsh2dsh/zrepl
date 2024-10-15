@@ -114,8 +114,8 @@ func (self *serverJob) mux(c *config.Listen) *http.ServeMux {
 	return mux
 }
 
-func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) {
-	defer self.log.Info("job finished")
+func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) error {
+	defer self.log.Info("server finished")
 
 	g, ctx := errgroup.WithContext(ctx)
 	baseContext := func(l net.Listener) context.Context { return ctx }
@@ -129,12 +129,15 @@ func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) {
 		})
 	}
 
+	self.log.Info("waiting for listeners to finish")
 	<-ctx.Done()
 	self.log.WithError(context.Cause(ctx)).Info("context done")
 	self.shutdownServers()
 	if err := g.Wait(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		self.log.WithError(err).Error("error serving")
+		return fmt.Errorf("daemon: %w", err)
 	}
+	return nil
 }
 
 func (self *serverJob) shutdownServers() {

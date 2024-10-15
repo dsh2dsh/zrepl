@@ -59,7 +59,6 @@ type Subsystem string
 
 const (
 	SubsysCron         Subsystem = "cron"
-	SubsysInternal     Subsystem = "internal"
 	SubsysMeta         Subsystem = "meta"
 	SubsysJob          Subsystem = "job"
 	SubsysReplication  Subsystem = "repl"
@@ -79,7 +78,6 @@ const (
 
 var AllSubsystems = []Subsystem{
 	SubsysCron,
-	SubsysInternal,
 	SubsysMeta,
 	SubsysJob,
 	SubsysReplication,

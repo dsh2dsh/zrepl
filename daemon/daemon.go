@@ -45,12 +45,11 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	log.Info("starting daemon")
 	jobs := newJobs(ctx, log, cancel)
-	if err := startInternalJobs(ctx, conf, jobs, outlets); err != nil {
+	if err := startServer(log, conf, jobs, outlets); err != nil {
 		return fmt.Errorf("daemon: %w", err)
 	}
-
 	// start regular jobs
-	jobs.startJobsWithCron(ctx, confJobs)
+	jobs.startJobsWithCron(confJobs)
 
 	wait := jobs.wait()
 	select {
@@ -80,33 +79,33 @@ func registerTraceCallbacks() {
 	})
 }
 
-func startInternalJobs(ctx context.Context, conf *config.Config, jobs *jobs,
+func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
 	logOutlets *logger.Outlets,
 ) error {
-	log := logging.GetLogger(ctx, logging.SubsysInternal)
-	api := newServerJob(log, newControlJob(jobs, log))
+	server := newServerJob(log, newControlJob(jobs, log))
 
 	var hasControl, hasMetrics bool
 	for i := range conf.Listen {
 		listen := &conf.Listen[i]
-		if err := api.AddServer(listen); err != nil {
+		if err := server.AddServer(listen); err != nil {
 			return fmt.Errorf("add server from listen[%d]: %w", i, err)
 		}
 		hasControl = hasControl || listen.Control
 		hasMetrics = hasMetrics || listen.Metrics
 	}
 
-	if err := defaultControl(hasControl, api, conf); err != nil {
+	if err := defaultControl(hasControl, server, conf); err != nil {
 		return err
 	}
 
-	if has, err := defaultMetrics(hasMetrics, api, conf); err != nil {
+	if has, err := defaultMetrics(hasMetrics, server, conf); err != nil {
 		return err
 	} else if has {
 		logOutlets.Add(newPrometheusLogOutlet(), logger.Debug)
 	}
 
-	jobs.startInternal(ctx, api)
+	log.Info("starting server")
+	jobs.startInternal(server)
 	return nil
 }
 

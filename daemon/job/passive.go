@@ -220,7 +220,7 @@ func (j *PassiveSide) SenderConfig() *endpoint.SenderConfig {
 
 func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}
 
-func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
+func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) error {
 	ctx, endTask := trace.WithTaskAndSpan(ctx, "passive-side-job", j.Name())
 	defer endTask()
 
@@ -244,11 +244,12 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) {
 	listener, err := j.listen()
 	if err != nil {
 		log.WithError(err).Error("cannot listen")
-		return
+		return fmt.Errorf("job: cannot listen: %w", err)
 	}
 
 	server.Serve(ctx, listener)
 	j.wait(log)
+	return nil
 }
 
 func (j *PassiveSide) goModePeriodic(ctx context.Context, cron *cron.Cron) {

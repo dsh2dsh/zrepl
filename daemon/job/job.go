@@ -23,7 +23,7 @@ func GetLogger(ctx context.Context) Logger {
 }
 
 type Internal interface {
-	Run(ctx context.Context, cron *cron.Cron)
+	Run(ctx context.Context, cron *cron.Cron) error
 	RegisterMetrics(registerer prometheus.Registerer)
 	Shutdown()
 }
