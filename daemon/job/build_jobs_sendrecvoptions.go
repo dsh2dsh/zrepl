@@ -57,13 +57,14 @@ type ReceivingJobConfig interface {
 	GetRecvOptions() *config.RecvOptions
 }
 
-func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoint.ReceiverConfig, err error) {
+func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
+) (rc endpoint.ReceiverConfig, err error) {
 	rootFs, err := zfs.NewDatasetPath(in.GetRootFS())
 	if err != nil {
 		return rc, errors.New("root_fs is not a valid zfs filesystem path")
-	}
-	if rootFs.Length() <= 0 {
-		return rc, errors.New("root_fs must not be empty") // duplicates error check of receiver
+	} else if rootFs.Length() <= 0 {
+		// duplicates error check of receiver
+		return rc, errors.New("root_fs must not be empty")
 	}
 
 	recvOpts := in.GetRecvOptions()
@@ -73,13 +74,17 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 		return rc, fmt.Errorf("cannot build bandwidth limit config: %w", err)
 	}
 
-	placeholderEncryption, err := endpoint.PlaceholderCreationEncryptionPropertyString(recvOpts.Placeholder.Encryption)
+	placeholderEncryption, err := endpoint.
+		PlaceholderCreationEncryptionPropertyString(
+			recvOpts.Placeholder.Encryption)
 	if err != nil {
 		options := []string{}
 		for _, v := range endpoint.PlaceholderCreationEncryptionPropertyValues() {
-			options = append(options, endpoint.PlaceholderCreationEncryptionProperty(v).String())
+			options = append(options,
+				endpoint.PlaceholderCreationEncryptionProperty(v).String())
 		}
-		return rc, fmt.Errorf("placeholder encryption value %q is invalid, must be one of %s",
+		return rc, fmt.Errorf(
+			"placeholder encryption value %q is invalid, must be one of %s",
 			recvOpts.Placeholder.Encryption, options)
 	}
 
@@ -97,9 +102,8 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID) (rc endpoi
 		ExecPipe:              recvOpts.ExecPipe,
 	}
 
-	if err := rc.Validate(); err != nil {
-		return rc, fmt.Errorf("cannot build receiver config: %w", err)
+	if err = rc.Validate(); err != nil {
+		err = fmt.Errorf("cannot build receiver config: %w", err)
 	}
-
-	return rc, nil
+	return
 }

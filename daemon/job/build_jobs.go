@@ -26,7 +26,8 @@ func JobsFromConfig(c *config.Config, parseFlags config.ParseFlags) ([]Job, erro
 	return js, nil
 }
 
-func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags) (j Job, err error) {
+func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags,
+) (j Job, err error) {
 	cannotBuildJob := func(e error, name string) (Job, error) {
 		return nil, fmt.Errorf("cannot build job %q: %w", name, e)
 	}

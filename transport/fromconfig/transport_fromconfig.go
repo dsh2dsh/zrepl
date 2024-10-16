@@ -13,11 +13,14 @@ import (
 	"github.com/dsh2dsh/zrepl/transport/tls"
 )
 
-func ListenerFactoryFromConfig(g *config.Global, in config.ServeEnum, parseFlags config.ParseFlags) (transport.AuthenticatedListenerFactory, error) {
+func ListenerFactoryFromConfig(g *config.Global, in config.ServeEnum,
+	parseFlags config.ParseFlags,
+) (transport.AuthenticatedListenerFactory, error) {
 	var (
 		l   transport.AuthenticatedListenerFactory
 		err error
 	)
+
 	switch v := in.Ret.(type) {
 	case *config.TCPServe:
 		l, err = tcp.TCPListenerFactoryFromConfig(g, v)
@@ -30,7 +33,6 @@ func ListenerFactoryFromConfig(g *config.Global, in config.ServeEnum, parseFlags
 	default:
 		return nil, fmt.Errorf("internal error: unknown serve type %T", v)
 	}
-
 	return l, err
 }
 
