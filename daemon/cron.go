@@ -1,12 +1,16 @@
 package daemon
 
 import (
+	"context"
+
 	"github.com/dsh2dsh/cron/v3"
 
+	"github.com/dsh2dsh/zrepl/daemon/logging"
 	"github.com/dsh2dsh/zrepl/logger"
 )
 
-func newCron(log logger.Logger, verbose bool) *cron.Cron {
+func newCron(ctx context.Context, verbose bool) *cron.Cron {
+	log := logging.GetLogger(ctx, logging.SubsysCron)
 	return cron.New(cron.WithLogger(newCronLogger(log, verbose)))
 }
 

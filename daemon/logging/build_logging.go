@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"iter"
 	"log/syslog"
 	"os"
 
@@ -92,30 +91,9 @@ var AllSubsystems = []Subsystem{
 	SubsysPlatformtest,
 }
 
-func WithInjectedField(ctx context.Context, field string, value any,
+func WithField(ctx context.Context, field string, value any,
 ) context.Context {
-	parent, _ := ctx.Value(contextKeyInjectedField).(*injectedField)
-	// TODO sanity-check `field` now
-	return context.WithValue(ctx, contextKeyInjectedField,
-		&injectedField{field, value, parent})
-}
-
-type injectedField struct {
-	field  string
-	value  any
-	parent *injectedField
-}
-
-func iterInjectedFields(ctx context.Context) iter.Seq2[string, any] {
-	inj, _ := ctx.Value(contextKeyInjectedField).(*injectedField)
-	fn := func(yield func(field string, value any) bool) {
-		for ; inj != nil; inj = inj.parent {
-			if !yield(inj.field, inj.value) {
-				return
-			}
-		}
-	}
-	return fn
+	return WithLogger(ctx, FromContext(ctx).WithField(field, value))
 }
 
 func WithLogger(ctx context.Context, l logger.Logger) context.Context {
@@ -123,18 +101,17 @@ func WithLogger(ctx context.Context, l logger.Logger) context.Context {
 }
 
 func GetLogger(ctx context.Context, subsys Subsystem) logger.Logger {
-	l, _ := ctx.Value(contextKeyLoggers).(logger.Logger)
-	if l == nil {
-		return logger.NewNullLogger()
-	}
+	return FromContext(ctx).
+		WithField(SubsysField, subsys).
+		WithField(SpanField,
+			trace.GetSpanStackOrDefault(ctx, *trace.StackKindId, "NOSPAN"))
+}
 
-	l = l.WithField(SubsysField, subsys).WithField(SpanField,
-		trace.GetSpanStackOrDefault(ctx, *trace.StackKindId, "NOSPAN"))
-
-	for field, v := range iterInjectedFields(ctx) {
-		l = l.WithField(field, v)
+func FromContext(ctx context.Context) logger.Logger {
+	if l, ok := ctx.Value(contextKeyLoggers).(logger.Logger); ok && l != nil {
+		return l
 	}
-	return l
+	return logger.NewNullLogger()
 }
 
 func parseLogFormat(common config.LoggingOutletCommon,

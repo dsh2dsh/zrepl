@@ -351,7 +351,7 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 
 	getLogger(ctx).Debug("examine filesystem state to find sync point")
 	for _, d := range fss {
-		ctx := logging.WithInjectedField(ctx, "fs", d.ToString())
+		ctx := logging.WithField(ctx, "fs", d.ToString())
 		syncPoint, err := findSyncPointFSNextOptimalSnapshotTime(
 			ctx, now, interval, prefix, d)
 		if err == findSyncPointFSNoFilesystemVersionsErr {

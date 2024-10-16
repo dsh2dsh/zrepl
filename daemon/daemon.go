@@ -43,7 +43,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	registerTraceCallbacks()
 
 	log.Info("starting daemon")
-	jobs := newJobs(ctx, log, cancel)
+	jobs := newJobs(ctx, cancel)
 	if err := startServer(log, conf, jobs, outlets); err != nil {
 		return fmt.Errorf("daemon: %w", err)
 	}
@@ -56,6 +56,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	case <-ctx.Done():
 		log.WithError(ctx.Err()).Info("context canceled")
 	}
+
 	log.Info("waiting for jobs to finish")
 	<-wait.Done()
 	log.Info("daemon exiting")

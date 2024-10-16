@@ -17,16 +17,14 @@ import (
 	"github.com/dsh2dsh/zrepl/zfs/zfscmd"
 )
 
-func newJobs(ctx context.Context, log logger.Logger,
-	cancel context.CancelFunc,
-) *jobs {
+func newJobs(ctx context.Context, cancel context.CancelFunc) *jobs {
 	g, ctx := errgroup.WithContext(ctx)
 	return &jobs{
 		g:   g,
 		ctx: ctx,
 
-		log:  log,
-		cron: newCron(logging.GetLogger(ctx, logging.SubsysCron), true),
+		log:  logging.FromContext(ctx),
+		cron: newCron(ctx, true),
 
 		wakeups: make(map[string]wakeup.Func),
 		resets:  make(map[string]reset.Func),
@@ -142,6 +140,7 @@ func (self *jobs) start(ctx context.Context, j job.Internal, log logger.Logger,
 	j.RegisterMetrics(prometheus.DefaultRegisterer)
 	self.g.Go(func() error {
 		log.Info("starting job")
+
 		if err := j.Run(ctx, self.cron); err != nil {
 			log.WithError(err).Error("job exited with error")
 			return err
@@ -161,7 +160,7 @@ func (self *jobs) withJobSignals(jobName string) context.Context {
 }
 
 func (self *jobs) context(jobName string) context.Context {
-	ctx := logging.WithInjectedField(self.ctx, logging.JobField, jobName)
+	ctx := logging.WithField(self.ctx, logging.JobField, jobName)
 	ctx = zfscmd.WithJobID(ctx, jobName)
 	return ctx
 }

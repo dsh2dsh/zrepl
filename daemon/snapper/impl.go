@@ -92,8 +92,8 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 			plan.args.timestampLocal)
 		snapname := fmt.Sprintf("%s%s", plan.args.prefix, suffix)
 
-		ctx := logging.WithInjectedField(ctx, "fs", fs.ToString())
-		ctx = logging.WithInjectedField(ctx, "snap", snapname)
+		ctx := logging.WithLogger(ctx, logging.FromContext(ctx).
+			WithField("fs", fs.ToString()).WithField("snap", snapname))
 
 		hookEnvExtra := hooks.Env{
 			hooks.EnvFS:       fs.ToString(),

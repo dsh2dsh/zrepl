@@ -6,13 +6,9 @@ type contextKey int
 
 const (
 	contextKeyLoggers contextKey = 1 + iota
-	contextKeyInjectedField
 )
 
-var contextKeys = []contextKey{
-	contextKeyLoggers,
-	contextKeyInjectedField,
-}
+var contextKeys = []contextKey{contextKeyLoggers}
 
 func WithInherit(ctx, inheritFrom context.Context) context.Context {
 	for _, k := range contextKeys {
