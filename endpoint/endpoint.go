@@ -551,19 +551,6 @@ func (c *ReceiverConfig) Validate() error {
 	return nil
 }
 
-// Receiver implements replication.ReplicationEndpoint for a receiving side
-type Receiver struct {
-	pdu.UnsafeReplicationServer // prefer compilation errors over default 'method X not implemented' impl
-
-	conf ReceiverConfig // validated
-
-	bwLimit bandwidthlimit.Wrapper
-
-	recvParentCreationMtx *chainlock.L
-
-	Test_OverrideClientIdentityFunc func() string // for use by platformtest
-}
-
 func NewReceiver(config ReceiverConfig) *Receiver {
 	config.copyIn()
 	if err := config.Validate(); err != nil {
@@ -576,9 +563,52 @@ func NewReceiver(config ReceiverConfig) *Receiver {
 	}
 }
 
-func TestClientIdentity(rootFS *zfs.DatasetPath, clientIdentity string) error {
-	_, err := clientRoot(rootFS, clientIdentity)
-	return err
+// Receiver implements replication.ReplicationEndpoint for a receiving side
+type Receiver struct {
+	// prefer compilation errors over default 'method X not implemented' impl
+	pdu.UnsafeReplicationServer
+
+	conf                  ReceiverConfig // validated
+	bwLimit               bandwidthlimit.Wrapper
+	recvParentCreationMtx *chainlock.L
+	clientIdentity        string
+
+	Test_OverrideClientIdentityFunc func() string // for use by platformtest
+}
+
+func (s *Receiver) WithClientIdentity(identity string) *Receiver {
+	s.clientIdentity = identity
+	return s
+}
+
+func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
+	if !s.conf.AppendClientIdentity {
+		return s.conf.RootWithoutClientComponent.Copy()
+	}
+
+	var clientIdentity string
+	switch {
+	case s.clientIdentity != "":
+		clientIdentity = s.clientIdentity
+	case s.Test_OverrideClientIdentityFunc != nil:
+		clientIdentity = s.Test_OverrideClientIdentityFunc()
+	default:
+		identity, ok := ctx.Value(ClientIdentityKey).(string) // no shadow
+		if !ok {
+			panic("ClientIdentityKey context value must be set")
+		}
+		clientIdentity = identity
+	}
+
+	clientRoot, err := clientRoot(s.conf.RootWithoutClientComponent,
+		clientIdentity)
+	if err != nil {
+		err = fmt.Errorf(
+			"ClientIdentityContextKey must have been validated before invoking Receiver: %s",
+			err)
+		panic(err)
+	}
+	return clientRoot
 }
 
 func clientRoot(rootFS *zfs.DatasetPath, clientIdentity string) (*zfs.DatasetPath, error) {
@@ -592,29 +622,6 @@ func clientRoot(rootFS *zfs.DatasetPath, clientIdentity string) (*zfs.DatasetPat
 		return nil, errors.New("client identity must be a single ZFS filesystem path component")
 	}
 	return clientRoot, nil
-}
-
-func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
-	if !s.conf.AppendClientIdentity {
-		return s.conf.RootWithoutClientComponent.Copy()
-	}
-
-	var clientIdentity string
-	if s.Test_OverrideClientIdentityFunc != nil {
-		clientIdentity = s.Test_OverrideClientIdentityFunc()
-	} else {
-		var ok bool
-		clientIdentity, ok = ctx.Value(ClientIdentityKey).(string) // no shadow
-		if !ok {
-			panic("ClientIdentityKey context value must be set")
-		}
-	}
-
-	clientRoot, err := clientRoot(s.conf.RootWithoutClientComponent, clientIdentity)
-	if err != nil {
-		panic(fmt.Sprintf("ClientIdentityContextKey must have been validated before invoking Receiver: %s", err))
-	}
-	return clientRoot
 }
 
 type subroot struct {

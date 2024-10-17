@@ -58,16 +58,22 @@ func (m *modeSink) SnapperReport() *snapper.Report { return nil }
 
 func (m *modeSink) Shutdown() {}
 
-func modeSinkFromConfig(_ *config.Global, in *config.SinkJob,
-	jobID endpoint.JobID,
-) (m *modeSink, err error) {
-	m = &modeSink{}
+func (m *modeSink) Receiver(clientIdentity string) *endpoint.Receiver {
+	return endpoint.NewReceiver(m.receiverConfig).
+		WithClientIdentity(clientIdentity)
+}
 
-	m.receiverConfig, err = buildReceiverConfig(in, jobID)
+func modeSinkFromConfig(in *config.SinkJob, jobID endpoint.JobID,
+) (*modeSink, error) {
+	c, err := buildReceiverConfig(in, jobID)
 	if err != nil {
 		return nil, err
 	}
+	m := &modeSink{receiverConfig: c}
 
+	if v, ok := in.Serve.Ret.(*config.LocalServe); ok {
+		addLocalReceiver(v.ListenerName, m.Receiver)
+	}
 	return m, nil
 }
 
@@ -76,19 +82,23 @@ type modeSource struct {
 	snapper      snapper.Snapper
 }
 
-func modeSourceFromConfig(g *config.Global, in *config.SourceJob, jobID endpoint.JobID) (m *modeSource, err error) {
+func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
+	jobID endpoint.JobID,
+) (m *modeSource, err error) {
+	if _, ok := in.Serve.Ret.(*config.LocalServe); ok {
+		return nil, fmt.Errorf("source job %q with local serve", jobID)
+	}
+
 	// FIXME exact dedup of modePush
 	m = &modeSource{}
-
-	m.senderConfig, err = buildSenderConfig(in, jobID)
-	if err != nil {
+	if m.senderConfig, err = buildSenderConfig(in, jobID); err != nil {
 		return nil, fmt.Errorf("send options: %w", err)
 	}
 
-	if m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting); err != nil {
+	m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting)
+	if err != nil {
 		return nil, fmt.Errorf("cannot build snapper: %w", err)
 	}
-
 	return m, nil
 }
 
@@ -113,17 +123,18 @@ func (m *modeSource) Shutdown() {
 	m.snapper.Shutdown()
 }
 
-func passiveSideFromConfig(g *config.Global, in *config.PassiveJob, configJob interface{}, parseFlags config.ParseFlags) (s *PassiveSide, err error) {
-	s = &PassiveSide{}
-
-	s.name, err = endpoint.MakeJobID(in.Name)
+func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
+	configJob any, parseFlags config.ParseFlags,
+) (*PassiveSide, error) {
+	name, err := endpoint.MakeJobID(in.Name)
 	if err != nil {
 		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
+	s := &PassiveSide{name: name}
 
 	switch v := configJob.(type) {
 	case *config.SinkJob:
-		s.mode, err = modeSinkFromConfig(g, v, s.name) // shadow
+		s.mode, err = modeSinkFromConfig(v, s.name) // shadow
 	case *config.SourceJob:
 		s.mode, err = modeSourceFromConfig(g, v, s.name) // shadow
 	}
@@ -131,10 +142,10 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob, configJob in
 		return nil, err // no wrapping necessary
 	}
 
-	if s.listen, err = fromconfig.ListenerFactoryFromConfig(g, in.Serve, parseFlags); err != nil {
+	s.listen, err = fromconfig.ListenerFactoryFromConfig(g, in.Serve, parseFlags)
+	if err != nil {
 		return nil, fmt.Errorf("cannot build listener factory: %w", err)
 	}
-
 	return s, nil
 }
 
@@ -229,25 +240,12 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) error {
 
 	j.goModePeriodic(ctx, cron)
 
-	handler := j.mode.Handler()
-	if handler == nil {
-		panic(fmt.Sprintf(
-			"implementation error: j.mode.Handler() returned nil: %#v", j))
-	}
-
 	ctx, j.shutdown = context.WithCancelCause(ctx)
 	defer j.shutdown(nil)
 
-	rpcLoggers := rpc.GetLoggersOrPanic(ctx) // WithSubsystemLoggers above
-	server := rpc.NewServer(handler, rpcLoggers, j.ctxInterceptor(ctx))
-
-	listener, err := j.listen()
-	if err != nil {
-		log.WithError(err).Error("cannot listen")
-		return fmt.Errorf("job: cannot listen: %w", err)
+	if err := j.serve(ctx, log); err != nil {
+		return fmt.Errorf("passive job: %w", err)
 	}
-
-	server.Serve(ctx, listener)
 	j.wait(log)
 	return nil
 }
@@ -264,6 +262,30 @@ func (j *PassiveSide) goModePeriodic(ctx context.Context, cron *cron.Cron) {
 		j.mode.RunPeriodic(ctx, cron)
 		endTask()
 	}()
+}
+
+func (j *PassiveSide) serve(ctx context.Context, log logger.Logger) error {
+	if j.listen == nil {
+		log.Info("serving local")
+		return nil
+	}
+
+	handler := j.mode.Handler()
+	if handler == nil {
+		panic(fmt.Sprintf(
+			"implementation error: j.mode.Handler() returned nil: %#v", j))
+	}
+
+	rpcLoggers := rpc.GetLoggersOrPanic(ctx) // WithSubsystemLoggers above
+	server := rpc.NewServer(handler, rpcLoggers, j.ctxInterceptor(ctx))
+
+	listener, err := j.listen()
+	if err != nil {
+		return fmt.Errorf("cannot listen: %w", err)
+	}
+
+	server.Serve(ctx, listener)
+	return nil
 }
 
 func (j *PassiveSide) ctxInterceptor(ctx context.Context,

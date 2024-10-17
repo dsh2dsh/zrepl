@@ -115,29 +115,60 @@ type modePush struct {
 	cronSpec      string
 
 	wg sync.WaitGroup
+
+	localReceiver  *endpoint.Receiver
+	localListener  string
+	clientIdentity string
 }
 
-func (m *modePush) ConnectEndpoints(ctx context.Context, connecter transport.Connecter) {
+func (m *modePush) ConnectEndpoints(ctx context.Context, cn transport.Connecter,
+) {
 	m.setupMtx.Lock()
 	defer m.setupMtx.Unlock()
-	if m.receiver != nil || m.sender != nil {
+
+	if m.receiver != nil || m.sender != nil || m.localReceiver != nil {
 		panic("inconsistent use of ConnectEndpoints and DisconnectEndpoints")
 	}
+
 	m.sender = endpoint.NewSender(*m.senderConfig)
-	m.receiver = rpc.NewClient(connecter, rpc.GetLoggersOrPanic(ctx))
+	m.initReceiver(ctx, cn)
+}
+
+func (m *modePush) initReceiver(ctx context.Context, cn transport.Connecter) {
+	if cn != nil {
+		m.receiver = rpc.NewClient(cn, rpc.GetLoggersOrPanic(ctx))
+		return
+	}
+
+	GetLogger(ctx).WithField("mode", "push").
+		WithField("listener_name", m.localListener).
+		WithField("client_identity", m.clientIdentity).
+		Info("use local receiver")
+
+	r := getLocalReceiver(m.localListener, m.clientIdentity)
+	if r == nil {
+		panic(fmt.Sprintf("local receiver %q not found", m.localListener))
+	}
+	m.localReceiver = r
 }
 
 func (m *modePush) DisconnectEndpoints() {
 	m.setupMtx.Lock()
 	defer m.setupMtx.Unlock()
-	m.receiver.Close()
+	if m.receiver != nil {
+		m.receiver.Close()
+	}
 	m.sender = nil
 	m.receiver = nil
+	m.localReceiver = nil
 }
 
 func (m *modePush) SenderReceiver() (logic.Sender, logic.Receiver) {
 	m.setupMtx.Lock()
 	defer m.setupMtx.Unlock()
+	if m.localReceiver != nil {
+		return m.sender, m.localReceiver
+	}
 	return m.sender, m.receiver
 }
 
@@ -193,10 +224,10 @@ func (m *modePush) Running() (time.Duration, bool) {
 	return 0, false
 }
 
-func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.JobID) (*modePush, error) {
+func modePushFromConfig(g *config.Global, in *config.PushJob,
+	jobID endpoint.JobID,
+) (*modePush, error) {
 	m := &modePush{}
-	var err error
-
 	cronSpec := in.CronSpec()
 	if _, ok := in.Snapshotting.Ret.(*config.SnapshottingManual); ok {
 		if cronSpec != "" {
@@ -210,6 +241,7 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 			"both cron spec and periodic snapshotting defined: %q", cronSpec)
 	}
 
+	var err error
 	m.senderConfig, err = buildSenderConfig(in, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("sender config: %w", err)
@@ -220,7 +252,8 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
 
-	conflictResolution, err := logic.ConflictResolutionFromConfig(&in.ConflictResolution)
+	conflictResolution, err := logic.ConflictResolutionFromConfig(
+		&in.ConflictResolution)
 	if err != nil {
 		return nil, fmt.Errorf("field `conflict_resolution`: %w", err)
 	}
@@ -234,10 +267,15 @@ func modePushFromConfig(g *config.Global, in *config.PushJob, jobID endpoint.Job
 		return nil, fmt.Errorf("cannot build planner policy: %w", err)
 	}
 
-	if m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting); err != nil {
+	m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting)
+	if err != nil {
 		return nil, fmt.Errorf("cannot build snapper: %w", err)
 	}
 
+	if v, ok := in.Connect.Ret.(*config.LocalConnect); ok {
+		m.localListener = v.ListenerName
+		m.clientIdentity = v.ClientIdentity
+	}
 	return m, nil
 }
 
@@ -305,11 +343,13 @@ func (m *modePull) Wait() {}
 
 func (m *modePull) Running() (time.Duration, bool) { return 0, false }
 
-func modePullFromConfig(_ *config.Global, in *config.PullJob,
-	jobID endpoint.JobID,
+func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 ) (m *modePull, err error) {
-	m = &modePull{}
+	if _, ok := in.Connect.Ret.(*config.LocalConnect); ok {
+		return nil, fmt.Errorf("pull job %q cannot use local connect", jobID)
+	}
 
+	m = &modePull{}
 	cronSpec := in.CronSpec()
 	if cronSpec != "" {
 		if _, err := cron.ParseStandard(cronSpec); err != nil {
@@ -323,7 +363,8 @@ func modePullFromConfig(_ *config.Global, in *config.PullJob,
 		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
 
-	conflictResolution, err := logic.ConflictResolutionFromConfig(&in.ConflictResolution)
+	conflictResolution, err := logic.ConflictResolutionFromConfig(
+		&in.ConflictResolution)
 	if err != nil {
 		return nil, fmt.Errorf("field `conflict_resolution`: %w", err)
 	}
@@ -341,7 +382,6 @@ func modePullFromConfig(_ *config.Global, in *config.PullJob,
 	if err != nil {
 		return nil, err
 	}
-
 	return m, nil
 }
 
@@ -358,18 +398,20 @@ func replicationDriverConfigFromConfig(in *config.Replication) (driver.Config,
 	return c, c.Validate()
 }
 
-func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, parseFlags config.ParseFlags) (j *ActiveSide, err error) {
-	j = &ActiveSide{}
-	j.name, err = endpoint.MakeJobID(in.Name)
+func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{},
+	parseFlags config.ParseFlags,
+) (*ActiveSide, error) {
+	name, err := endpoint.MakeJobID(in.Name)
 	if err != nil {
 		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
+	j := &ActiveSide{name: name}
 
 	switch v := configJob.(type) {
 	case *config.PushJob:
 		j.mode, err = modePushFromConfig(g, v, j.name) // shadow
 	case *config.PullJob:
-		j.mode, err = modePullFromConfig(g, v, j.name) // shadow
+		j.mode, err = modePullFromConfig(v, j.name) // shadow
 	default:
 		panic(fmt.Sprintf("implementation error: unknown job type %T", v))
 	}
@@ -384,6 +426,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 		Help:        "seconds spent during replication",
 		ConstLabels: prometheus.Labels{"zrepl_job": j.name.String()},
 	}, []string{"state"})
+
 	j.promBytesReplicated = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   "zrepl",
 		Subsystem:   "replication",
@@ -391,6 +434,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 		Help:        "number of bytes replicated from sender to receiver per filesystem",
 		ConstLabels: prometheus.Labels{"zrepl_job": j.name.String()},
 	}, []string{"filesystem"})
+
 	j.promReplicationErrors = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:   "zrepl",
 		Subsystem:   "replication",
@@ -398,6 +442,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 		Help:        "number of filesystems that failed replication in the latest replication attempt, or -1 if the job failed before enumerating the filesystems",
 		ConstLabels: prometheus.Labels{"zrepl_job": j.name.String()},
 	})
+
 	j.promLastSuccessful = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:   "zrepl",
 		Subsystem:   "replication",
@@ -418,6 +463,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 		Help:        "seconds spent in pruner",
 		ConstLabels: prometheus.Labels{"zrepl_job": j.name.String()},
 	}, []string{"prune_side"})
+
 	j.prunerFactory, err = pruner.NewPrunerFactory(in.Pruning, j.promPruneSecs)
 	if err != nil {
 		return nil, err
@@ -427,7 +473,6 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{}, p
 	if err != nil {
 		return nil, fmt.Errorf("cannot build replication driver config: %w", err)
 	}
-
 	return j, nil
 }
 
