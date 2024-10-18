@@ -58,23 +58,28 @@ type FilesystemPlaceholderState struct {
 	RawLocalPropertyValue string
 }
 
-// ZFSGetFilesystemPlaceholderState is the authoritative way to determine whether a filesystem
-// is a placeholder. Note that the property source must be `local` for the returned value to be valid.
+// ZFSGetFilesystemPlaceholderState is the authoritative way to determine
+// whether a filesystem is a placeholder. Note that the property source must be
+// `local` for the returned value to be valid.
 //
 // For nonexistent FS, err == nil and state.FSExists == false
-func ZFSGetFilesystemPlaceholderState(ctx context.Context, p *DatasetPath) (state *FilesystemPlaceholderState, err error) {
-	state = &FilesystemPlaceholderState{FS: p.ToString()}
-	state.FS = p.ToString()
-	props, err := zfsGet(ctx, p.ToString(), []string{PlaceholderPropertyName}, SourceLocal)
+func ZFSGetFilesystemPlaceholderState(ctx context.Context, p *DatasetPath,
+) (*FilesystemPlaceholderState, error) {
+	state := &FilesystemPlaceholderState{FS: p.ToString()}
+	props, err := zfsGet(ctx, state.FS,
+		[]string{PlaceholderPropertyName}, SourceLocal)
+
 	var _ error = (*DatasetDoesNotExist)(nil) // weak assertion on zfsGet's interface
 	if _, ok := err.(*DatasetDoesNotExist); ok {
 		return state, nil
 	} else if err != nil {
 		return state, err
 	}
+
 	state.FSExists = true
 	state.RawLocalPropertyValue = props.Get(PlaceholderPropertyName)
-	state.IsPlaceholder = isLocalPlaceholderPropertyValuePlaceholder(p, state.RawLocalPropertyValue)
+	state.IsPlaceholder = isLocalPlaceholderPropertyValuePlaceholder(
+		p, state.RawLocalPropertyValue)
 	return state, nil
 }
 
