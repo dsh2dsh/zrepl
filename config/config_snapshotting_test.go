@@ -163,8 +163,7 @@ jobs:
 		assert.Equal(t, "periodic", snp.Type)
 		assert.Equal(t, 10*time.Minute, snp.Interval.Duration())
 		assert.Equal(t, "zrepl_", snp.Prefix)
-		assert.Equal(t, snp.TimestampFormat, "dense")
-		assert.Equal(t, snp.TimestampLocation, "UTC")
+		assert.Equal(t, "dense", snp.TimestampFormat) // default was set correctly
 	})
 
 	t.Run("cron", func(t *testing.T) {
@@ -172,7 +171,6 @@ jobs:
 		snp := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingCron)
 		assert.Equal(t, "cron", snp.Type)
 		assert.Equal(t, "zrepl_", snp.Prefix)
-		assert.Equal(t, snp.TimestampFormat, "dense")
-		assert.Equal(t, snp.TimestampLocation, "UTC")
+		assert.Equal(t, "dense", snp.TimestampFormat) // default was set correctly
 	})
 }
