@@ -111,7 +111,7 @@ jobs:
 }
 
 func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
-	paths, err := filepath.Glob("../../config/samples/*")
+	paths, err := filepath.Glob("../../../internal/config/samples/*")
 	if err != nil {
 		t.Errorf("glob failed: %+v", err)
 	}
