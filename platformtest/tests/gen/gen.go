@@ -6,6 +6,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -21,6 +22,7 @@ func check(err error) {
 }
 
 type platformtestFuncDeclFinder struct {
+	pkg       *packages.Package
 	testFuncs []*ast.FuncDecl
 }
 
@@ -77,7 +79,7 @@ func main() {
 
 	pkgs, err := packages.Load(
 		&packages.Config{
-			Mode:  packages.NeedFiles,
+			Mode:  packages.LoadFiles,
 			Tests: false,
 		},
 		os.Args[1],
@@ -96,7 +98,9 @@ func main() {
 		s := token.NewFileSet()
 		a, err := parser.ParseFile(s, f, nil, parser.AllErrors)
 		check(err)
-		finder := &platformtestFuncDeclFinder{}
+		finder := &platformtestFuncDeclFinder{
+			pkg: p,
+		}
 		ast.Walk(finder, a)
 		tests = append(tests, finder.testFuncs...)
 	}
@@ -128,7 +132,7 @@ var Cases = []Case {
 		formatted, err := format.Source(buf.Bytes())
 		check(err)
 
-		err = os.WriteFile("generated_cases.go", formatted, 0664)
+		err = ioutil.WriteFile("generated_cases.go", formatted, 0664)
 		check(err)
 
 	}

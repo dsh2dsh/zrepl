@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log/syslog"
 	"os"
 	"time"
@@ -670,7 +671,7 @@ func ParseConfig(path string) (i *Config, err error) {
 
 	var bytes []byte
 
-	if bytes, err = os.ReadFile(path); err != nil {
+	if bytes, err = ioutil.ReadFile(path); err != nil {
 		return
 	}
 

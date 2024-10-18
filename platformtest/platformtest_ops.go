@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -63,7 +64,7 @@ func (o *FSOp) Run(ctx context.Context, e Execer) error {
 		if o.Encrypted {
 			const passphraseFilePath = "/tmp/zreplplatformtest.encryption.passphrase"
 			const passphrase = "foobar2342"
-			err := os.WriteFile(passphraseFilePath, []byte(passphrase), 0600)
+			err := ioutil.WriteFile(passphraseFilePath, []byte(passphrase), 0600)
 			if err != nil {
 				panic(err)
 			}

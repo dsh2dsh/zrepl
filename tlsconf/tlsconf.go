@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -13,7 +14,7 @@ import (
 
 func ParseCAFile(certfile string) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
-	pem, err := os.ReadFile(certfile)
+	pem, err := ioutil.ReadFile(certfile)
 	if err != nil {
 		return nil, err
 	}

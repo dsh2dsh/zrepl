@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bits-and-blooms/bitset"
+	"github.com/willf/bitset"
 )
 
 type uniqueConcurrentTaskNamer struct {
