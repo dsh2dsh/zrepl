@@ -214,7 +214,7 @@ func ZFSListIter(ctx context.Context, properties []string,
 			return
 		}
 
-		err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
+		err = scanCmdOutput(cmd, stdout, &stderrBuf,
 			func(s string) (error, bool) {
 				fields := strings.SplitN(s, "\t", len(properties)+1)
 				if len(fields) != len(properties) {
@@ -241,7 +241,7 @@ func zfsListArgs(properties []string, zfsArgs []string) []string {
 	return args
 }
 
-func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf []byte,
+func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf *bytes.Buffer,
 	fn func(s string) (error, bool),
 ) (err error) {
 	var ok bool
@@ -262,7 +262,7 @@ func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf []byte,
 	case s.Err() != nil:
 		err = s.Err()
 	case cmdErr != nil:
-		err = NewZfsError(cmdErr, stderrBuf)
+		err = NewZfsError(cmdErr, stderrBuf.Bytes())
 	}
 	return
 }
@@ -1388,7 +1388,9 @@ func ZFSGetRawAnySource(ctx context.Context, path string, props []string) (*ZFSP
 	return zfsGet(ctx, path, props, SourceAny)
 }
 
-var zfsGetDatasetDoesNotExistRegexp = regexp.MustCompile(`^cannot open '([^)]+)': (dataset does not exist|no such pool or dataset)`) // verified in platformtest
+// verified in platformtest
+var zfsGetDatasetDoesNotExistRegexp = regexp.MustCompile(
+	`^cannot open '([^)]+)': (dataset does not exist|no such pool or dataset)`)
 
 type DatasetDoesNotExist struct {
 	Path string
@@ -1483,7 +1485,7 @@ func ZFSGetRecursive(ctx context.Context, path string, depth int,
 	propsByFS := map[string]*ZFSProperties{}
 	allowedPrefixes := allowedSources.zfsGetSourceFieldPrefixes()
 
-	err = scanCmdOutput(cmd, stdout, stderrBuf.Bytes(),
+	err = scanCmdOutput(cmd, stdout, &stderrBuf,
 		func(s string) (error, bool) {
 			if err := parsePropsByFs(s, propsByFS, allowedPrefixes); err != nil {
 				return err, false
