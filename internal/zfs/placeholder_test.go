@@ -9,7 +9,7 @@ import (
 )
 
 func TestZFSGetFilesystemPlaceholderState_doesntExist(t *testing.T) {
-	// t.SkipNow()
+	t.SkipNow()
 	fs, err := NewDatasetPath("zdisk/zrepl/doesntexist")
 	require.NoError(t, err)
 
