@@ -472,12 +472,13 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 		}
 
 		if oneStep && len(remainingSFSVs) > 1 {
+			lastIdx := len(remainingSFSVs) - 1
 			steps = []*Step{resumeStep, {
 				parent:   fs,
 				sender:   fs.sender,
 				receiver: fs.receiver,
 				from:     remainingSFSVs[0],
-				to:       remainingSFSVs[len(remainingSFSVs)-1],
+				to:       remainingSFSVs[lastIdx],
 			}}
 		} else {
 			steps = make([]*Step, 0, len(remainingSFSVs)) // shadow
@@ -514,7 +515,9 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 		case len(path) == 0:
 			steps = nil
 		case len(path) == 1:
-			panic(fmt.Sprintf("len(path) must be two for incremental repl, and initial repl must start with nil, got path[0]=%#v", path[0]))
+			panic(fmt.Sprintf(
+				"len(path) must be two for incremental repl, and initial repl must start with nil, got path[0]=%#v",
+				path[0]))
 		default:
 			steps = make([]*Step, 0, len(path)) // shadow
 			for i := 0; i < len(path)-1; i++ {
@@ -527,8 +530,11 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 					to:   path[i+1],
 				}
 				steps = append(steps, step)
-				if step.from.Type == pdu.FilesystemVersion_Snapshot && oneStep {
-					step.to = path[len(path)-1]
+				sendStream := step.from != nil && oneStep &&
+					step.from.Type == pdu.FilesystemVersion_Snapshot
+				if sendStream {
+					lastIdx := len(path) - 1
+					step.to = path[lastIdx]
 					break
 				}
 			}
