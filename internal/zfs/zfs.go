@@ -201,7 +201,8 @@ type ZFSListResult struct {
 func ZFSListIter(ctx context.Context, properties []string,
 	notExistHint *DatasetPath, zfsArgs ...string,
 ) iter.Seq[ZFSListResult] {
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, zfsListArgs(properties, zfsArgs)...)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin,
+		zfsListArgs(properties, zfsArgs)...).WithLogError(false)
 	var stderrBuf bytes.Buffer
 	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
 
@@ -226,7 +227,7 @@ func ZFSListIter(ctx context.Context, properties []string,
 			})
 		if err != nil {
 			if notExistHint != nil {
-				err = maybeDatasetNotExists(notExistHint.ToString(), err)
+				err = maybeDatasetNotExists(cmd, notExistHint.ToString(), err)
 			}
 			yield(ZFSListResult{Err: err})
 		}
@@ -267,14 +268,21 @@ func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf *bytes.Buffer,
 	return
 }
 
-func maybeDatasetNotExists(path string, err error) error {
+func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {
 	var zfsError *ZFSError
-	if errors.As(err, &zfsError) && len(zfsError.Stderr) != 0 {
+	if !errors.As(err, &zfsError) {
+		return err
+	}
+
+	if len(zfsError.Stderr) != 0 {
 		enotexist := tryDatasetDoesNotExist(path, zfsError.Stderr)
 		if enotexist != nil {
+			cmd.LogError(err, true)
 			return enotexist
 		}
 	}
+
+	cmd.LogError(err, false)
 	return err
 }
 
@@ -1473,7 +1481,7 @@ func ZFSGetRecursive(ctx context.Context, path string, depth int,
 	dstypes []string, props []string, allowedSources PropertySource,
 ) (map[string]*ZFSProperties, error) {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin,
-		zfsGetArgs(path, depth, dstypes, props)...)
+		zfsGetArgs(path, depth, dstypes, props)...).WithLogError(false)
 	var stderrBuf bytes.Buffer
 	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
 	if err != nil {
@@ -1493,7 +1501,7 @@ func ZFSGetRecursive(ctx context.Context, path string, depth int,
 			return nil, true
 		})
 	if err != nil {
-		return nil, maybeDatasetNotExists(path, err)
+		return nil, maybeDatasetNotExists(cmd, path, err)
 	}
 
 	// validate we got expected output
