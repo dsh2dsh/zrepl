@@ -69,6 +69,30 @@ func TestDatasetMapFilter(t *testing.T) {
 				"tank/home/mark/foo":     false,
 			},
 		},
+		{
+			name: "include first level",
+			filter: map[string]string{
+				"test/app</*": "ok",
+			},
+			checkPass: map[string]bool{
+				"test/app/1":       true,
+				"test/app/1/cache": false,
+				"test/app/2":       true,
+				"test/app/2/cache": false,
+			},
+		},
+		{
+			name: "exclude by shell pattern",
+			filter: map[string]string{
+				"test/app</*/cache": "!",
+			},
+			checkPass: map[string]bool{
+				"test/app/1":       true,
+				"test/app/1/cache": false,
+				"test/app/2":       true,
+				"test/app/2/cache": false,
+			},
+		},
 	}
 
 	for tc := range tcs {

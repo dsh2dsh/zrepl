@@ -25,7 +25,7 @@ pkg install zrepl-dsh2dsh
   * Added support of shell patterns for datasets definitions. See
     [#755](https://github.com/zrepl/zrepl/pull/755). Configuration example:
 
-    ``` yaml
+    ```yaml
     filesystems:
       "zroot/bastille/jails</*/root": true
     ```
@@ -33,6 +33,22 @@ pkg install zrepl-dsh2dsh
     This configuration includes `zroot/bastille/jails/a/root`,
     `zroot/bastille/jails/b/root` zfs datasets and so on, and excludes
     `zroot/bastille/jails/a`, `zroot/bastille/jails/b` zfs datasets and so on.
+
+    Configuration like that (with `true`) includes everything matched by its
+    shell pattern and ignores everything else.
+
+    But this configuration:
+
+    ```yaml
+    filesystems:
+      "zroot/bastille/jails</*/root": false
+    ```
+
+    excludes `zroot/bastille/jails/a/root`, `zroot/bastille/jails/b/root` and so
+    on and includes everything else inside `zroot/bastille/jails`.
+
+    Configuration like that, with `false`, excludes everything matched by its
+    shell pattern, and includes everything else inside parent.
 
     See [Match](https://pkg.go.dev/path/filepath@go1.22.0#Match) for details
     about patterns.
