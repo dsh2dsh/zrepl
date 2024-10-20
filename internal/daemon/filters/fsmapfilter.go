@@ -1,7 +1,6 @@
 package filters
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,19 +9,40 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
+const (
+	MapFilterResultOk   = "ok"
+	MapFilterResultOmit = "!"
+)
+
+func DatasetMapFilterFromConfig(in map[string]bool,
+) (*DatasetMapFilter, error) {
+	f := NewDatasetMapFilter(len(in), true)
+	for pathPattern, accept := range in {
+		mapping := MapFilterResultOmit
+		if accept {
+			mapping = MapFilterResultOk
+		}
+		if err := f.Add(pathPattern, mapping); err != nil {
+			return nil, fmt.Errorf(
+				"invalid mapping entry ['%s':'%s']: %w", pathPattern, mapping, err)
+		}
+	}
+	return f, nil
+}
+
+func NewDatasetMapFilter(size int, filterMode bool) *DatasetMapFilter {
+	return &DatasetMapFilter{
+		entries: make([]datasetMapFilterEntry, 0, size),
+	}
+}
+
 type DatasetMapFilter struct {
 	entries []datasetMapFilterEntry
-
-	// if set, only valid filter entries can be added using Add()
-	// and Map() will always return an error
-	filterMode bool
 }
 
 type datasetMapFilterEntry struct {
-	path *zfs.DatasetPath
-	// the mapping. since this datastructure acts as both mapping and filter
-	// we have to convert it to the desired rep dynamically
-	mapping      string
+	path         *zfs.DatasetPath
+	mapping      bool
 	subtreeMatch bool
 
 	// subtreePattern contains a shell pattern for checking is a subtree matching
@@ -30,33 +50,24 @@ type datasetMapFilterEntry struct {
 	subtreePattern string
 }
 
-func (e datasetMapFilterEntry) HasPattern() bool {
-	return e.subtreePattern != ""
+func (self *datasetMapFilterEntry) hasPattern() bool {
+	return self.subtreePattern != ""
 }
 
-func (e datasetMapFilterEntry) Match(path *zfs.DatasetPath) (bool, error) {
-	fullPattern := filepath.Join(e.path.ToString(), e.subtreePattern)
+func (self *datasetMapFilterEntry) match(path *zfs.DatasetPath) (bool, error) {
+	fullPattern := filepath.Join(self.path.ToString(), self.subtreePattern)
 	return filepath.Match(fullPattern, path.ToString())
 }
 
-func NewDatasetMapFilter(capacity int, filterMode bool) *DatasetMapFilter {
-	return &DatasetMapFilter{
-		entries:    make([]datasetMapFilterEntry, 0, capacity),
-		filterMode: filterMode,
-	}
-}
-
-func (m *DatasetMapFilter) Add(pathPattern, mapping string) (err error) {
-	if m.filterMode {
-		if _, err = m.parseDatasetFilterResult(mapping); err != nil {
-			return
-		}
+func (self *DatasetMapFilter) Add(pathPattern, mapping string) error {
+	mappingOk, err := parseDatasetFilterResult(mapping)
+	if err != nil {
+		return err
 	}
 
 	// assert path glob adheres to spec
-	const SUBTREE_PATTERN string = "<"
+	const SUBTREE_PATTERN = "<"
 	pathStr, pattern, found := strings.Cut(pathPattern, SUBTREE_PATTERN)
-
 	if pattern != "" {
 		if strings.Contains(pattern, SUBTREE_PATTERN) {
 			return fmt.Errorf(
@@ -74,229 +85,81 @@ func (m *DatasetMapFilter) Add(pathPattern, mapping string) (err error) {
 		return fmt.Errorf("pattern is not a dataset path: %s", err)
 	}
 
-	entry := datasetMapFilterEntry{
+	self.entries = append(self.entries, datasetMapFilterEntry{
 		path:           path,
-		mapping:        mapping,
+		mapping:        mappingOk,
 		subtreeMatch:   found,
 		subtreePattern: pattern,
+	})
+	return nil
+}
+
+// Parse a dataset filter result
+func parseDatasetFilterResult(result string) (bool, error) {
+	switch strings.ToLower(result) {
+	case MapFilterResultOk:
+		return true, nil
+	case MapFilterResultOmit:
+		return false, nil
 	}
-	m.entries = append(m.entries, entry)
-	return
+	return false, fmt.Errorf("%q is not a valid filter result", result)
 }
 
 // find the most specific prefix mapping we have
 //
 // longer prefix wins over shorter prefix, direct wins over glob
-func (m DatasetMapFilter) mostSpecificPrefixMapping(path *zfs.DatasetPath) (idx int, found bool) {
-	lcp, lcp_entry_idx := -1, -1
-	direct_idx := -1
-	for e := range m.entries {
-		entry := m.entries[e]
-		ep := m.entries[e].path
+func (self *DatasetMapFilter) mostSpecificPrefixMapping(path *zfs.DatasetPath,
+) (int, bool) {
+	lcp, lcp_entry_idx, direct_idx := -1, -1, -1
+	for e := range self.entries {
+		entry := &self.entries[e]
+		ep := self.entries[e].path
 		lep := ep.Length()
-
 		switch {
 		case !entry.subtreeMatch && ep.Equal(path):
 			direct_idx = e
-			continue
 		case entry.subtreeMatch && path.HasPrefix(ep) && lep > lcp:
 			lcp = lep
 			lcp_entry_idx = e
-		default:
-			continue
 		}
 	}
 
-	if lcp_entry_idx >= 0 || direct_idx >= 0 {
-		found = true
-		switch {
-		case direct_idx >= 0:
-			idx = direct_idx
-		case lcp_entry_idx >= 0:
-			idx = lcp_entry_idx
-		}
+	switch {
+	case direct_idx >= 0:
+		return direct_idx, true
+	case lcp_entry_idx >= 0:
+		return lcp_entry_idx, true
 	}
-	return
+	return 0, false
 }
 
-// Returns target == nil if there is no mapping
-func (m DatasetMapFilter) Map(source *zfs.DatasetPath) (target *zfs.DatasetPath, err error) {
-	if m.filterMode {
-		err = errors.New("using a filter for mapping simply does not work")
-		return
+func (self *DatasetMapFilter) Filter(p *zfs.DatasetPath) (bool, error) {
+	idx, ok := self.mostSpecificPrefixMapping(p)
+	if !ok {
+		return false, nil
 	}
+	entry := &self.entries[idx]
 
-	mi, hasMapping := m.mostSpecificPrefixMapping(source)
-	if !hasMapping {
-		return nil, nil
-	}
-	me := m.entries[mi]
-
-	if me.mapping == "" {
-		// Special case treatment: 'foo/bar<' => ''
-		if !me.subtreeMatch {
-			return nil, errors.New("mapping to '' must be a subtree match")
-		}
-		// ok...
-	} else {
-		if strings.HasPrefix("!", me.mapping) {
-			// reject mapping
-			return nil, nil
-		}
-	}
-
-	target, err = zfs.NewDatasetPath(me.mapping)
-	if err != nil {
-		err = fmt.Errorf("mapping target is not a dataset path: %s", err)
-		return
-	}
-	if me.subtreeMatch {
-		// strip common prefix ('<' wildcards are no special case here)
-		extendComps := source.Copy()
-		extendComps.TrimPrefix(me.path)
-		target.Extend(extendComps)
-	}
-	return
-}
-
-func (m DatasetMapFilter) Filter(p *zfs.DatasetPath) (pass bool, err error) {
-	if !m.filterMode {
-		err = errors.New("using a mapping as a filter does not work")
-		return
-	}
-
-	mi, hasMapping := m.mostSpecificPrefixMapping(p)
-	if !hasMapping {
-		pass = false
-		return
-	}
-
-	me := m.entries[mi]
-	if me.HasPattern() {
-		if matched, err := me.Match(p); err != nil {
+	if entry.hasPattern() {
+		if matched, err := entry.match(p); err != nil {
 			return false, err
 		} else if !matched {
 			return false, nil
 		}
 	}
-
-	return m.parseDatasetFilterResult(me.mapping)
+	return entry.mapping, nil
 }
 
-func (m DatasetMapFilter) UserSpecifiedDatasets() (datasets zfs.UserSpecifiedDatasetsSet) {
-	datasets = make(zfs.UserSpecifiedDatasetsSet)
-	for i := range m.entries {
-		datasets[m.entries[i].path.ToString()] = true
+func (self *DatasetMapFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet {
+	datasets := make(zfs.UserSpecifiedDatasetsSet)
+	for i := range self.entries {
+		entry := &self.entries[i]
+		datasets[entry.path.ToString()] = true
 	}
-	return
+	return datasets
 }
 
-// Construct a new filter-only DatasetMapFilter from a mapping
-// The new filter allows exactly those paths that were not forbidden by the mapping.
-func (m DatasetMapFilter) InvertedFilter() (inv *DatasetMapFilter, err error) {
-	if m.filterMode {
-		err = errors.New("can only invert mappings")
-		return
-	}
-
-	inv = &DatasetMapFilter{
-		make([]datasetMapFilterEntry, len(m.entries)),
-		true,
-	}
-
-	for i, e := range m.entries {
-		inv.entries[i].path, err = zfs.NewDatasetPath(e.mapping)
-		if err != nil {
-			err = fmt.Errorf("mapping cannot be inverted: '%s' is not a dataset path: %w", e.mapping, err)
-			return
-		}
-		inv.entries[i].mapping = MapFilterResultOk
-		inv.entries[i].subtreeMatch = e.subtreeMatch
-	}
-
-	return inv, nil
-}
-
-// FIXME investigate whether we can support more...
-func (m DatasetMapFilter) Invert() (endpoint.FSMap, error) {
-	if m.filterMode {
-		return nil, errors.New("can only invert mappings")
-	}
-
-	if len(m.entries) != 1 {
-		return nil, errors.New("inversion of complicated mappings is not implemented") // FIXME
-	}
-
-	e := m.entries[0]
-
-	inv := &DatasetMapFilter{
-		make([]datasetMapFilterEntry, len(m.entries)),
-		false,
-	}
-	mp, err := zfs.NewDatasetPath(e.mapping)
-	if err != nil {
-		return nil, err
-	}
-
-	inv.entries[0] = datasetMapFilterEntry{
-		path:         mp,
-		mapping:      e.path.ToString(),
-		subtreeMatch: e.subtreeMatch,
-	}
-
-	return inv, nil
-}
-
-// Creates a new DatasetMapFilter in filter mode from a mapping
-// All accepting mapping results are mapped to accepting filter results
-// All rejecting mapping results are mapped to rejecting filter results
-func (m DatasetMapFilter) AsFilter() endpoint.FSFilter {
-	f := &DatasetMapFilter{
-		make([]datasetMapFilterEntry, len(m.entries)),
-		true,
-	}
-
-	for i, e := range m.entries {
-		var newe datasetMapFilterEntry = e
-		if strings.HasPrefix(newe.mapping, "!") {
-			newe.mapping = MapFilterResultOmit
-		} else {
-			newe.mapping = MapFilterResultOk
-		}
-		f.entries[i] = newe
-	}
-
-	return f
-}
-
-const (
-	MapFilterResultOk   string = "ok"
-	MapFilterResultOmit string = "!"
-)
-
-// Parse a dataset filter result
-func (m DatasetMapFilter) parseDatasetFilterResult(result string) (pass bool, err error) {
-	l := strings.ToLower(result)
-	if l == MapFilterResultOk {
-		return true, nil
-	}
-	if l == MapFilterResultOmit {
-		return false, nil
-	}
-	return false, fmt.Errorf("'%s' is not a valid filter result", result)
-}
-
-func DatasetMapFilterFromConfig(in map[string]bool) (f *DatasetMapFilter, err error) {
-	f = NewDatasetMapFilter(len(in), true)
-	for pathPattern, accept := range in {
-		mapping := MapFilterResultOmit
-		if accept {
-			mapping = MapFilterResultOk
-		}
-		if err = f.Add(pathPattern, mapping); err != nil {
-			err = fmt.Errorf("invalid mapping entry ['%s':'%s']: %s", pathPattern, mapping, err)
-			return
-		}
-	}
-	return
-}
+// Creates a new DatasetMapFilter in filter mode from a mapping. All accepting
+// mapping results are mapped to accepting filter results. All rejecting mapping
+// results are mapped to rejecting filter results.
+func (self *DatasetMapFilter) AsFilter() endpoint.FSFilter { return self }
