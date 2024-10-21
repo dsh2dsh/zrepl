@@ -47,7 +47,7 @@ func (j *SnapJob) Type() Type { return TypeSnap }
 
 func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob, err error) {
 	j = &SnapJob{}
-	fsf, err := filters.DatasetMapFilterFromConfig(in.Filesystems)
+	fsf, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}

@@ -116,7 +116,7 @@ func (flag *FilesystemsFilterFlag) Set(s string) error {
 		return nil
 	}
 
-	f := filters.NewDatasetMapFilter(len(mappings), true)
+	f := filters.New(len(mappings))
 	for _, m := range mappings {
 		thisMappingErr := fmt.Errorf("expecting comma-separated list of <dataset-pattern>:<ok|!> pairs, got %q", m)
 		lhsrhs := strings.SplitN(m, ":", 2)
@@ -128,6 +128,7 @@ func (flag *FilesystemsFilterFlag) Set(s string) error {
 			return fmt.Errorf("%s: %s", thisMappingErr, err)
 		}
 	}
+	f.CompatSort()
 	flag.F = endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter{
 		Filter: f,
 	}

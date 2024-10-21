@@ -16,9 +16,9 @@ jobs:
       type: local
       listener_name: localsink
       client_identity: local_backup
-    filesystems: {
-      "root<": true,
-    }
+    datasets:
+      - pattern: "root"
+        recursive: true
     send:
       bandwidth_limit:
         max: 54321 B

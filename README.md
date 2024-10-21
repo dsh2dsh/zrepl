@@ -22,33 +22,100 @@ pkg install zrepl-dsh2dsh
   * ~~`last_n` keep rule fixed. See
     [#691](https://github.com/zrepl/zrepl/pull/750)~~ Merged.
 
-  * Added support of shell patterns for datasets definitions. See
-    [#755](https://github.com/zrepl/zrepl/pull/755). Configuration example:
+  * New dataset filter syntax instead of `filesystems`:
+
+    New field `datasets` is a list of patterns. By default a pattern includes
+    matched dataset. All patterns applied in order and last matched pattern
+    wins. Lets see some examples.
+
+    The following configuration will allow access to all datasets:
 
     ```yaml
-    filesystems:
-      "zroot/bastille/jails</*/root": true
+    jobs:
+      - name: "source"
+        type: "source"
+        datasets:
+          - pattern: ""
+    ```
+
+    The following configuration will allow access to datasets
+    `zroot/ROOT/default` and `zroot/usr/home` including all their children.
+
+    ```yaml
+    jobs:
+      - name: "snap-1h"
+        type: "snap"
+        datasets:
+          - pattern: "zroot/ROOT/default"
+            recursive: true
+          - pattern: "zroot/usr/home"
+            recursive: true
+    ```
+
+    The following configuration is more complicated:
+
+    ```yaml
+    jobs:
+      - name: "source"
+        type: "source"
+        datasets:
+          - pattern: "tank"         # rule (1)
+            recursive: true
+          - pattern: "tank/foo"     # rule (2)
+            exclude: true
+            recursive: true
+          - pattern: "tank/foo/bar" # rule (3)
+    ```
+
+    `tank/foo/bar/loo` is excluded by (2), because (3) isn't matched (it isn't
+    recursive).
+
+    `tank/bar` is included by (1).
+
+    `tank/foo/bar` is included by (3), because yes, it matched by (2), but last
+    matched rule wins and (3) is the last matched rule.
+
+    `zroot` isn't included at all, because nothing matched it.
+
+    `tank/var/log` is included by (1), becuase this rule is recursive and other
+    rules are not matched.
+
+    For compatibility reasons old `filesystems` still works, but I wouldn't
+    suggest use it. It's deprecated and can be removed anytime.
+
+  * Added support of shell patterns for datasets definitions. Configuration
+    example:
+
+    ```yaml
+    datasets:
+      # exclude all children of zroot/bastille/jails
+      - pattern: "zroot/bastille/jails"
+        exclude: true
+        recursive: true
+      # except datasets matched by this shell pattern
+      - pattern: "zroot/bastille/jails/*/root"
+        shell: true
     ```
 
     This configuration includes `zroot/bastille/jails/a/root`,
-    `zroot/bastille/jails/b/root` zfs datasets and so on, and excludes
-    `zroot/bastille/jails/a`, `zroot/bastille/jails/b` zfs datasets and so on.
+    `zroot/bastille/jails/b/root` zfs datasets, and excludes
+    `zroot/bastille/jails/a`, `zroot/bastille/jails/b` zfs datasets on.
 
-    Configuration like that (with `true`) includes everything matched by its
-    shell pattern and ignores everything else.
-
-    But this configuration:
+    Another example:
 
     ```yaml
-    filesystems:
-      "zroot/bastille/jails</*/root": false
+    datasets:
+      # exclude datasets matched by this shell pattern
+      - pattern: "zroot/bastille/jails/*/root"
+        exclude: true
+        shell: true
+      # and include everything else inside zroot/bastille/jails
+      - pattern: "zroot/bastille/jails"
+        recursive: true
     ```
 
-    excludes `zroot/bastille/jails/a/root`, `zroot/bastille/jails/b/root` and so
-    on and includes everything else inside `zroot/bastille/jails`.
-
-    Configuration like that, with `false`, excludes everything matched by its
-    shell pattern, and includes everything else inside parent.
+    excludes `zroot/bastille/jails/a/root`, `zroot/bastille/jails/b/root` and
+    includes everything else inside `zroot/bastille/jails`.
 
     See [Match](https://pkg.go.dev/path/filepath@go1.22.0#Match) for details
     about patterns.

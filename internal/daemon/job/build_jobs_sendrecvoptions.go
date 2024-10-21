@@ -12,12 +12,12 @@ import (
 )
 
 type SendingJobConfig interface {
-	GetFilesystems() config.FilesystemsFilter
+	GetFilesystems() (config.FilesystemsFilter, []config.DatasetFilter)
 	GetSendOptions() *config.SendOptions // must not be nil
 }
 
 func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.SenderConfig, error) {
-	fsf, err := filters.DatasetMapFilterFromConfig(in.GetFilesystems())
+	fsf, err := filters.NewFromConfig(in.GetFilesystems())
 	if err != nil {
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}

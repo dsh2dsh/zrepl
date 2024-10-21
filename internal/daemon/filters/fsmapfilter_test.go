@@ -8,9 +8,10 @@ import (
 
 func TestDatasetMapFilter(t *testing.T) {
 	type testCase struct {
-		name      string
-		filter    map[string]string
-		checkPass map[string]bool // each entry is checked to match the filter's `pass` return value
+		name   string
+		filter map[string]string
+		// each entry is checked to match the filter's `pass` return value
+		checkPass map[string]bool
 	}
 
 	tcs := []testCase{
@@ -93,18 +94,31 @@ func TestDatasetMapFilter(t *testing.T) {
 				"test/app/2/cache": false,
 			},
 		},
+		{
+			name: "match all",
+			filter: map[string]string{
+				"<": "ok",
+			},
+			checkPass: map[string]bool{
+				"test":             true,
+				"test/app":         true,
+				"test/app/2":       true,
+				"test/app/2/cache": true,
+			},
+		},
 	}
 
 	for tc := range tcs {
 		t.Run(tcs[tc].name, func(t *testing.T) {
 			c := tcs[tc]
-			f := NewDatasetMapFilter(len(c.filter), true)
+			f := New(len(c.filter))
 			for p, a := range c.filter {
 				err := f.Add(p, a)
 				if err != nil {
 					t.Fatalf("incorrect filter spec: %s", err)
 				}
 			}
+			f.CompatSort()
 			for p, checkPass := range c.checkPass {
 				zp, err := zfs.NewDatasetPath(p)
 				if err != nil {

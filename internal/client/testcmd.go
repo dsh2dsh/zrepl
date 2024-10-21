@@ -48,24 +48,26 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 	}
 
 	conf := subcommand.Config()
-
-	var confFilter config.FilesystemsFilter
 	job, err := conf.Job(testFilterArgs.job)
 	if err != nil {
 		return err
 	}
+
+	var ff config.FilesystemsFilter
+	var df []config.DatasetFilter
+
 	switch j := job.Ret.(type) {
 	case *config.SourceJob:
-		confFilter = j.Filesystems
+		ff, df = j.Filesystems, j.Datasets
 	case *config.PushJob:
-		confFilter = j.Filesystems
+		ff, df = j.Filesystems, j.Datasets
 	case *config.SnapJob:
-		confFilter = j.Filesystems
+		ff, df = j.Filesystems, j.Datasets
 	default:
 		return fmt.Errorf("job type %T does not have filesystems filter", j)
 	}
 
-	f, err := filters.DatasetMapFilterFromConfig(confFilter)
+	f, err := filters.NewFromConfig(ff, df)
 	if err != nil {
 		return fmt.Errorf("filter invalid: %s", err)
 	}

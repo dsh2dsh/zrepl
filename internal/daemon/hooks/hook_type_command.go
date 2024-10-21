@@ -121,7 +121,7 @@ func NewCommandHook(in *config.HookCommand) (r *CommandHook, err error) {
 		timeout:    in.Timeout,
 	}
 
-	r.filter, err = filters.DatasetMapFilterFromConfig(in.Filesystems)
+	r.filter, err = filters.NewFromConfig(in.Filesystems, in.Datasets)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse filesystem filter: %s", err)
 	}

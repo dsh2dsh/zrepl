@@ -1,9 +1,9 @@
 jobs:
 - name: snapjob
   type: snap
-  filesystems: {
-    "tank<": true,
-  }
+  datasets:
+    - pattern: "tank"
+      recursive: true
   snapshotting:
     type: cron
     prefix: zrepl_snapjob_

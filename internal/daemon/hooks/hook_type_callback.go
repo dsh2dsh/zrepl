@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -16,8 +17,12 @@ type CallbackHook struct {
 	displayString string
 }
 
-func NewCallbackHookForFilesystem(displayString string, fs *zfs.DatasetPath, cb HookJobCallback) *CallbackHook {
-	filter, _ := filters.DatasetMapFilterFromConfig(map[string]bool{fs.ToString(): true})
+func NewCallbackHookForFilesystem(displayString string, fs *zfs.DatasetPath,
+	cb HookJobCallback,
+) *CallbackHook {
+	filter, _ := filters.NewFromConfig(nil, []config.DatasetFilter{
+		{Pattern: fs.ToString()},
+	})
 	return NewCallbackHook(displayString, cb, filter)
 }
 

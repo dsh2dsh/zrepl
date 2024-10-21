@@ -38,7 +38,7 @@ import (
 type replicationInvocation struct {
 	sjid, rjid             endpoint.JobID
 	sfs                    string
-	sfilter                *filters.DatasetMapFilter
+	sfilter                *filters.DatasetFilter
 	rfsRoot                string
 	interceptSender        func(e *endpoint.Sender) logic.Sender
 	interceptReceiver      func(e *endpoint.Receiver) logic.Receiver
@@ -61,9 +61,10 @@ func (i replicationInvocation) Do(ctx *platformtest.Context) *report.Report {
 		panic("either sfs or sfilter must be set")
 	}
 	if i.sfilter == nil {
-		i.sfilter = filters.NewDatasetMapFilter(1, true)
+		i.sfilter = filters.New(1)
 		err := i.sfilter.Add(i.sfs, "ok")
 		require.NoError(ctx, err)
+		i.sfilter.CompatSort()
 	}
 
 	senderConfig := endpoint.SenderConfig{
@@ -276,9 +277,10 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 		expectedOjidAbstractions = append(expectedOjidAbstractions, ojidSendAbstractions...)
 		expectedOjidAbstractions = append(expectedOjidAbstractions, snap3ojidLastReceivedHold)
 
-		sfsAndRfsFilter := filters.NewDatasetMapFilter(2, true)
+		sfsAndRfsFilter := filters.New(2)
 		require.NoError(ctx, sfsAndRfsFilter.Add(sfs, "ok"))
 		require.NoError(ctx, sfsAndRfsFilter.Add(rfs, "ok"))
+		sfsAndRfsFilter.CompatSort()
 		rAbs, rAbsErrs, err := endpoint.ListAbstractions(ctx, endpoint.ListZFSHoldsAndBookmarksQuery{
 			FS:          endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter{Filter: sfsAndRfsFilter},
 			JobID:       &ojid,
@@ -989,10 +991,11 @@ func ReplicationFailingInitialParentProhibitsChildReplication(ctx *platformtest.
 	fsAChild := ctx.RootDataset + "/sender/a/child"
 	fsAA := ctx.RootDataset + "/sender/aa"
 
-	sfilter := filters.NewDatasetMapFilter(3, true)
+	sfilter := filters.New(3)
 	mustAddToSFilter(ctx, sfilter, fsA)
 	mustAddToSFilter(ctx, sfilter, fsAChild)
 	mustAddToSFilter(ctx, sfilter, fsAA)
+	sfilter.CompatSort()
 	rfsRoot := ctx.RootDataset + "/receiver"
 
 	mockRecvErr := errors.New("yifae4ohPhaquaes0hohghiep9oufie4roo7quoWooluaj2ee8")
@@ -1056,9 +1059,10 @@ func ReplicationPropertyReplicationWorks(ctx *platformtest.Context) {
 	fsA := ctx.RootDataset + "/sender/a"
 	fsAChild := ctx.RootDataset + "/sender/a/child"
 
-	sfilter := filters.NewDatasetMapFilter(2, true)
+	sfilter := filters.New(2)
 	mustAddToSFilter(ctx, sfilter, fsA)
 	mustAddToSFilter(ctx, sfilter, fsAChild)
+	sfilter.CompatSort()
 	rfsRoot := ctx.RootDataset + "/receiver"
 
 	type testPropExpectation struct {
@@ -1202,9 +1206,10 @@ func ReplicationPlaceholderEncryption__UnspecifiedLeadsToFailureAtRuntimeWhenCre
 
 	childfs := ctx.RootDataset + "/sender/a/child"
 
-	sfilter := filters.NewDatasetMapFilter(3, true)
+	sfilter := filters.New(3)
 
 	mustAddToSFilter(ctx, sfilter, childfs)
+	sfilter.CompatSort()
 	rfsRoot := ctx.RootDataset + "/receiver"
 
 	rep := replicationInvocation{
@@ -1257,7 +1262,7 @@ func ReplicationPlaceholderEncryption__UnspecifiedIsOkForClientIdentityPlacehold
 	sjid := endpoint.MustMakeJobID("sender-job")
 	rjid := endpoint.MustMakeJobID("receiver-job")
 
-	sfilter := filters.NewDatasetMapFilter(1, true)
+	sfilter := filters.New(1)
 
 	// hacky...
 	comps := strings.Split(ctx.RootDataset, "/")
@@ -1274,6 +1279,7 @@ func ReplicationPlaceholderEncryption__UnspecifiedIsOkForClientIdentityPlacehold
 
 	mustAddToSFilter(ctx, sfilter, pool)
 	mustAddToSFilter(ctx, sfilter, poolchild)
+	sfilter.CompatSort()
 
 	clientIdentity := "testclientid"
 
@@ -1340,9 +1346,10 @@ func replicationPlaceholderEncryption__EncryptOnReceiverUseCase__impl(ctx *platf
 
 	childfs := ctx.RootDataset + "/sender/a/child"
 
-	sfilter := filters.NewDatasetMapFilter(3, true)
+	sfilter := filters.New(3)
 
 	mustAddToSFilter(ctx, sfilter, childfs)
+	sfilter.CompatSort()
 	rfsRoot := ctx.RootDataset + "/receiver"
 
 	rep := replicationInvocation{
@@ -1467,7 +1474,6 @@ func ReplicationInitialFail(ctx *platformtest.Context) {
 
 // https://github.com/zrepl/zrepl/issues/742
 func ReplicationOfPlaceholderFilesystemsInChainedReplicationScenario(ctx *platformtest.Context) {
-
 	//
 	// Setup datasets
 	//
@@ -1520,8 +1526,7 @@ func ReplicationOfPlaceholderFilesystemsInChainedReplicationScenario(ctx *platfo
 	}
 
 	do_repl := func(j job) {
-
-		sfilter := filters.NewDatasetMapFilter(len(j.sender_filesystems_filter), true)
+		sfilter := filters.New(len(j.sender_filesystems_filter))
 
 		for lhs, rhs := range j.sender_filesystems_filter {
 			var err error
@@ -1532,6 +1537,7 @@ func ReplicationOfPlaceholderFilesystemsInChainedReplicationScenario(ctx *platfo
 			}
 			require.NoError(ctx, err)
 		}
+		sfilter.CompatSort()
 
 		rep := replicationInvocation{
 			sjid:      j.sender,

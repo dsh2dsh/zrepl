@@ -16,9 +16,9 @@ jobs:
       type: local
       listener_name: localsink
       client_identity: local_backup
-    filesystems: {
-      "system<": true,
-    }
+    datasets:
+      - pattern: "system"
+        recursive: true
     conflict_resolution:
       initial_replication: "all"
     snapshotting:

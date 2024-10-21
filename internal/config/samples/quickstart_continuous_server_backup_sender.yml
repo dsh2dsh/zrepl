@@ -8,11 +8,14 @@ jobs:
     cert: /etc/zrepl/prod.crt
     key:  /etc/zrepl/prod.key
     server_cn: "backups"
-  filesystems: {
-    "zroot<": true,
-    "zroot/var/tmp<": false,
-    "zroot/usr/home/paranoid": false
-  }
+  datasets:
+    - pattern: "zroot"
+      recursive: true
+    - pattern: "zroot/var/tmp"
+      exclude: true
+      recursive: true
+    - pattern: "zroot/usr/home/paranoid"
+      exclude: true
   snapshotting:
     type: periodic
     prefix: zrepl_

@@ -1,10 +1,11 @@
 jobs:
   - type: push
     name: "push"
-    filesystems: {
-      "<": true,
-      "tmp": false
-    }
+    datasets:
+      - pattern: ""
+        recursive: true
+      - pattern: "tmp"
+        exclude: true
     connect:
       type: tcp
       address: "backup-server.foo.bar:8888"

@@ -35,9 +35,11 @@ listen:
 jobs:
   - name: "snap-1h"
     type: "snap"
-    filesystems: &filesystems
-      "zroot/ROOT/default<": true
-      "zroot/usr/home<": true
+    datasets: &datasets
+      - pattern: "zroot/ROOT/default"
+        recursive: true
+      - pattern: "zroot/usr/home"
+        recursive: true
     snapshotting:
       type: "periodic"
       cron: "20 * * * *"
@@ -46,7 +48,7 @@ jobs:
 
   - name: "snap-1d"
     type: "snap"
-    filesystems: *filesystems
+    datasets: *datasets
     snapshotting:
       type: "periodic"
       interval: "1d"
@@ -55,7 +57,7 @@ jobs:
 
   - name: "snap-1mon"
     type: "snap"
-    filesystems: *filesystems
+    datasets: *datasets
     snapshotting:
       type: "periodic"
       interval: "30d"
@@ -119,7 +121,7 @@ jobs:
       type: "local"
       listener_name: "zdisk"
       client_identity: "localhost"
-    filesystems: *filesystems
+    datasets: *datasets
     replication: &replication
       # Send all intermediary snapshots as a stream package, instead of sending
       # them one by one.

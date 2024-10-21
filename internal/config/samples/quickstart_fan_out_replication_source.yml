@@ -2,8 +2,9 @@ jobs:
 # Separate job for snapshots and pruning
 - name: snapshots
   type: snap
-  filesystems:
-    'tank<': true # all filesystems
+  datasets:
+    - pattern: "tank"           # all filesystems
+      recursive: true
   snapshotting:
     type: periodic
     prefix: zrepl_
@@ -30,8 +31,9 @@ jobs:
     key: /etc/zrepl/a.example.com.key
     client_cns:
       - b.example.com
-  filesystems:
-    'tank<': true # all filesystems
+  datasets:
+    - pattern: "tank"           # all filesystems
+      recursive: true
   # Snapshots are handled by the separate snap job
   snapshotting:
     type: manual
@@ -47,8 +49,9 @@ jobs:
     key: /etc/zrepl/a.example.com.key
     client_cns:
       - c.example.com
-  filesystems:
-    'tank<': true # all filesystems
+  datasets:
+    - pattern: "tank"           # all filesystems
+      recursive: true
   # Snapshots are handled by the separate snap job
   snapshotting:
     type: manual

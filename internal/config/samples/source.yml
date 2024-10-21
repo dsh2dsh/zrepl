@@ -11,10 +11,11 @@ jobs:
       "10.23.42.0/24":       "cluster-*",
       "fde4:8dba:82e1::/64": "san-*",
     }
-  filesystems: {
-    "<": true,
-    "secret": false
-  }
+  datasets:
+    - pattern: ""
+      recursive: true
+    - pattern: "secret"
+      exclude: true
   snapshotting:
     type: periodic
     interval: 10m

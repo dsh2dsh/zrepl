@@ -1,9 +1,9 @@
 jobs:
 - name: snapjob
   type: snap
-  filesystems: {
-    "tank/frequently_changed<": true,
-  }
+  datasets:
+    - pattern: "tank/frequently_changed"
+      recursive: true
   snapshotting:
     type: periodic
     interval: 2m

@@ -15,9 +15,9 @@ jobs:
 # this job takes care of snapshot creation + pruning
 - name: snapjob
   type: snap
-  filesystems: {
-      "system<": true,
-  }
+  datasets:
+    - pattern: "system"
+      recursive: true
   # create snapshots with prefix `zrepl_` every 15 minutes
   snapshotting:
     type: periodic
@@ -47,9 +47,9 @@ jobs:
     type: local
     listener_name: backuppool_sink
     client_identity: myhostname
-  filesystems: {
-      "system<": true
-  }
+  datasets:
+    - pattern: "system"
+      recursive: true
   send:
     encrypted: true
   replication:

@@ -127,11 +127,11 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 	var datasets []string
 	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
-		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
+		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems, j.Datasets)
 	case *config.SnapJob:
-		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
+		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems, j.Datasets)
 	case *config.SourceJob:
-		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems)
+		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems, j.Datasets)
 	case *config.PullJob:
 		datasets, err = self.datasetsFromRootFs(ctx, j.RootFS, 0)
 	case *config.SinkJob:
@@ -151,8 +151,9 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 
 func (self *SnapCheck) datasetsFromFilter(
 	ctx context.Context, ff config.FilesystemsFilter,
+	df []config.DatasetFilter,
 ) ([]string, error) {
-	filesystems, err := filters.DatasetMapFilterFromConfig(ff)
+	filesystems, err := filters.NewFromConfig(ff, df)
 	if err != nil {
 		return nil, fmt.Errorf("invalid filesystems: %w", err)
 	}

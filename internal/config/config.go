@@ -150,8 +150,16 @@ type SnapJob struct {
 	Name             string            `yaml:"name" validate:"required"`
 	Pruning          PruningLocal      `yaml:"pruning"`
 	Snapshotting     SnapshottingEnum  `yaml:"snapshotting"`
-	Filesystems      FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
+	Filesystems      FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
+	Datasets         []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`
 	MonitorSnapshots MonitorSnapshots  `yaml:"monitor"`
+}
+
+type DatasetFilter struct {
+	Pattern   string `yaml:"pattern"`
+	Exclude   bool   `yaml:"exclude"`
+	Recursive bool   `yaml:"recursive" validate:"excluded_with=Shell"`
+	Shell     bool   `yaml:"shell" validate:"excluded_with=Recursive"`
 }
 
 type SendOptions struct {
@@ -215,12 +223,16 @@ type PlaceholderRecvOptions struct {
 type PushJob struct {
 	ActiveJob    `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
-	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
+	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
+	Datasets     []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`
 	Send         SendOptions       `yaml:"send"`
 }
 
-func (j *PushJob) GetFilesystems() FilesystemsFilter { return j.Filesystems }
-func (j *PushJob) GetSendOptions() *SendOptions      { return &j.Send }
+func (j *PushJob) GetFilesystems() (FilesystemsFilter, []DatasetFilter) {
+	return j.Filesystems, j.Datasets
+}
+
+func (j *PushJob) GetSendOptions() *SendOptions { return &j.Send }
 
 type PullJob struct {
 	ActiveJob `yaml:",inline"`
@@ -273,12 +285,16 @@ func (j *SinkJob) GetRecvOptions() *RecvOptions  { return &j.Recv }
 type SourceJob struct {
 	PassiveJob   `yaml:",inline"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
-	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
+	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
+	Datasets     []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`
 	Send         SendOptions       `yaml:"send"`
 }
 
-func (j *SourceJob) GetFilesystems() FilesystemsFilter { return j.Filesystems }
-func (j *SourceJob) GetSendOptions() *SendOptions      { return &j.Send }
+func (j *SourceJob) GetFilesystems() (FilesystemsFilter, []DatasetFilter) {
+	return j.Filesystems, j.Datasets
+}
+
+func (j *SourceJob) GetSendOptions() *SendOptions { return &j.Send }
 
 type FilesystemsFilter map[string]bool
 
@@ -572,7 +588,8 @@ type HookEnum struct {
 type HookCommand struct {
 	Path               string            `yaml:"path" validate:"required"`
 	Timeout            time.Duration     `yaml:"timeout" default:"30s" validate:"gt=0s"`
-	Filesystems        FilesystemsFilter `yaml:"filesystems" validate:"min=1"`
+	Filesystems        FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
+	Datasets           []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`
 	HookSettingsCommon `yaml:",inline"`
 }
 

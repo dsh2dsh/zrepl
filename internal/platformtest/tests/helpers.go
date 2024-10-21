@@ -178,7 +178,7 @@ func datasetToStringSortedTrimPrefix(prefix *zfs.DatasetPath, paths []*zfs.Datas
 	return pstrs
 }
 
-func mustAddToSFilter(ctx *platformtest.Context, f *filters.DatasetMapFilter, fs string) {
+func mustAddToSFilter(ctx *platformtest.Context, f *filters.DatasetFilter, fs string) {
 	err := f.Add(fs, "ok")
 	require.NoError(ctx, err)
 }

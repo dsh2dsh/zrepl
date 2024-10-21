@@ -3,8 +3,10 @@ package filters
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -14,86 +16,94 @@ const (
 	MapFilterResultOmit = "!"
 )
 
-func DatasetMapFilterFromConfig(c map[string]bool,
-) (*DatasetMapFilter, error) {
-	f := NewDatasetMapFilter(len(c), true)
-	for pathPattern, accept := range c {
-		mapping := MapFilterResultOmit
-		if accept {
-			mapping = MapFilterResultOk
-		}
-		if err := f.Add(pathPattern, mapping); err != nil {
-			return nil, fmt.Errorf(
-				"invalid mapping entry ['%s':'%s']: %w", pathPattern, mapping, err)
-		}
+func NewFromConfig(compatMap map[string]bool, in []config.DatasetFilter,
+) (*DatasetFilter, error) {
+	f := New(len(compatMap) + len(in))
+	if err := f.addMap(compatMap); err != nil {
+		return nil, err
+	} else if err := f.AddList(in); err != nil {
+		return nil, err
 	}
 	return f, nil
 }
 
-func NewDatasetMapFilter(size int, filterMode bool) *DatasetMapFilter {
-	return &DatasetMapFilter{
-		entries: make([]datasetMapFilterEntry, 0, size),
+func New(size int) *DatasetFilter {
+	return &DatasetFilter{entries: make([]*filterItem, 0, size)}
+}
+
+type DatasetFilter struct {
+	entries []*filterItem
+}
+
+func (self *DatasetFilter) AddList(in []config.DatasetFilter) error {
+	for i := range in {
+		configItem := &in[i]
+		entry := &filterItem{
+			pattern:      configItem.Pattern,
+			mapping:      !configItem.Exclude,
+			recursive:    configItem.Recursive,
+			shellPattern: configItem.Shell,
+		}
+		if err := entry.Init(); err != nil {
+			return err
+		}
+		self.entries = append(self.entries, entry)
 	}
+	return nil
 }
 
-type DatasetMapFilter struct {
-	entries []datasetMapFilterEntry
+func (self *DatasetFilter) addMap(in map[string]bool) error {
+	for pathPattern, accept := range in {
+		if err := self.addCompat(pathPattern, accept); err != nil {
+			return fmt.Errorf(
+				"invalid mapping entry [%q: %v]: %w", pathPattern, accept, err)
+		}
+	}
+	self.CompatSort()
+	return nil
 }
 
-type datasetMapFilterEntry struct {
-	pattern   string
-	mapping   bool
-	recursive bool
-	path      *zfs.DatasetPath
-
-	// shellPattern contains a shell pattern for checking is a subtree matching
-	// this definition or not. See pattern syntax in [filepath.Match].
-	shellPattern string
-}
-
-func (self *datasetMapFilterEntry) hasPattern() bool {
-	return self.shellPattern != ""
-}
-
-func (self *datasetMapFilterEntry) match(path *zfs.DatasetPath) (bool, error) {
-	fullPattern := filepath.Join(self.path.ToString(), self.shellPattern)
-	return filepath.Match(fullPattern, path.ToString())
-}
-
-func (self *DatasetMapFilter) Add(pathPattern, mapping string) error {
-	mappingOk, err := parseDatasetFilterResult(mapping)
-	if err != nil {
+func (self *DatasetFilter) addCompat(pathPattern string, mapping bool) error {
+	// assert path glob adheres to spec
+	const subTreeSep = "<"
+	pathStr, pattern, found := strings.Cut(pathPattern, subTreeSep)
+	entry := &filterItem{
+		pattern:   pathStr,
+		mapping:   mapping,
+		recursive: found,
+	}
+	if err := entry.Init(); err != nil {
 		return err
 	}
 
-	// assert path glob adheres to spec
-	const SUBTREE_PATTERN = "<"
-	pathStr, pattern, found := strings.Cut(pathPattern, SUBTREE_PATTERN)
 	if pattern != "" {
-		if strings.Contains(pattern, SUBTREE_PATTERN) {
+		if strings.Contains(pattern, subTreeSep) {
 			return fmt.Errorf(
 				"invalid shell pattern %q in path pattern %q: '<' not allowed in shell patterns",
 				pattern, pathPattern)
-		} else if _, err := filepath.Match(pattern, ""); err != nil {
-			return fmt.Errorf(
-				"invalid shell pattern %q in %q: %w", pattern, pathPattern, err)
+		}
+		if !mapping {
+			rootEntry := entry.Clone()
+			rootEntry.mapping = true
+			self.entries = append(self.entries, rootEntry)
+		}
+		entry.pattern = filepath.Join(pathStr, pattern)
+		entry.shellPattern = true
+		if err := entry.Init(); err != nil {
+			return err
 		}
 	}
 
-	path, err := zfs.NewDatasetPath(pathStr)
-	if err != nil {
-		return fmt.Errorf("pattern is not a dataset path: %s", err)
-	}
-
-	self.entries = append(self.entries, datasetMapFilterEntry{
-		pattern:   pathPattern,
-		mapping:   mappingOk,
-		recursive: found,
-		path:      path,
-
-		shellPattern: pattern,
-	})
+	self.entries = append(self.entries, entry)
 	return nil
+}
+
+func (self *DatasetFilter) Add(path, mapping string) error {
+	accept, err := parseDatasetFilterResult(mapping)
+	if err != nil {
+		return err
+	}
+	return self.addCompat(path, accept)
 }
 
 // Parse a dataset filter result
@@ -107,59 +117,31 @@ func parseDatasetFilterResult(result string) (bool, error) {
 	return false, fmt.Errorf("%q is not a valid filter result", result)
 }
 
-// find the most specific prefix mapping we have
-//
-// longer prefix wins over shorter prefix, direct wins over glob
-func (self *DatasetMapFilter) mostSpecificPrefixMapping(path *zfs.DatasetPath,
-) (int, bool) {
-	lcp, lcp_entry_idx, direct_idx := -1, -1, -1
-	for e := range self.entries {
-		entry := &self.entries[e]
-		ep := self.entries[e].path
-		lep := ep.Length()
-		switch {
-		case !entry.recursive && ep.Equal(path):
-			direct_idx = e
-		case entry.recursive && path.HasPrefix(ep) && lep > lcp:
-			lcp = lep
-			lcp_entry_idx = e
-		}
-	}
-
-	switch {
-	case direct_idx >= 0:
-		return direct_idx, true
-	case lcp_entry_idx >= 0:
-		return lcp_entry_idx, true
-	}
-	return 0, false
+func (self *DatasetFilter) CompatSort() {
+	slices.SortStableFunc(self.entries, func(a, b *filterItem) int {
+		return a.CompatCompare(b)
+	})
 }
 
-func (self *DatasetMapFilter) Filter(p *zfs.DatasetPath) (bool, error) {
-	idx, ok := self.mostSpecificPrefixMapping(p)
-	if !ok {
-		return false, nil
-	}
-	entry := &self.entries[idx]
-
-	if entry.hasPattern() {
-		matched, err := entry.match(p)
-		switch {
-		case err != nil:
+func (self *DatasetFilter) Filter(p *zfs.DatasetPath) (bool, error) {
+	var lastMapping bool
+	for _, entry := range self.entries {
+		if matched, err := entry.Match(p); err != nil {
 			return false, err
-		case matched:
-			return entry.mapping, nil
+		} else if matched {
+			lastMapping = entry.mapping
 		}
-		return !entry.mapping, nil
 	}
-	return entry.mapping, nil
+	return lastMapping, nil
 }
 
-func (self *DatasetMapFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet {
+func (self *DatasetFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet {
 	datasets := make(zfs.UserSpecifiedDatasetsSet)
 	for i := range self.entries {
-		entry := &self.entries[i]
-		datasets[entry.path.ToString()] = true
+		path := self.entries[i].path
+		if path != nil {
+			datasets[path.ToString()] = true
+		}
 	}
 	return datasets
 }
@@ -167,4 +149,4 @@ func (self *DatasetMapFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsS
 // Creates a new DatasetMapFilter in filter mode from a mapping. All accepting
 // mapping results are mapped to accepting filter results. All rejecting mapping
 // results are mapped to rejecting filter results.
-func (self *DatasetMapFilter) AsFilter() endpoint.FSFilter { return self }
+func (self *DatasetFilter) AsFilter() endpoint.FSFilter { return self }
