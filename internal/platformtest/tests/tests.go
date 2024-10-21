@@ -13,4 +13,4 @@ func (c Case) String() string {
 	return runtime.FuncForPC(reflect.ValueOf(c).Pointer()).Name()
 }
 
-//go:generate ../../artifacts/generate-platform-test-list github.com/dsh2dsh/zrepl/platformtest/tests
+//go:generate ./gen/wrapper.bash
