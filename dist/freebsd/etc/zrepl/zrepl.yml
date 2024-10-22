@@ -37,9 +37,7 @@ jobs:
     type: "snap"
     datasets: &datasets
       - pattern: "zroot/ROOT/default"
-        recursive: true
       - pattern: "zroot/usr/home"
-        recursive: true
     snapshotting:
       type: "periodic"
       cron: "20 * * * *"
