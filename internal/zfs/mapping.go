@@ -9,6 +9,7 @@ import (
 )
 
 type DatasetFilter interface {
+	Empty() bool
 	Filter(p *DatasetPath) (pass bool, err error)
 	// The caller owns the returned set.
 	// Implementations should return a copy.
@@ -32,6 +33,8 @@ func (noFilter) Filter(p *DatasetPath) (bool, error) {
 }
 
 func (noFilter) UserSpecifiedDatasets() UserSpecifiedDatasetsSet { return nil }
+
+func (noFilter) Empty() bool { return true }
 
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 ) ([]*DatasetPath, error) {

@@ -39,7 +39,7 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
 		return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)
 	}
 
-	hookList, err := hooks.ListFromConfig(&in.Hooks)
+	hookList, err := hooks.ListFromConfig(in.Hooks)
 	if err != nil {
 		return nil, fmt.Errorf("hook config error: %w", err)
 	}

@@ -10,22 +10,19 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-// Re-export type here so that
-// every file in package hooks doesn't
-// have to import github.com/dsh2dsh/zrepl/zfs
-type Filter zfs.DatasetFilter
-
 type Hook interface {
-	Filesystems() Filter
+	Filesystems() zfs.DatasetFilter
+	String() string
 
-	// If true and the Pre edge invocation of Run fails, Post edge will not run and other Pre edges will not run.
+	// If true and the Pre edge invocation of Run fails, Post edge will not run
+	// and other Pre edges will not run.
 	ErrIsFatal() bool
 
-	// Run is invoked by HookPlan for a Pre edge.
-	// If HookReport.HadError() == false, the Post edge will be invoked, too.
-	Run(ctx context.Context, edge Edge, phase Phase, dryRun bool, extra Env, state map[interface{}]interface{}) HookReport
-
-	String() string
+	// Run is invoked by HookPlan for a Pre edge. If HookReport.HadError() ==
+	// false, the Post edge will be invoked, too.
+	Run(ctx context.Context, edge Edge, phase Phase, dryRun bool,
+		extra Env, state map[interface{}]any,
+	) HookReport
 }
 
 type Phase string
@@ -35,9 +32,7 @@ const (
 	PhaseTesting  = Phase("testing")
 )
 
-func (p Phase) String() string {
-	return string(p)
-}
+func (p Phase) String() string { return string(p) }
 
 //go:generate stringer -type=Edge
 type Edge uint
@@ -76,9 +71,11 @@ type Step struct {
 	Status     StepStatus
 	Begin, End time.Time
 	// Report may be nil
-	// FIXME cannot serialize this for client status, but contains interesting info (like what error happened)
+	//
+	// FIXME cannot serialize this for client status, but contains interesting
+	// info (like what error happened)
 	Report HookReport
-	state  map[interface{}]interface{}
+	state  map[any]any
 }
 
 func (s Step) String() (out string) {
@@ -91,7 +88,8 @@ func (s Step) String() (out string) {
 		t := s.End.Sub(s.Begin)
 		runTime = t.Round(time.Millisecond).String()
 	}
-	return fmt.Sprintf("[%s] [%5s] %s [%s]  %s", s.Status, runTime, fatal, s.Edge, s.Hook)
+	return fmt.Sprintf("[%s] [%5s] %s [%s]  %s",
+		s.Status, runTime, fatal, s.Edge, s.Hook)
 }
 
 type Plan struct {
@@ -100,32 +98,32 @@ type Plan struct {
 	steps []*Step
 	pre   []*Step // protected by mtx
 	cb    *Step
-	post  []*Step // not reversed, i.e. entry at index i corresponds to pre-edge in pre[i]
+	// not reversed, i.e. entry at index i corresponds to pre-edge in pre[i]
+	post []*Step
 
 	phase Phase
 	env   Env
 }
 
-func NewPlan(hooks *List, phase Phase, cb *CallbackHook, extra Env) (*Plan, error) {
-	pre := make([]*Step, 0, len(*hooks))
-	post := make([]*Step, 0, len(*hooks))
+func NewPlan(hooks List, phase Phase, cb *CallbackHook, extra Env,
+) (*Plan, error) {
+	pre := make([]*Step, 0, len(hooks))
+	post := make([]*Step, 0, len(hooks))
 	// TODO sanity check unique name of hook?
-	for _, hook := range *hooks {
-		state := make(map[interface{}]interface{})
-		preE := &Step{
+	for _, hook := range hooks {
+		state := make(map[any]any)
+		pre = append(pre, &Step{
 			Hook:   hook,
 			Edge:   Pre,
 			Status: StepPending,
 			state:  state,
-		}
-		pre = append(pre, preE)
-		postE := &Step{
+		})
+		post = append(post, &Step{
 			Hook:   hook,
 			Edge:   Post,
 			Status: StepPending,
 			state:  state,
-		}
-		post = append(post, postE)
+		})
 	}
 
 	cbE := &Step{
@@ -149,7 +147,6 @@ func NewPlan(hooks *List, phase Phase, cb *CallbackHook, extra Env) (*Plan, erro
 		post:  post,
 		cb:    cbE,
 	}
-
 	return plan, nil
 }
 
@@ -194,6 +191,7 @@ func (r PlanReport) String() string {
 func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
+
 	w := func(f func()) {
 		p.mtx.RUnlock()
 		defer p.mtx.RLock()
@@ -201,6 +199,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 		defer p.mtx.Unlock()
 		f()
 	}
+
 	runHook := func(s *Step, ctx context.Context, edge Edge) HookReport {
 		w(func() { s.Status = StepExec })
 		begin := time.Now()
@@ -218,7 +217,6 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	}
 
 	l := getLogger(ctx)
-
 	// it's a stack, execute until we reach the end of the list (last item in)
 	// or fail between
 	l.Info("run pre-edges in configuration order")
@@ -236,8 +234,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 		}
 	}
 
-	hadFatalErr := next != len(p.pre)
-	if hadFatalErr {
+	if next != len(p.pre) {
 		l.Error("fatal error in a pre-snapshot hook invocation")
 		l.Error("no snapshot will be taken")
 		l.Error("only running post-edges for successful pre-edges")
@@ -253,23 +250,22 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	}
 
 	l.Info("running callback")
-	cbR := runHook(p.cb, ctx, Callback)
-	if cbR.HadError() {
+	if cbR := runHook(p.cb, ctx, Callback); cbR.HadError() {
 		l.WithError(cbR).Error("callback failed")
 	}
 
 	l.Info("run post-edges for successful pre-edges in reverse configuration order")
-
 	// the constructor produces pre and post entries
 	// post is NOT reversed
 	next-- // now at index of last executed pre-edge
 	for ; next >= 0; next-- {
 		e := p.post[next]
 		l := l.WithField("hook", e.Hook)
-
 		if p.pre[next].Status != StepOk {
 			if p.pre[next].Status != StepErr {
-				panic(fmt.Sprintf("expecting a pre-edge hook report to be either Ok or Err, got %s", p.pre[next].Status))
+				panic(fmt.Sprintf(
+					"expecting a pre-edge hook report to be either Ok or Err, got %s",
+					p.pre[next].Status))
 			}
 			l.Info("skip post-edge because pre-edge failed")
 			w(func() {
@@ -279,13 +275,10 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 		}
 
 		report := runHook(e, ctx, Post)
-
 		if report.HadError() {
 			l.WithError(report).Error("hook invocation failed for post-edge")
 			l.Error("subsequent post-edges run regardless of this post-edge failure")
 		}
-
 		// ErrIsFatal is only relevant for Pre
-
 	}
 }

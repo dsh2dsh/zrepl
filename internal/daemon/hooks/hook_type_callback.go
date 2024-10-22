@@ -13,7 +13,7 @@ type HookJobCallback func(ctx context.Context) error
 
 type CallbackHook struct {
 	cb            HookJobCallback
-	filter        Filter
+	filter        zfs.DatasetFilter
 	displayString string
 }
 
@@ -26,7 +26,9 @@ func NewCallbackHookForFilesystem(displayString string, fs *zfs.DatasetPath,
 	return NewCallbackHook(displayString, cb, filter)
 }
 
-func NewCallbackHook(displayString string, cb HookJobCallback, filter Filter) *CallbackHook {
+func NewCallbackHook(displayString string, cb HookJobCallback,
+	filter zfs.DatasetFilter,
+) *CallbackHook {
 	return &CallbackHook{
 		cb:            cb,
 		filter:        filter,
@@ -34,17 +36,13 @@ func NewCallbackHook(displayString string, cb HookJobCallback, filter Filter) *C
 	}
 }
 
-func (h *CallbackHook) Filesystems() Filter {
-	return h.filter
-}
+func (h *CallbackHook) Filesystems() zfs.DatasetFilter { return h.filter }
 
 func (h *CallbackHook) ErrIsFatal() bool {
 	return false // callback is by definition
 }
 
-func (h *CallbackHook) String() string {
-	return h.displayString
-}
+func (h *CallbackHook) String() string { return h.displayString }
 
 type CallbackHookReport struct {
 	Name string
@@ -64,7 +62,8 @@ func (r *CallbackHookReport) Error() string {
 	return fmt.Sprintf("%s error: %s", r.Name, r.Err)
 }
 
-func (h *CallbackHook) Run(ctx context.Context, edge Edge, phase Phase, dryRun bool, extra Env, state map[interface{}]interface{}) HookReport {
-	err := h.cb(ctx)
-	return &CallbackHookReport{h.displayString, err}
+func (h *CallbackHook) Run(ctx context.Context, edge Edge, phase Phase,
+	dryRun bool, extra Env, state map[any]any,
+) HookReport {
+	return &CallbackHookReport{Name: h.displayString, Err: h.cb(ctx)}
 }

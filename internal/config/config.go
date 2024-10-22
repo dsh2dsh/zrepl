@@ -303,13 +303,13 @@ type SnapshottingEnum struct {
 }
 
 type SnapshottingPeriodic struct {
-	Type            string   `yaml:"type" validate:"required"`
-	Prefix          string   `yaml:"prefix" validate:"required"`
-	Interval        Duration `yaml:"interval"`
-	Cron            string   `yaml:"cron"`
-	Hooks           HookList `yaml:"hooks"`
-	TimestampFormat string   `yaml:"timestamp_format" default:"dense" validate:"required"`
-	TimestampLocal  bool     `yaml:"timestamp_local" default:"true"`
+	Type            string        `yaml:"type" validate:"required"`
+	Prefix          string        `yaml:"prefix" validate:"required"`
+	Interval        Duration      `yaml:"interval"`
+	Cron            string        `yaml:"cron"`
+	Hooks           []HookCommand `yaml:"hooks" validate:"dive"`
+	TimestampFormat string        `yaml:"timestamp_format" default:"dense" validate:"required"`
+	TimestampLocal  bool          `yaml:"timestamp_local" default:"true"`
 }
 
 func (self *SnapshottingPeriodic) CronSpec() string {
@@ -579,23 +579,23 @@ type GlobalStdinServer struct {
 	SockDir string `yaml:"sockdir" default:"/var/run/zrepl/stdinserver" validate:"required"`
 }
 
-type HookList []HookEnum
-
-type HookEnum struct {
-	Ret any `validate:"required"`
-}
-
 type HookCommand struct {
-	Path               string            `yaml:"path" validate:"required"`
-	Timeout            time.Duration     `yaml:"timeout" default:"30s" validate:"gt=0s"`
-	Filesystems        FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
-	Datasets           []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`
-	HookSettingsCommon `yaml:",inline"`
+	Path        string            `yaml:"path" validate:"required"`
+	Timeout     time.Duration     `yaml:"timeout" default:"30s" validate:"min=0s"`
+	Filesystems FilesystemsFilter `yaml:"filesystems"`
+	Datasets    []DatasetFilter   `yaml:"datasets" validate:"dive"`
+	ErrIsFatal  bool              `yaml:"err_is_fatal"`
 }
 
-type HookSettingsCommon struct {
-	Type       string `yaml:"type" validate:"required"`
-	ErrIsFatal bool   `yaml:"err_is_fatal"`
+func (self *HookCommand) UnmarshalYAML(value *yaml.Node) error {
+	type hookCommand HookCommand
+	v := (*hookCommand)(self)
+	if err := value.Decode(v); err != nil {
+		return fmt.Errorf("UnmarshalYAML %T: %w", self, err)
+	} else if err := defaults.Set(v); err != nil {
+		return fmt.Errorf("set defaults for %T: %w", self, err)
+	}
+	return nil
 }
 
 func enumUnmarshal(value *yaml.Node, types map[string]any) (any, error) {
@@ -703,15 +703,6 @@ func (t *SyslogFacility) UnmarshalYAML(value *yaml.Node) (err error) {
 		return err
 	}
 	return t.UnmarshalJSON([]byte(s))
-}
-
-var _ yaml.Unmarshaler = (*HookEnum)(nil)
-
-func (t *HookEnum) UnmarshalYAML(value *yaml.Node) (err error) {
-	t.Ret, err = enumUnmarshal(value, map[string]any{
-		"command": new(HookCommand),
-	})
-	return
 }
 
 var ConfigFileDefaultLocations = []string{

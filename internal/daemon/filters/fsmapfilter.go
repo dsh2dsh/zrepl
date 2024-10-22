@@ -150,3 +150,5 @@ func (self *DatasetFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet 
 // mapping results are mapped to accepting filter results. All rejecting mapping
 // results are mapped to rejecting filter results.
 func (self *DatasetFilter) AsFilter() endpoint.FSFilter { return self }
+
+func (self *DatasetFilter) Empty() bool { return len(self.entries) == 0 }

@@ -9,40 +9,30 @@ import (
 
 type List []Hook
 
-func HookFromConfig(in config.HookEnum) (Hook, error) {
-	switch v := in.Ret.(type) {
-	case *config.HookCommand:
-		return NewCommandHook(v)
-	default:
-		return nil, fmt.Errorf("unknown hook type %T", v)
-	}
-}
-
-func ListFromConfig(in *config.HookList) (r *List, err error) {
-	hl := make(List, len(*in))
-
-	for i, h := range *in {
-		hl[i], err = HookFromConfig(h)
+func ListFromConfig(in []config.HookCommand) (List, error) {
+	hl := make(List, len(in))
+	for i, h := range in {
+		h, err := NewCommandHook(&h)
 		if err != nil {
 			return nil, fmt.Errorf("create hook #%d: %s", i+1, err)
 		}
+		hl[i] = h
 	}
-
-	return &hl, nil
+	return hl, nil
 }
 
-func (l List) CopyFilteredForFilesystem(fs *zfs.DatasetPath) (ret List, err error) {
-	ret = make(List, 0, len(l))
-
-	for _, h := range l {
-		var passFilesystem bool
-		if passFilesystem, err = h.Filesystems().Filter(fs); err != nil {
-			return nil, err
+func (self List) CopyFilteredForFilesystem(fs *zfs.DatasetPath) (List, error) {
+	ret := make(List, 0, len(self))
+	for _, h := range self {
+		if h.Filesystems().Empty() {
+			ret = append(ret, h)
+			continue
 		}
-		if passFilesystem {
+		if ok, err := h.Filesystems().Filter(fs); err != nil {
+			return nil, err
+		} else if ok {
 			ret = append(ret, h)
 		}
 	}
-
 	return ret, nil
 }

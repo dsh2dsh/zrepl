@@ -465,6 +465,7 @@ func (p *Sender) Receive(ctx context.Context, r *pdu.ReceiveReq, _ io.ReadCloser
 }
 
 type FSFilter interface { // FIXME unused
+	Empty() bool
 	Filter(path *zfs.DatasetPath) (pass bool, err error)
 	UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet
 }
@@ -640,6 +641,8 @@ func (f subroot) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet {
 		f.localRoot.ToString(): true,
 	}
 }
+
+func (f subroot) Empty() bool { return false }
 
 func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
 	p, err := zfs.NewDatasetPath(fs)

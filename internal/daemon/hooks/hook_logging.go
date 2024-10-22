@@ -8,14 +8,9 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 )
 
-type Logger = logger.Logger
-
-func GetLogger(ctx context.Context) Logger { return getLogger(ctx) }
-
-func getLogger(ctx context.Context) Logger {
+func getLogger(ctx context.Context) logger.Logger {
 	return logging.GetLogger(ctx, logging.SubsysHooks)
 }
 
@@ -34,12 +29,14 @@ type logWriter struct {
 	mtx     *sync.Mutex
 	buf     bytes.Buffer
 	scanner *bufio.Scanner
-	logger  Logger
+	logger  logger.Logger
 	level   logger.Level
 	field   string
 }
 
-func NewLogWriter(mtx *sync.Mutex, logger Logger, level logger.Level, field string) *logWriter {
+func NewLogWriter(mtx *sync.Mutex, logger logger.Logger, level logger.Level,
+	field string,
+) *logWriter {
 	w := new(logWriter)
 	w.mtx = mtx
 	w.scanner = bufio.NewScanner(&w.buf)
@@ -53,39 +50,31 @@ func (w *logWriter) log(line string) {
 	w.logger.WithField(w.field, line).Log(w.level, "hook output")
 }
 
-func (w *logWriter) logUnreadBytes() error {
+func (w *logWriter) logUnreadBytes() {
 	for w.scanner.Scan() {
 		w.log(w.scanner.Text())
 	}
-	if w.buf.Cap() > envconst.Int("ZREPL_MAX_HOOK_LOG_SIZE", MAX_HOOK_LOG_SIZE_DEFAULT) {
-		w.buf.Reset()
-	}
-
-	return nil
 }
 
 func (w *logWriter) Write(in []byte) (int, error) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
 
-	n, bufErr := w.buf.Write(in)
-	if bufErr != nil {
-		return n, bufErr
-	}
-
-	err := w.logUnreadBytes()
+	n, err := w.buf.Write(in)
 	if err != nil {
 		return n, err
 	}
-	// Always reset the scanner for the next Write
-	w.scanner = bufio.NewScanner(&w.buf)
+	w.logUnreadBytes()
 
+	// Always reset the scanner for the next Write
+	w.buf.Reset()
+	w.scanner = bufio.NewScanner(&w.buf)
 	return n, nil
 }
 
-func (w *logWriter) Close() (err error) {
+func (w *logWriter) Close() error {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-
-	return w.logUnreadBytes()
+	w.logUnreadBytes()
+	return nil
 }

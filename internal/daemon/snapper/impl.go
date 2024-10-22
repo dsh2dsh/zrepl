@@ -18,7 +18,7 @@ type planArgs struct {
 	prefix          string
 	timestampFormat string
 	timestampLocal  bool
-	hooks           *hooks.List
+	hooks           hooks.List
 }
 
 type plan struct {
@@ -80,8 +80,8 @@ func (plan *plan) formatNow(format string, localTime bool) string {
 }
 
 func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
-	hookMatchCount := make(map[hooks.Hook]int, len(*plan.args.hooks))
-	for _, h := range *plan.args.hooks {
+	hookMatchCount := make(map[hooks.Hook]int, len(plan.args.hooks))
+	for _, h := range plan.args.hooks {
 		hookMatchCount[h] = 0
 	}
 
@@ -126,7 +126,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 			}
 
 			var planErr error
-			hookPlan, planErr = hooks.NewPlan(&filteredHooks, hooks.PhaseSnapshot, jobCallback, hookEnvExtra)
+			hookPlan, planErr = hooks.NewPlan(filteredHooks, hooks.PhaseSnapshot, jobCallback, hookEnvExtra)
 			if planErr != nil {
 				fsHadErr = true
 				getLogger(ctx).WithError(planErr).Error("cannot create job hook plan")
@@ -168,7 +168,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 	for h, mc := range hookMatchCount {
 		if mc == 0 {
 			hookIdx := -1
-			for idx, ah := range *plan.args.hooks {
+			for idx, ah := range plan.args.hooks {
 				if ah == h {
 					hookIdx = idx
 					break
