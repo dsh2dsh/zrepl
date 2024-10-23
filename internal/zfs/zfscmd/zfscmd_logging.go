@@ -1,9 +1,13 @@
 package zfscmd
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"os/exec"
 	"time"
+
+	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 // Implementation Note:
@@ -45,13 +49,19 @@ func waitPostLogging(c *Cmd, err error, debug bool) {
 	if errors.As(err, &exitError) {
 		log = log.WithField("status", exitError.ExitCode())
 	}
-	if len(c.stdoutStderr) > 0 {
-		log = log.WithField("stderr", string(c.stdoutStderr))
+
+	level := logger.Error
+	if debug {
+		level = logger.Debug
+	}
+	log.Log(level, "command exited with error")
+
+	if len(c.stderrOutput) == 0 {
+		return
 	}
 
-	if debug {
-		log.Debug("command exited with error")
-	} else {
-		log.Error("command exited with error")
+	s := bufio.NewScanner(bytes.NewReader(c.stderrOutput))
+	for s.Scan() {
+		c.log().Log(level, "output: "+s.Text())
 	}
 }

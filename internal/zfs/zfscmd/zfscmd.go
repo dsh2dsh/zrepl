@@ -36,7 +36,7 @@ type Cmd struct {
 	waitReturnEndSpanCb                      trace.DoneFunc
 
 	usage        usage
-	stdoutStderr []byte
+	stderrOutput []byte
 	logError     bool
 
 	cmdLogger Logger
@@ -58,13 +58,18 @@ func (c *Cmd) WithPipeLen(n int) *Cmd {
 	return c
 }
 
+func (c *Cmd) WithStderrOutput(b []byte) *Cmd {
+	c.stderrOutput = b
+	return c
+}
+
 // err.(*exec.ExitError).Stderr will NOT be set
 func (c *Cmd) CombinedOutput() (o []byte, err error) {
 	c.startPre(false)
 	c.startPost(nil)
 	c.waitPre()
 	o, err = c.cmd.CombinedOutput()
-	c.stdoutStderr = o
+	c.stderrOutput = o
 	c.waitPost(err)
 	return
 }
@@ -222,8 +227,8 @@ func (c *Cmd) waitPost(err error) {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			s = exitError.ProcessState
-			if c.stdoutStderr == nil {
-				c.stdoutStderr = exitError.Stderr
+			if c.stderrOutput == nil {
+				c.stderrOutput = exitError.Stderr
 			}
 		}
 	}

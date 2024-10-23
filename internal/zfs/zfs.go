@@ -169,8 +169,17 @@ type ZFSError struct {
 }
 
 func (self *ZFSError) Error() string {
-	return fmt.Sprintf("zfs exited with error: %s\nstderr:\n%s",
-		self.WaitErr.Error(), self.Stderr)
+	msg := "zfs exited with error: " + self.WaitErr.Error()
+	if len(self.Stderr) == 0 {
+		return msg
+	}
+
+	firstLine, leftBytes, _ := bytes.Cut(self.Stderr, []byte{'\n'})
+	msg += ": " + string(firstLine)
+	if len(leftBytes) != 0 {
+		return msg + fmt.Sprintf(": %d bytes left", len(leftBytes))
+	}
+	return msg
 }
 
 func (self *ZFSError) Unwrap() error {
@@ -228,6 +237,8 @@ func ZFSListIter(ctx context.Context, properties []string,
 		if err != nil {
 			if notExistHint != nil {
 				err = maybeDatasetNotExists(cmd, notExistHint.ToString(), err)
+			} else {
+				cmd.WithStderrOutput(stderrBuf.Bytes()).LogError(err, false)
 			}
 			yield(ZFSListResult{Err: err})
 		}
@@ -275,6 +286,7 @@ func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {
 	}
 
 	if len(zfsError.Stderr) != 0 {
+		cmd.WithStderrOutput(zfsError.Stderr)
 		enotexist := tryDatasetDoesNotExist(path, zfsError.Stderr)
 		if enotexist != nil {
 			cmd.LogError(err, true)
