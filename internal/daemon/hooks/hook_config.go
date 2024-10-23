@@ -7,7 +7,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-type List []Hook
+type List []*CommandHook
 
 func ListFromConfig(in []config.HookCommand) (List, error) {
 	hl := make(List, len(in))
@@ -19,6 +19,13 @@ func ListFromConfig(in []config.HookCommand) (List, error) {
 		hl[i] = h
 	}
 	return hl, nil
+}
+
+func (self List) WithCombinedOutput() List {
+	for _, h := range self {
+		h.WithCombinedOutput()
+	}
+	return self
 }
 
 func (self List) CopyFilteredForFilesystem(fs *zfs.DatasetPath) (List, error) {

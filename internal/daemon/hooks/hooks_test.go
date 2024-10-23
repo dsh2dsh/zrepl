@@ -401,7 +401,7 @@ jobs:
 		return nil
 	})
 
-	hookEnvExtra := hooks.Env{
+	hookEnvExtra := map[string]string{
 		hooks.EnvFS:       fs.ToString(),
 		hooks.EnvSnapshot: testSnapshotName,
 	}
@@ -419,7 +419,8 @@ jobs:
 
 			filteredHooks, err := hookList.CopyFilteredForFilesystem(fs)
 			require.NoError(t, err)
-			plan, err := hooks.NewPlan(filteredHooks, hooks.PhaseTesting, cb, hookEnvExtra)
+			plan, err := hooks.NewPlan(filteredHooks.WithCombinedOutput(),
+				hooks.PhaseTesting, cb, hookEnvExtra)
 			require.NoError(t, err)
 			t.Logf("REPORT PRE EXECUTION:\n%s", plan.Report())
 

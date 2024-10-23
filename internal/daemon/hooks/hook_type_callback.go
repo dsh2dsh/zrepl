@@ -63,7 +63,7 @@ func (r *CallbackHookReport) Error() string {
 }
 
 func (h *CallbackHook) Run(ctx context.Context, edge Edge, phase Phase,
-	dryRun bool, extra Env, state map[any]any,
+	dryRun bool, extra map[string]string,
 ) HookReport {
 	return &CallbackHookReport{Name: h.displayString, Err: h.cb(ctx)}
 }

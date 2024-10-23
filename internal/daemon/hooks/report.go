@@ -10,7 +10,7 @@ import (
 type CommandHookReport struct {
 	Command string
 	Args    []string // currently always empty
-	Env     Env
+	Env     map[string]string
 	Err     error
 
 	CombinedOutput []byte

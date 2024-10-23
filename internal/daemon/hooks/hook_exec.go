@@ -6,12 +6,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 type Hook interface {
-	Filesystems() zfs.DatasetFilter
 	String() string
 
 	// If true and the Pre edge invocation of Run fails, Post edge will not run
@@ -21,7 +18,7 @@ type Hook interface {
 	// Run is invoked by HookPlan for a Pre edge. If HookReport.HadError() ==
 	// false, the Post edge will be invoked, too.
 	Run(ctx context.Context, edge Edge, phase Phase, dryRun bool,
-		extra Env, state map[interface{}]any,
+		extra map[string]string,
 	) HookReport
 }
 
@@ -75,7 +72,6 @@ type Step struct {
 	// FIXME cannot serialize this for client status, but contains interesting
 	// info (like what error happened)
 	Report HookReport
-	state  map[any]any
 }
 
 func (s Step) String() (out string) {
@@ -102,27 +98,24 @@ type Plan struct {
 	post []*Step
 
 	phase Phase
-	env   Env
+	env   map[string]string
 }
 
-func NewPlan(hooks List, phase Phase, cb *CallbackHook, extra Env,
+func NewPlan(hooks List, phase Phase, cb *CallbackHook, extra map[string]string,
 ) (*Plan, error) {
 	pre := make([]*Step, 0, len(hooks))
 	post := make([]*Step, 0, len(hooks))
 	// TODO sanity check unique name of hook?
 	for _, hook := range hooks {
-		state := make(map[any]any)
 		pre = append(pre, &Step{
 			Hook:   hook,
 			Edge:   Pre,
 			Status: StepPending,
-			state:  state,
 		})
 		post = append(post, &Step{
 			Hook:   hook,
 			Edge:   Post,
 			Status: StepPending,
-			state:  state,
 		})
 	}
 
@@ -203,7 +196,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	runHook := func(s *Step, ctx context.Context, edge Edge) HookReport {
 		w(func() { s.Status = StepExec })
 		begin := time.Now()
-		r := s.Hook.Run(ctx, edge, p.phase, dryRun, p.env, s.state)
+		r := s.Hook.Run(ctx, edge, p.phase, dryRun, p.env)
 		end := time.Now()
 		w(func() {
 			s.Report = r

@@ -95,7 +95,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 		ctx := logging.WithLogger(ctx, logging.FromContext(ctx).
 			WithField("fs", fs.ToString()).WithField("snap", snapname))
 
-		hookEnvExtra := hooks.Env{
+		hookEnvExtra := map[string]string{
 			hooks.EnvFS:       fs.ToString(),
 			hooks.EnvSnapshot: snapname,
 		}
