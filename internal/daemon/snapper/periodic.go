@@ -129,7 +129,7 @@ type (
 	state   func(a periodicArgs, u updater) state
 )
 
-func (s *Periodic) RunPeriodic() bool { return true }
+func (s *Periodic) Periodic() bool { return true }
 
 func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 	cron *cron.Cron,

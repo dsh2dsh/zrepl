@@ -9,7 +9,7 @@ import (
 
 type manual struct{}
 
-func (s *manual) RunPeriodic() bool { return false }
+func (s *manual) Periodic() bool { return false }
 
 func (s *manual) Run(ctx context.Context, wakeUpCommon chan<- struct{},
 	cron *cron.Cron,

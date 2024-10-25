@@ -39,7 +39,7 @@ func (r *CommandHookReport) String() string {
 	if r.Err == nil {
 		msg = "command hook"
 	} else {
-		msg = fmt.Sprintf("command hook failed with %q", r.Err)
+		msg = fmt.Sprintf("command hook failed: %s", r.Err)
 	}
 	// no %q to make copy-pastable
 	return fmt.Sprintf("%s: \"%s\"", msg, cmdLine.String())
@@ -49,7 +49,8 @@ func (r *CommandHookReport) Error() string {
 	if r.Err == nil {
 		return ""
 	}
-	return fmt.Sprintf("%s FAILED with error: %s", r.String(), r.Err)
+	return r.String()
+	// return fmt.Sprintf("%s FAILED with error: %s", r.String(), r.Err)
 }
 
 func (r *CommandHookReport) HadError() bool { return r.Err != nil }

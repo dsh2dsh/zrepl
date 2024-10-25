@@ -2,18 +2,14 @@ package hooks
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"maps"
 	"math"
-	"os"
-	"os/exec"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -25,35 +21,14 @@ const (
 	EnvTimeout  = "ZREPL_TIMEOUT"
 )
 
-func NewHookEnv(edge Edge, phase Phase, dryRun bool, timeout time.Duration,
-	extra map[string]string,
-) map[string]string {
-	r := map[string]string{
-		EnvTimeout: fmt.Sprintf("%.f", math.Floor(timeout.Seconds())),
-	}
-
-	edgeString := edge.StringForPhase(phase)
-	r[EnvType] = strings.ToLower(edgeString)
-
-	var dryRunString string
-	if dryRun {
-		dryRunString = "true"
-	} else {
-		dryRunString = ""
-	}
-	r[EnvDryRun] = dryRunString
-
-	for k, v := range extra {
-		r[k] = v
-	}
-	return r
-}
-
 func NewCommandHook(in *config.HookCommand) (*CommandHook, error) {
 	r := &CommandHook{
 		errIsFatal: in.ErrIsFatal,
 		command:    in.Path,
 		timeout:    in.Timeout,
+
+		args: in.Args,
+		env:  in.Env,
 	}
 
 	filter, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
@@ -69,6 +44,9 @@ type CommandHook struct {
 	errIsFatal bool
 	command    string
 	timeout    time.Duration
+
+	args []string
+	env  map[string]string
 
 	combinedOutput bool
 }
@@ -87,54 +65,44 @@ func (self *CommandHook) String() string { return self.command }
 func (self *CommandHook) Run(ctx context.Context, edge Edge, phase Phase,
 	dryRun bool, extra map[string]string,
 ) HookReport {
-	if self.timeout > 0 {
-		cmdCtx, cancel := context.WithTimeout(ctx, self.timeout)
-		defer cancel()
-		ctx = cmdCtx
-	}
-
-	cmd := exec.CommandContext(ctx, self.command)
-	env, hookEnv := self.makeEnv(edge, phase, dryRun, extra)
-	cmd.Env = env
-
 	report := &CommandHookReport{
 		Command: self.command,
-		Env:     hookEnv,
+		Env:     self.makeEnv(edge, phase, dryRun, extra),
 		// no report.Args
 	}
 
-	combinedOutput, err := cmd.Output()
-	l := getLogger(ctx).WithField("command", self.command)
-	logOutput(l, logger.Info, "stdout", combinedOutput)
+	cmd := NewCommand(self.command, self.args...).
+		WithEnv(report.Env).
+		WithTimeout(self.timeout)
 
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			logOutput(l, logger.Warn, "stderr", ee.Stderr)
-			if self.combinedOutput {
-				combinedOutput = slices.Concat(combinedOutput, ee.Stderr)
-			}
-		}
-		if errors.Is(context.Cause(ctx), context.DeadlineExceeded) {
-			err = fmt.Errorf("timed out after %s: %s", self.timeout, err)
-		}
-		report.Err = err
-	}
-
+	report.Err = cmd.Run(ctx)
 	if self.combinedOutput {
-		report.CombinedOutput = combinedOutput
+		report.CombinedOutput = cmd.CombinedOutput()
 	}
 	return report
 }
 
 func (self *CommandHook) makeEnv(edge Edge, phase Phase, dryRun bool,
 	extra map[string]string,
-) ([]string, map[string]string) {
-	env := slices.Clone(os.Environ())
-	hookEnv := NewHookEnv(edge, phase, dryRun, self.timeout, extra)
-	env = slices.Grow(env, len(hookEnv))
-	for k, v := range hookEnv {
-		env = append(env, k+"="+v)
+) map[string]string {
+	hookEnv := self.hookEnv(edge, phase, dryRun)
+	env := make(map[string]string, len(self.env)+len(hookEnv)+len(extra))
+	maps.Copy(env, self.env)
+	maps.Copy(env, hookEnv)
+	maps.Copy(env, extra)
+	return env
+}
+
+func (self *CommandHook) hookEnv(edge Edge, phase Phase, dryRun bool,
+) map[string]string {
+	env := make(map[string]string, 3)
+	env[EnvTimeout] = fmt.Sprintf("%.f", math.Floor(self.timeout.Seconds()))
+	env[EnvType] = strings.ToLower(edge.StringForPhase(phase))
+
+	if dryRun {
+		env[EnvDryRun] = "true"
+	} else {
+		env[EnvDryRun] = ""
 	}
-	return env, hookEnv
+	return env
 }

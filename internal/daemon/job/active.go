@@ -53,6 +53,9 @@ type ActiveSide struct {
 
 	running  context.Context
 	shutdown context.CancelFunc
+
+	preHook  *Hook
+	postHook *Hook
 }
 
 //go:generate enumer -type=ActiveSideState
@@ -68,6 +71,7 @@ const (
 type activeSideTasks struct {
 	state     ActiveSideState
 	startedAt time.Time
+	err       error
 
 	// valid for state ActiveSideReplicating, ActiveSidePruneSender,
 	// ActiveSidePruneReceiver, ActiveSideDone
@@ -95,8 +99,10 @@ type activeMode interface {
 	SenderReceiver() (logic.Sender, logic.Receiver)
 	Type() Type
 	PlannerPolicy() logic.PlannerPolicy
-	RunPeriodic(ctx context.Context, wakeUpCommon chan<- struct{},
-		cron *cron.Cron) <-chan struct{}
+	PeriodicSnapshots() bool
+	RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
+		cron *cron.Cron,
+	) <-chan struct{}
 	Cron() string
 	SnapperReport() *snapper.Report
 	ResetConnectBackoff()
@@ -178,20 +184,21 @@ func (m *modePush) PlannerPolicy() logic.PlannerPolicy { return *m.plannerPolicy
 
 func (m *modePush) Cron() string { return m.cronSpec }
 
-func (m *modePush) RunPeriodic(ctx context.Context,
-	wakeUpCommon chan<- struct{}, cron *cron.Cron,
+func (m *modePush) PeriodicSnapshots() bool { return m.snapper.Periodic() }
+
+func (m *modePush) RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
+	cron *cron.Cron,
 ) <-chan struct{} {
-	if m.snapper.RunPeriodic() {
+	if m.PeriodicSnapshots() {
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
 			m.snapper.Run(ctx, wakeUpCommon, cron)
 		}()
-		return make(chan struct{}) // snapper will handle wakeup signal
+		return make(chan struct{})
 	}
-
 	GetLogger(ctx).Info("periodic snapshotting disabled")
-	return wakeup.Wait(ctx) // caller will handle wakeup signal
+	return wakeup.Wait(ctx)
 }
 
 func (m *modePush) SnapperReport() *snapper.Report {
@@ -208,7 +215,7 @@ func (m *modePush) ResetConnectBackoff() {
 }
 
 func (m *modePush) Shutdown() {
-	if m.snapper.RunPeriodic() {
+	if m.snapper.Periodic() {
 		m.snapper.Shutdown()
 	}
 }
@@ -218,7 +225,7 @@ func (m *modePush) Wait() {
 }
 
 func (m *modePush) Running() (time.Duration, bool) {
-	if m.snapper.RunPeriodic() {
+	if m.snapper.Periodic() {
 		return m.snapper.Running()
 	}
 	return 0, false
@@ -318,11 +325,13 @@ func (m *modePull) PlannerPolicy() logic.PlannerPolicy { return *m.plannerPolicy
 
 func (m *modePull) Cron() string { return m.cronSpec }
 
-func (m *modePull) RunPeriodic(ctx context.Context,
-	wakeUpCommon chan<- struct{}, cron *cron.Cron,
+func (m *modePull) PeriodicSnapshots() bool { return false }
+
+func (m *modePull) RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
+	cron *cron.Cron,
 ) <-chan struct{} {
 	GetLogger(ctx).Info("manual pull configured, periodic pull disabled")
-	return wakeup.Wait(ctx) // caller will handle wakeup signal
+	return wakeup.Wait(ctx)
 }
 
 func (m *modePull) SnapperReport() *snapper.Report {
@@ -473,6 +482,13 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{},
 	if err != nil {
 		return nil, fmt.Errorf("cannot build replication driver config: %w", err)
 	}
+
+	if in.Hooks.Pre != nil {
+		j.preHook = NewHookFromConfig(in.Hooks.Pre)
+	}
+	if in.Hooks.Post != nil {
+		j.postHook = NewHookFromConfig(in.Hooks.Post).WithPostHook(true)
+	}
 	return j, nil
 }
 
@@ -500,9 +516,13 @@ func (j *ActiveSide) Status() *Status {
 		s.SleepUntil = j.cron.Entry(id).Next
 	}
 
-	if cnt := j.wakeupBusy; cnt > 0 {
+	switch {
+	case tasks.err != nil:
+		s.err = tasks.err
+	case j.wakeupBusy > 0:
 		s.err = fmt.Errorf(
-			"job frequency is too high; replication was not done %d times", cnt)
+			"job frequency is too high; replication was not done %d times",
+			j.wakeupBusy)
 	}
 
 	if tasks.replicationReport != nil {
@@ -753,8 +773,8 @@ forLoop:
 func (j *ActiveSide) runPeriodic(ctx context.Context,
 	wakeUpCommon chan<- struct{}, cron *cron.Cron,
 ) <-chan struct{} {
-	if j.periodicMode() {
-		return j.mode.RunPeriodic(ctx, wakeUpCommon, cron)
+	if j.mode.PeriodicSnapshots() {
+		return j.mode.RunSnapper(ctx, wakeUpCommon, cron)
 	}
 
 	cronSpec := j.mode.Cron()
@@ -778,19 +798,17 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 	return wakeup.Wait(ctx) // caller will handle wakeup signal
 }
 
-func (j *ActiveSide) periodicMode() bool { return j.mode.Cron() == "" }
-
 func (j *ActiveSide) do(ctx context.Context, cnt int) {
 	ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", cnt))
 	defer endSpan()
 
 	j.mode.ConnectEndpoints(ctx, j.connecter)
 	defer j.mode.DisconnectEndpoints()
-	log := GetLogger(ctx)
 
 	// allow cancellation of an invocation (this function)
 	ctx, cancelThisRun := context.WithCancel(ctx)
 	defer cancelThisRun()
+	log := GetLogger(ctx)
 	go func() {
 		select {
 		case <-reset.Wait(ctx):
@@ -810,82 +828,156 @@ func (j *ActiveSide) do(ctx context.Context, cnt int) {
 		shutdown(nil)
 	}()
 
-	sender, receiver := j.mode.SenderReceiver()
+	steps := []func(context.Context) error{
+		func(context.Context) error { return j.beforeReplication(ctx) },
+		func(context.Context) error { return j.replicate(ctx) },
+		j.pruneSender, j.pruneReceiver,
+		func(context.Context) error { return j.afterPruning(ctx) },
+	}
+	if j.activeSteps(running, steps) {
+		log.Info("task completed")
+	}
+}
 
-	if running.Err() == nil {
-		ctx, endSpan := trace.WithSpan(ctx, "replication")
-		var repWait driver.WaitFunc
+func (j *ActiveSide) activeSteps(ctx context.Context,
+	steps []func(ctx context.Context) error,
+) bool {
+	defer func() {
 		j.updateTasks(func(tasks *activeSideTasks) {
-			// reset it
-			*tasks = activeSideTasks{startedAt: time.Now()}
-			tasks.replicationReport, repWait = replication.Do(
-				ctx, j.replicationDriverConfig, logic.NewPlanner(
-					j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
-					j.mode.PlannerPolicy()),
-				j.running)
-			tasks.state = ActiveSideReplicating
+			tasks.state = ActiveSideDone
 		})
-		log.Info("start replication")
-		repWait(true) // wait blocking
+	}()
 
-		replicationReport := j.tasks.replicationReport()
-		numErrors := replicationReport.GetFailedFilesystemsCountInLatestAttempt()
-		j.promReplicationErrors.Set(float64(numErrors))
-		if numErrors == 0 {
-			j.promLastSuccessful.SetToCurrentTime()
+	for _, fn := range steps {
+		if ctx.Err() != nil {
+			return false
+		} else if err := fn(ctx); err != nil {
+			return false
 		}
-		endSpan()
-	} else {
-		return
 	}
+	return true
+}
 
-	if running.Err() == nil {
-		ctx, endSpan := trace.WithSpan(running, "prune_sender")
-		tasks := j.updateTasks(func(tasks *activeSideTasks) {
-			tasks.prunerSender = j.prunerFactory.BuildSenderPruner(
-				ctx, sender, sender)
-			tasks.state = ActiveSidePruneSender
-		})
-		log.Info("start pruning sender")
-		tasks.prunerSender.Prune()
-		log.Info("finished pruning sender")
-		endSpan()
-	} else {
-		return
-	}
-
-	if running.Err() == nil {
-		ctx, endSpan := trace.WithSpan(running, "prune_recever")
-		tasks := j.updateTasks(func(tasks *activeSideTasks) {
-			tasks.prunerReceiver = j.prunerFactory.BuildReceiverPruner(
-				ctx, receiver, sender)
-			tasks.state = ActiveSidePruneReceiver
-		})
-		log.Info("start pruning receiver")
-		tasks.prunerReceiver.Prune()
-		log.Info("finished pruning receiver")
-		endSpan()
-	} else {
-		return
-	}
-
+func (j *ActiveSide) beforeReplication(ctx context.Context) error {
 	j.updateTasks(func(tasks *activeSideTasks) {
-		tasks.state = ActiveSideDone
+		// reset it
+		*tasks = activeSideTasks{
+			state:     ActiveSideReplicating,
+			startedAt: time.Now(),
+		}
 	})
+
+	h := j.preHook
+	if h == nil {
+		return nil
+	}
+	log := GetLogger(ctx)
+	log.Info("run pre hook")
+
+	if err := h.Run(ctx, j); err != nil {
+		log.WithField("err_is_fatal", h.ErrIsFatal()).
+			WithError(err).Error("pre hook exited with error")
+		err = fmt.Errorf("pre hook exited with error: %w", err)
+		j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
+		if h.ErrIsFatal() {
+			return err
+		}
+	}
+	return nil
+}
+
+func (j *ActiveSide) replicate(ctx context.Context) error {
+	log := GetLogger(ctx)
+	log.Info("start replication")
+
+	ctx, endSpan := trace.WithSpan(ctx, "replication")
+	defer endSpan()
+
+	var repWait driver.WaitFunc
+	sender, receiver := j.mode.SenderReceiver()
+	j.updateTasks(func(tasks *activeSideTasks) {
+		tasks.replicationReport, repWait = replication.Do(
+			ctx, j.replicationDriverConfig, logic.NewPlanner(
+				j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
+				j.mode.PlannerPolicy()),
+			j.running)
+	})
+	repWait(true) // wait blocking
+
+	replicationReport := j.tasks.replicationReport()
+	numErrors := replicationReport.GetFailedFilesystemsCountInLatestAttempt()
+	j.promReplicationErrors.Set(float64(numErrors))
+	if numErrors == 0 {
+		j.promLastSuccessful.SetToCurrentTime()
+	}
+	log.Info("finished replication")
+	return nil
+}
+
+func (j *ActiveSide) pruneSender(ctx context.Context) error {
+	log := GetLogger(ctx)
+	log.Info("start pruning sender")
+
+	ctx, endSpan := trace.WithSpan(ctx, "prune_sender")
+	defer endSpan()
+
+	sender, _ := j.mode.SenderReceiver()
+	tasks := j.updateTasks(func(tasks *activeSideTasks) {
+		tasks.state = ActiveSidePruneSender
+		tasks.prunerSender = j.prunerFactory.BuildSenderPruner(
+			ctx, sender, sender)
+	})
+
+	tasks.prunerSender.Prune()
+	log.Info("finished pruning sender")
+	return nil
+}
+
+func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
+	log := GetLogger(ctx)
+	log.Info("start pruning receiver")
+
+	ctx, endSpan := trace.WithSpan(ctx, "prune_recever")
+	defer endSpan()
+
+	sender, receiver := j.mode.SenderReceiver()
+	tasks := j.updateTasks(func(tasks *activeSideTasks) {
+		tasks.prunerReceiver = j.prunerFactory.BuildReceiverPruner(
+			ctx, receiver, sender)
+		tasks.state = ActiveSidePruneReceiver
+	})
+
+	tasks.prunerReceiver.Prune()
+	log.Info("finished pruning receiver")
+	return nil
+}
+
+func (j *ActiveSide) afterPruning(ctx context.Context) error {
+	if j.postHook != nil {
+		log := GetLogger(ctx)
+		log.Info("run post hook")
+		if err := j.postHook.Run(ctx, j); err != nil {
+			log.WithError(err).Error("post hook exited with error")
+			j.updateTasks(func(tasks *activeSideTasks) {
+				tasks.err = fmt.Errorf("post hook exited with error: %w", err)
+			})
+		}
+	}
+	return nil
 }
 
 func (j *ActiveSide) Shutdown() {
-	if j.periodicMode() {
+	if j.mode.PeriodicSnapshots() {
 		j.mode.Shutdown()
 	}
 	j.shutdown()
 }
 
 func (j *ActiveSide) wait(l logger.Logger) {
-	if j.periodicMode() {
+	if j.mode.PeriodicSnapshots() {
 		l = l.WithField("mode", j.mode.Type())
-		l.Info("waiting for mode job exit")
-		defer l.Info("mode job exited")
+		l.Info("waiting for snapper exit")
+		defer l.Info("snapper exited")
 	}
 	j.mode.Wait()
 }

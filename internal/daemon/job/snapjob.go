@@ -221,7 +221,7 @@ forLoop:
 }
 
 func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
-	if !j.snapper.RunPeriodic() {
+	if !j.snapper.Periodic() {
 		return wakeup.Wait(ctx)
 	}
 
@@ -243,7 +243,7 @@ func (j *SnapJob) prune(ctx context.Context, cnt int) {
 }
 
 func (j *SnapJob) wait(l logger.Logger) {
-	if j.snapper.RunPeriodic() {
+	if j.snapper.Periodic() {
 		l.Info("waiting for snapper job exit")
 		defer l.Info("snapper job exited")
 	}
@@ -251,7 +251,7 @@ func (j *SnapJob) wait(l logger.Logger) {
 }
 
 func (j *SnapJob) Shutdown() {
-	if j.snapper.RunPeriodic() {
+	if j.snapper.Periodic() {
 		j.snapper.Shutdown()
 	}
 	j.shutdown(errors.New("shutdown received"))

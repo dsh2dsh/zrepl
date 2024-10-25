@@ -19,8 +19,8 @@ func logOutput(l logger.Logger, level logger.Level, field string,
 	if len(output) == 0 {
 		return
 	}
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	for scanner.Scan() {
-		l.WithField(field, scanner.Text()).Log(level, "hook output")
+	s := bufio.NewScanner(bytes.NewReader(output))
+	for s.Scan() {
+		l.Log(level, field+": "+s.Text())
 	}
 }

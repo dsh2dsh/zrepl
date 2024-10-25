@@ -380,31 +380,74 @@ pkg install zrepl-dsh2dsh
 
   * `zfs send -w` is default now. Example how to change it back:
 
-  ``` yaml
-  send:
-    raw: false
-  ```
+    ``` yaml
+    send:
+      raw: false
+    ```
 
   * New configuration for control and prometheus services. Example:
 
-  ``` yaml
-  listen:
-    # control socket for zrepl client, like `zrepl signal` or `zrepl status`.
-    - unix: "/var/run/zrepl/control"
-      # unix_mode: 0o660            # write perm for group
-      control: true
+    ``` yaml
+    listen:
+      # control socket for zrepl client, like `zrepl signal` or `zrepl status`.
+      - unix: "/var/run/zrepl/control"
+        # unix_mode: 0o660            # write perm for group
+        control: true
 
-    # Export Prometheus metrics on http://127.0.0.1:8000/metrics
-    - addr: "127.0.0.1:8000"
-      # tls_cert: "/usr/local/etc/zrepl/cert.pem"
-      # tls_key: "/usr/local/etc/zrepl/key.pem"
-      metrics: true
-  ```
+      # Export Prometheus metrics on http://127.0.0.1:8000/metrics
+      - addr: "127.0.0.1:8000"
+        # tls_cert: "/usr/local/etc/zrepl/cert.pem"
+        # tls_key: "/usr/local/etc/zrepl/key.pem"
+        metrics: true
+    ```
 
-  One of `addr` or `unix` is required or both of them can be configured. One of
-  `control` or `metrics` is required or both of them can be configured too.
-  Everything else is optional. For backward compatibility old style
-  configuration works too.
+    One of `addr` or `unix` is required or both of them can be configured. One
+    of `control` or `metrics` is required or both of them can be configured too.
+    Everything else is optional. For backward compatibility old style
+    configuration works too.
+
+  * New optional `pre` and `post` hooks for `push` and `pull` jobs. Example:
+
+    ```yaml
+    - name: "zroot-to-zdisk"
+      type: "push"
+      hooks:
+        pre:
+          path: "/root/bin/zrepl_hook.sh"
+          args: [ "pre" ]         # optional positional parameters
+          env:                    # optional environment variables
+            ZREPL_FOOBAR: "foo"
+          # don't continue job if exit status is nonzero (default: false)
+          err_is_fatal: true
+        post:
+          path: "/root/bin/zrepl_hook.sh"
+          args: [ "post" ]        # optional positional parameters
+          env:                    # optional environment variables
+            ZREPL_FOOBAR: "bar"
+    ```
+
+    This configuration runs `/root/bin/zrepl_hook.sh pre` before replication
+    with environment variables:
+
+    ```
+    ZREPL_FOOBAR=foo
+    ZREPL_JOB_NAME=zroot-to-zdisk
+    ```
+
+    If it exit with nonzero exit status the job will not continue. By default
+    `err_is_fatal: false` and exit status is ignored.
+
+    After pruning finished it runs `/root/bin/zrepl_hook.sh post` with
+    environment variables:
+
+    ```
+    ZREPL_FOOBAR=bar
+    ZREPL_JOB_ERR=
+    ZREPL_JOB_NAME=zroot-to-zdisk
+    ```
+
+    The `post` hook sets `ZREPL_JOB_ERR` to the last error. It's empty if the
+    job finished without errors.
 
 ## Upstream user documentation
 

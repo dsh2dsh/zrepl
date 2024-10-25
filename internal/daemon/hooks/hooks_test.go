@@ -162,7 +162,7 @@ jobs:
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
-					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
+					ErrorTest:    regexpTest("^command hook failed.*exit status 1:"),
 				},
 				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
 				{
@@ -186,7 +186,7 @@ jobs:
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
-					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
+					ErrorTest:    regexpTest("^command hook failed.*exit status 1:"),
 				},
 				{
 					ExpectedEdge: hooks.Pre,
@@ -235,7 +235,7 @@ jobs:
 					ExpectedEdge: hooks.Post,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR post_testing %s@%s", testFSName, testSnapshotName)),
-					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
+					ErrorTest:    regexpTest("^command hook failed.*exit status 1:"),
 				},
 			},
 		},
@@ -268,7 +268,7 @@ jobs:
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
-					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
+					ErrorTest:    regexpTest("^command hook failed.*exit status 1:"),
 				},
 				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
 				{
@@ -296,7 +296,7 @@ jobs:
 					ExpectedEdge: hooks.Pre,
 					ExpectStatus: hooks.StepErr,
 					OutputTest:   containsTest(fmt.Sprintf("TEST ERROR pre_testing %s@%s", testFSName, testSnapshotName)),
-					ErrorTest:    regexpTest("^command hook failed.*exit status 1$"),
+					ErrorTest:    regexpTest("^command hook failed.*exit status 1:"),
 				},
 				{ExpectedEdge: hooks.Callback, ExpectStatus: hooks.StepOk},
 				{

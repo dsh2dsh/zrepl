@@ -100,6 +100,7 @@ type ActiveJob struct {
 	MonitorSnapshots   MonitorSnapshots         `yaml:"monitor"`
 	Interval           PositiveDurationOrManual `yaml:"interval"`
 	Cron               string                   `yaml:"cron"`
+	Hooks              JobHooks                 `yaml:"hooks"`
 }
 
 func (self *ActiveJob) CronSpec() string {
@@ -136,6 +137,11 @@ type MonitorCreation struct {
 func (self *MonitorSnapshots) Valid() bool {
 	return len(self.Count) > 0 || len(self.Latest) > 0 ||
 		len(self.Oldest) > 0
+}
+
+type JobHooks struct {
+	Pre  *HookCommand `yaml:"pre"`
+	Post *HookCommand `yaml:"post"`
 }
 
 type PassiveJob struct {
@@ -581,6 +587,8 @@ type GlobalStdinServer struct {
 
 type HookCommand struct {
 	Path        string            `yaml:"path" validate:"required"`
+	Args        []string          `yaml:"args" validate:"dive,required"`
+	Env         map[string]string `yaml:"env" validate:"dive,keys,required,endkeys,required"`
 	Timeout     time.Duration     `yaml:"timeout" default:"30s" validate:"min=0s"`
 	Filesystems FilesystemsFilter `yaml:"filesystems"`
 	Datasets    []DatasetFilter   `yaml:"datasets" validate:"dive"`
