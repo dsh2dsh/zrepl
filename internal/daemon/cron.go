@@ -2,16 +2,23 @@ package daemon
 
 import (
 	"context"
+	"time"
 
 	"github.com/dsh2dsh/cron/v3"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
+	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 func newCron(ctx context.Context, verbose bool) *cron.Cron {
 	log := logging.GetLogger(ctx, logging.SubsysCron)
-	return cron.New(cron.WithLogger(newCronLogger(log, verbose)))
+	return cron.New(
+		cron.WithLogger(newCronLogger(log, verbose)),
+		cron.WithTimer(func(d time.Duration) cron.Timer {
+			return nanosleep.NewTimer(d)
+		}),
+	)
 }
 
 func newCronLogger(log logger.Logger, verbose bool) *cronLogger {

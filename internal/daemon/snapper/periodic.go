@@ -17,6 +17,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
+	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -237,9 +238,9 @@ func periodicStateSyncUp(a periodicArgs, u updater) state {
 	})
 
 	if syncPoint.After(time.Now()) {
-		t := time.NewTimer(time.Until(syncPoint))
+		t := nanosleep.NewTimer(time.Until(syncPoint))
 		select {
-		case <-t.C:
+		case <-t.C():
 		case <-a.wakeSig:
 			t.Stop()
 		case <-a.ctx.Done():
