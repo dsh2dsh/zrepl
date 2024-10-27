@@ -508,8 +508,6 @@ func (j *ActiveSide) Status() *Status {
 		CronSpec:     j.mode.Cron(),
 		StartedAt:    tasks.startedAt,
 		Snapshotting: j.mode.SnapperReport(),
-
-		state: tasks.state,
 	}
 
 	if id := j.cronId; id > 0 {
@@ -518,9 +516,9 @@ func (j *ActiveSide) Status() *Status {
 
 	switch {
 	case tasks.err != nil:
-		s.err = tasks.err
+		s.Err = tasks.err.Error()
 	case j.wakeupBusy > 0:
-		s.err = fmt.Errorf(
+		s.Err = fmt.Sprintf(
 			"job frequency is too high; replication was not done %d times",
 			j.wakeupBusy)
 	}
@@ -541,9 +539,7 @@ type ActiveSideStatus struct {
 	CronSpec   string
 	SleepUntil time.Time
 	StartedAt  time.Time
-
-	state ActiveSideState
-	err   error
+	Err        string
 
 	Replication                    *report.Report
 	PruningSender, PruningReceiver *pruner.Report
@@ -551,8 +547,8 @@ type ActiveSideStatus struct {
 }
 
 func (self *ActiveSideStatus) Error() string {
-	if self.err != nil {
-		return self.err.Error()
+	if self.Err != "" {
+		return self.Err
 	}
 
 	if snap := self.Snapshotting; snap != nil {
