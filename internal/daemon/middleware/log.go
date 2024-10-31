@@ -9,11 +9,9 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
-func RequestLogger(log logger.Logger, opts ...LoggerOption) Middleware {
+func RequestLogger(opts ...LoggerOption) Middleware {
 	l := &LogReq{
-		log:    log,
-		levels: make(map[string]logger.Level, 1),
-
+		levels:         make(map[string]logger.Level, 1),
 		completedLevel: logger.Debug,
 	}
 
@@ -34,7 +32,6 @@ func WithCustomLevel(url string, level logger.Level) LoggerOption {
 }
 
 type LogReq struct {
-	log    logger.Logger
 	levels map[string]logger.Level
 
 	completedLevel logger.Level
@@ -47,11 +44,8 @@ func (self *LogReq) WithCustomLevel(url string, level logger.Level) *LogReq {
 
 func (self *LogReq) middleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		log := self.log
+		log := getLogger(r)
 		logLevel := self.requestLevel(r)
-		if requestId := GetRequestId(r.Context()); requestId != "" {
-			log = log.WithField("rid", requestId)
-		}
 
 		methodURL := r.Method + " " + r.URL.String()
 		log.Log(logLevel, "\""+methodURL+"\"")

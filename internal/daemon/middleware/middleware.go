@@ -3,6 +3,9 @@ package middleware
 import (
 	"net/http"
 	"slices"
+
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 type Middleware func(next http.Handler) http.Handler
@@ -23,4 +26,8 @@ func Append(m1 []Middleware, m2 ...Middleware) http.Handler {
 
 func AppendHandler(m []Middleware, h http.Handler) http.Handler {
 	return Append(m, func(http.Handler) http.Handler { return h })
+}
+
+func getLogger(r *http.Request) logger.Logger {
+	return logging.FromContext(r.Context())
 }

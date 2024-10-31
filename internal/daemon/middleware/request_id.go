@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"sync/atomic"
+
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 )
 
 type ctxKeyRequestId struct{}
@@ -22,12 +24,13 @@ func RequestId(next http.Handler) http.Handler {
 		requestId := genRequestId()
 		ctx := context.WithValue(r.Context(),
 			RequestIdKey, strconv.FormatUint(requestId, 10))
+		ctx = logging.WithLogger(ctx, getLogger(r).WithField("rid", requestId))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 	return http.HandlerFunc(fn)
 }
 
-func GetRequestId(ctx context.Context) string {
+func RequestIdFrom(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}

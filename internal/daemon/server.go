@@ -60,7 +60,7 @@ type serverJob struct {
 
 func (self *serverJob) init() *serverJob {
 	self.defaultMiddles = []middleware.Middleware{
-		middleware.RequestLogger(self.log,
+		middleware.RequestLogger(
 			// don't log requests to status endpoint, too spammy
 			middleware.WithCustomLevel(ControlJobEndpointStatus, logger.Debug)),
 		middleware.PrometheusMetrics(self.reqBegin, self.reqFinished),

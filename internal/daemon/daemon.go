@@ -82,7 +82,7 @@ func registerTraceCallbacks() {
 func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
 	logOutlets *logger.Outlets,
 ) error {
-	server := newServerJob(log, newControlJob(jobs, log))
+	server := newServerJob(log, newControlJob(jobs))
 
 	var hasControl, hasMetrics bool
 	for i := range conf.Listen {
