@@ -32,12 +32,16 @@ type Config struct {
 	Jobs   []JobEnum `yaml:"jobs" validate:"min=1,dive"`
 	Global Global    `yaml:"global"`
 	Listen []Listen  `yaml:"listen" validate:"dive"`
+
+	Keys        []AuthKey `yaml:"keys" validate:"dive"`
+	IncludeKeys string    `yaml:"include_keys" validate:"omitempty,filepath"`
 }
 
-func (c *Config) lateInit() {
+func (c *Config) lateInit(path string) error {
 	if len(c.Global.Logging) == 0 {
 		c.Global.Logging.SetDefaults()
 	}
+	return includeYAML(path, c.IncludeKeys, &c.Keys)
 }
 
 func (c *Config) Job(name string) (*JobEnum, error) {
@@ -48,6 +52,11 @@ func (c *Config) Job(name string) (*JobEnum, error) {
 		}
 	}
 	return nil, fmt.Errorf("job %q not defined in config", name)
+}
+
+type AuthKey struct {
+	Name string `yaml:"name" validate:"required"`
+	Key  string `yaml:"key" validate:"required"`
 }
 
 type JobEnum struct {
@@ -93,7 +102,7 @@ func (j JobEnum) MonitorSnapshots() MonitorSnapshots {
 type ActiveJob struct {
 	Type               string                   `yaml:"type" validate:"required"`
 	Name               string                   `yaml:"name" validate:"required"`
-	Connect            ConnectEnum              `yaml:"connect"`
+	Connect            LocalConnect             `yaml:"connect"`
 	Pruning            PruningSenderReceiver    `yaml:"pruning" validate:"required"`
 	Replication        Replication              `yaml:"replication"`
 	ConflictResolution ConflictResolution       `yaml:"conflict_resolution"`
@@ -147,7 +156,6 @@ type JobHooks struct {
 type PassiveJob struct {
 	Type             string           `yaml:"type" validate:"required"`
 	Name             string           `yaml:"name" validate:"required"`
-	Serve            ServeEnum        `yaml:"serve"`
 	MonitorSnapshots MonitorSnapshots `yaml:"monitor"`
 }
 
@@ -375,7 +383,7 @@ type ConnectEnum struct {
 }
 
 type ConnectCommon struct {
-	Type string `yaml:"type" validate:"required"`
+	Type string `yaml:"type" validate:"required,oneof=http local"`
 }
 
 type TCPConnect struct {
@@ -408,9 +416,9 @@ type SSHStdinserverConnect struct {
 
 type LocalConnect struct {
 	ConnectCommon  `yaml:",inline"`
-	ListenerName   string        `yaml:"listener_name" validate:"required"`
-	ClientIdentity string        `yaml:"client_identity" validate:"required"`
-	DialTimeout    time.Duration `yaml:"dial_timeout" default:"2s" validate:"min=0s"`
+	Server         string `yaml:"server" validate:"required_if=Type http,omitempty,url"`
+	ListenerName   string `yaml:"listener_name" validate:"required"`
+	ClientIdentity string `yaml:"client_identity" validate:"required"`
 }
 
 type ServeEnum struct {
@@ -718,7 +726,7 @@ var ConfigFileDefaultLocations = []string{
 	"/usr/local/etc/zrepl/zrepl.yml",
 }
 
-func ParseConfig(path string) (i *Config, err error) {
+func ParseConfig(path string) (*Config, error) {
 	if path == "" {
 		// Try default locations
 		for _, l := range ConfigFileDefaultLocations {
@@ -727,24 +735,22 @@ func ParseConfig(path string) (i *Config, err error) {
 				continue
 			}
 			if !stat.Mode().IsRegular() {
-				err = fmt.Errorf("file at default location is not a regular file: %s", l)
-				return
+				return nil, fmt.Errorf(
+					"file at default location is not a regular file: %s", l)
 			}
 			path = l
 			break
 		}
 	}
 
-	var bytes []byte
-
-	if bytes, err = os.ReadFile(path); err != nil {
-		return
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
-
-	return ParseConfigBytes(bytes)
+	return ParseConfigBytes(path, b)
 }
 
-func ParseConfigBytes(bytes []byte) (*Config, error) {
+func ParseConfigBytes(path string, bytes []byte) (*Config, error) {
 	c := New()
 	if err := defaults.Set(c); err != nil {
 		return nil, fmt.Errorf("init config with defaults: %w", err)
@@ -753,9 +759,10 @@ func ParseConfigBytes(bytes []byte) (*Config, error) {
 	} else if c == nil {
 		return nil, errors.New("There was no yaml document in the file")
 	}
-	c.lateInit()
 
-	if err := Validator().Struct(c); err != nil {
+	if err := c.lateInit(path); err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	} else if err := Validator().Struct(c); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}
 	return c, nil

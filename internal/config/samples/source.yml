@@ -1,22 +1,20 @@
+include_keys: "keys.yaml"
+
+listen:
+  - addr: ":8888"
+    tls_cert: "/etc/zrepl/cert.pem"
+    tls_key: "/etc/zrepl/key.pem"
+    zfs: true
+
 jobs:
-- name: pull_source
-  type: source
-  serve:
-    type: tcp
-    listen: "0.0.0.0:8888"
-    clients: {
-      "192.168.122.123" :               "mysql01",
-      "192.168.122.42" :                "mx01",
-      "2001:0db8:85a3::8a2e:0370:7334": "gateway",
-      "10.23.42.0/24":       "cluster-*",
-      "fde4:8dba:82e1::/64": "san-*",
-    }
-  datasets:
-    - pattern: ""
-      recursive: true
-    - pattern: "secret"
-      exclude: true
-  snapshotting:
-    type: periodic
-    interval: 10m
-    prefix: zrepl_
+  - name: "pull_source"
+    type: "source"
+    datasets:
+      - pattern: ""
+        recursive: true
+      - pattern: "secret"
+        exclude: true
+    snapshotting:
+      type: "periodic"
+      interval: "10m"
+      prefix: "zrepl_"

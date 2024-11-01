@@ -1,14 +1,14 @@
 jobs:
-- name: snapjob
-  type: snap
-  datasets:
-    - pattern: "tank/frequently_changed"
-      recursive: true
-  snapshotting:
-    type: periodic
-    interval: 2m
-    prefix: zrepl_snapjob_
-  pruning:
-    keep:
-      - type: last_n
-        count: 60
+  - name: "snapjob"
+    type: "snap"
+    datasets:
+      - pattern: "tank/frequently_changed"
+        recursive: true
+    snapshotting:
+      type: "periodic"
+      interval: "2m"
+      prefix: "zrepl_snapjob_"
+    pruning:
+      keep:
+        - type: "last_n"
+          count: 60

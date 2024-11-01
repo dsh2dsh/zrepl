@@ -1,5 +1,7 @@
+include_keys: "keys.yaml"
+
 jobs:
-  - type: push
+  - type: "push"
     name: "push"
     datasets:
       - pattern: ""
@@ -7,21 +9,23 @@ jobs:
       - pattern: "tmp"
         exclude: true
     connect:
-      type: tcp
-      address: "backup-server.foo.bar:8888"
+      type: "http"
+      server: "https://backup-server.foo.bar:8888"
+      listener_name: "sink_job_name"
+      client_identity: "server1" # see keys.yaml
     snapshotting:
-      type: manual
+      type: "manual"
     send:
       encrypted: false
     pruning:
       keep_sender:
-        - type: not_replicated
-        - type: last_n
+        - type: "not_replicated"
+        - type: "last_n"
           count: 10
-        - type: grid
-          grid: 1x1h(keep=all) | 24x1h | 14x1d
+        - type: "grid"
+          grid: "1x1h(keep=all) | 24x1h | 14x1d"
           regex: "^zrepl_.*"
       keep_receiver:
-        - type: grid
-          grid: 1x1h(keep=all) | 24x1h | 35x1d | 6x30d
+        - type: "grid"
+          grid: "1x1h(keep=all) | 24x1h | 35x1d | 6x30d"
           regex: "^zrepl_.*"

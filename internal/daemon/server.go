@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,7 +17,8 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
-func newServerJob(log logger.Logger, controlJob *controlJob) *serverJob {
+func newServerJob(log logger.Logger, controlJob *controlJob, zfsJob *zfsJob,
+) *serverJob {
 	j := &serverJob{
 		reqBegin: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: "zrepl",
@@ -40,6 +42,7 @@ func newServerJob(log logger.Logger, controlJob *controlJob) *serverJob {
 		servers: make([]*server, 0, 2),
 
 		controlJob: controlJob,
+		zfsJob:     zfsJob,
 	}
 	return j.init()
 }
@@ -48,22 +51,27 @@ type serverJob struct {
 	reqBegin    *prometheus.CounterVec
 	reqFinished *prometheus.HistogramVec
 
-	log            logger.Logger
-	defaultMiddles []middleware.Middleware
+	middlewares []middleware.Middleware
+	prometheus  middleware.Middleware
 
+	log      logger.Logger
 	servers  []*server
 	shutdown context.CancelFunc
 
 	controlJob *controlJob
 	hasMetrics bool
+	zfsJob     *zfsJob
 }
 
 func (self *serverJob) init() *serverJob {
-	self.defaultMiddles = []middleware.Middleware{
+	self.prometheus = middleware.PrometheusMetrics(self.reqBegin,
+		self.reqFinished)
+	self.middlewares = []middleware.Middleware{
 		middleware.RequestLogger(
 			// don't log requests to status endpoint, too spammy
-			middleware.WithCustomLevel(ControlJobEndpointStatus, logger.Debug)),
-		middleware.PrometheusMetrics(self.reqBegin, self.reqFinished),
+			middleware.WithCustomLevel(ControlJobEndpointStatus, logger.Debug),
+			middleware.WithCustomLevel("/metrics", logger.Debug)),
+		self.prometheus,
 	}
 	return self
 }
@@ -79,12 +87,19 @@ func (self *serverJob) AddServer(c *config.Listen) error {
 	self.log.WithField("addr", c.Addr).WithField("unix", c.Unix).
 		WithField("control", c.Control).
 		WithField("metrics", c.Metrics).
+		WithField("zfs", c.Zfs).
 		Info("adding listener")
 
 	s := &server{
-		Server: &http.Server{Addr: c.Addr, Handler: self.mux(c)},
-		cert:   c.TLSCert,
-		key:    c.TLSKey,
+		Server: &http.Server{
+			Addr:    c.Addr,
+			Handler: self.mux(c),
+
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       30 * time.Second,
+		},
+		cert: c.TLSCert,
+		key:  c.TLSKey,
 	}
 
 	if c.Unix != "" {
@@ -105,11 +120,14 @@ func (self *serverJob) AddServer(c *config.Listen) error {
 func (self *serverJob) mux(c *config.Listen) *http.ServeMux {
 	mux := http.NewServeMux()
 	if c.Control {
-		self.controlJob.Endpoints(mux, self.defaultMiddles...)
+		self.controlJob.Endpoints(mux, self.middlewares...)
 	}
 	if c.Metrics {
 		self.hasMetrics = true
-		metricsEndpoints(mux, self.defaultMiddles...)
+		metricsEndpoints(mux, self.middlewares...)
+	}
+	if c.Zfs {
+		self.zfsJob.Endpoints(mux, self.prometheus)
 	}
 	return mux
 }

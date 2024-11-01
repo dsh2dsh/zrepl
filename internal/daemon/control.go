@@ -40,13 +40,14 @@ func (j *controlJob) Endpoints(mux *http.ServeMux, m ...middleware.Middleware,
 }
 
 func (j *controlJob) version(_ context.Context) (
-	version.ZreplVersionInformation, error,
+	*version.ZreplVersionInformation, error,
 ) {
-	return version.NewZreplVersionInformation(), nil
+	v := version.NewZreplVersionInformation()
+	return &v, nil
 }
 
-func (j *controlJob) status(_ context.Context) (Status, error) {
-	s := Status{
+func (j *controlJob) status(_ context.Context) (*Status, error) {
+	s := &Status{
 		Jobs: j.jobs.status(),
 		Global: GlobalStatus{
 			ZFSCmds:   zfscmd.GetReport(),
@@ -63,7 +64,7 @@ type signalRequest struct {
 }
 
 func (j *controlJob) signal(ctx context.Context, req *signalRequest,
-) (struct{}, error) {
+) (*struct{}, error) {
 	log := logging.FromContext(ctx).WithField("op", req.Op)
 	if req.Name != "" {
 		log = log.WithField("name", req.Name)
@@ -83,5 +84,5 @@ func (j *controlJob) signal(ctx context.Context, req *signalRequest,
 	default:
 		err = fmt.Errorf("invalid operation %q", req.Op)
 	}
-	return struct{}{}, err
+	return &struct{}{}, err
 }

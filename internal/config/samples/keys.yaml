@@ -1,0 +1,8 @@
+# Clients with defined authentication keys have network access to "sink" and
+# "source" jobs. The key name is their client identity name.
+
+- name: "server1"               # client identity name
+  key: "long long and secret key"
+
+- name: "a.example.com"
+  key: "long long and secret key for target_b on a.example.com:8888"

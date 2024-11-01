@@ -1,31 +1,31 @@
+include_keys: "keys.yaml"
+
 jobs:
-- name: prod_to_backups
-  type: push
-  connect:
-    type: tls
-    address: "backups.example.com:8888"
-    ca: /etc/zrepl/backups.crt
-    cert: /etc/zrepl/prod.crt
-    key:  /etc/zrepl/prod.key
-    server_cn: "backups"
-  datasets:
-    - pattern: "zroot"
-      recursive: true
-    - pattern: "zroot/var/tmp"
-      exclude: true
-      recursive: true
-    - pattern: "zroot/usr/home/paranoid"
-      exclude: true
-  snapshotting:
-    type: periodic
-    prefix: zrepl_
-    interval: 10m
-  pruning:
-    keep_sender:
-    - type: not_replicated
-    - type: last_n
-      count: 10
-    keep_receiver:
-    - type: grid
-      grid: 1x1h(keep=all) | 24x1h | 30x1d | 6x30d
-      regex: "^zrepl_"
+  - name: "prod_to_backups"
+    type: push
+    connect:
+      type: "http"
+      server: "https://backups.example.com:8888"
+      listener_name: "sink"
+      client_identity: "server1"
+    datasets:
+      - pattern: "zroot"
+        recursive: true
+      - pattern: "zroot/var/tmp"
+        exclude: true
+        recursive: true
+      - pattern: "zroot/usr/home/paranoid"
+        exclude: true
+    snapshotting:
+      type: "periodic"
+      prefix: "zrepl_"
+      interval: "10m"
+    pruning:
+      keep_sender:
+        - type: "not_replicated"
+        - type: "last_n"
+          count: 10
+      keep_receiver:
+        - type: "grid"
+          grid: "1x1h(keep=all) | 24x1h | 30x1d | 6x30d"
+          regex: "^zrepl_"

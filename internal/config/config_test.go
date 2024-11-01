@@ -67,7 +67,7 @@ func testValidConfig(t *testing.T, input string) *Config {
 
 func testConfig(t *testing.T, input string) (*Config, error) {
 	t.Helper()
-	return ParseConfigBytes([]byte(input))
+	return ParseConfigBytes("", []byte(input))
 }
 
 func trimSpaceEachLineAndPad(s, pad string) string {
@@ -157,12 +157,10 @@ jobs:
   - name: "foo"
     type: "pull"
     connect:
-      type: "tls"
-      address: "server1.foo.bar:8888"
-      ca: "/certs/ca.crt"
-      cert: "/certs/cert.crt"
-      key: "/certs/key.pem"
-      server_cn: "server1"
+      type: "http"
+      server: "https://server1.foo.bar:8888"
+      listener_name: "job_name"
+      client_identity: "client_name"
     root_fs: "pool2/backup_servers"
     pruning:
       keep_sender:
@@ -181,12 +179,10 @@ jobs:
   - name: "foo"
     type: "pull"
     connect:
-      type: "tls"
-      address: "server1.foo.bar:8888"
-      ca: "/certs/ca.crt"
-      cert: "/certs/cert.crt"
-      key: "/certs/key.pem"
-      server_cn: "server1"
+      type: "http"
+      server: "https://server1.foo.bar:8888"
+      listener_name: "job_name"
+      client_identity: "client_name"
     root_fs: "pool2/backup_servers"
     replication:
       one_step: false

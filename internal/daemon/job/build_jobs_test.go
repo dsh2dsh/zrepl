@@ -1,9 +1,12 @@
 package job
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/kr/pretty"
@@ -49,6 +52,35 @@ func TestValidateReceivingSidesDoNotOverlap(t *testing.T) {
 	}
 }
 
+func validateReceivingSidesDoNotOverlap(receivingRootFSs []string) error {
+	if len(receivingRootFSs) == 0 {
+		return nil
+	}
+	rfss := make([]string, len(receivingRootFSs))
+	copy(rfss, receivingRootFSs)
+	sort.Slice(rfss, func(i, j int) bool {
+		return strings.Compare(rfss[i], rfss[j]) == -1
+	})
+	// add tailing slash because of hierarchy-simulation
+	// rootfs/ is not root of rootfs2/
+	for i := 0; i < len(rfss); i++ {
+		rfss[i] += "/"
+	}
+	// idea:
+	//   no path in rfss must be prefix of another
+	//
+	// rfss is now lexicographically sorted, which means that
+	// if i is prefix of j, i < j (in lexicographical order)
+	// thus,
+	// if any i is prefix of i+n (n >= 1), there is overlap
+	for i := 0; i < len(rfss)-1; i++ {
+		if strings.HasPrefix(rfss[i+1], rfss[i]) {
+			return errors.New("receiving jobs with overlapping root filesystems are forbidden")
+		}
+	}
+	return nil
+}
+
 func TestJobIDErrorHandling(t *testing.T) {
 	tmpl := `
 jobs:
@@ -56,7 +88,7 @@ jobs:
   type: push
   connect:
     type: local
-    listener_name: foo
+    listener_name: "zdisk"
     client_identity: bar
   filesystems: {"<": true}
   snapshotting:
@@ -68,6 +100,13 @@ jobs:
     keep_receiver:
     - type: last_n
       count: 10
+
+- name: "zdisk"
+  type: "sink"
+  root_fs: "zdisk/zrepl"
+  serve:
+    type: "local"
+    listener_name: "zdisk"
 `
 	fill := func(s string) string { return fmt.Sprintf(tmpl, s) }
 
@@ -92,14 +131,14 @@ jobs:
 		t.Run(cases[i].jobName, func(t *testing.T) {
 			c := cases[i]
 
-			conf, err := config.ParseConfigBytes([]byte(fill(c.jobName)))
+			conf, err := config.ParseConfigBytes("", []byte(fill(c.jobName)))
 			require.NoError(t, err, "not expecting yaml-config to know about job ids")
 			require.NotNil(t, conf)
-			jobs, err := JobsFromConfig(conf, config.ParseFlagsNone)
+			jobs, _, err := JobsFromConfig(conf)
 
 			if c.valid {
 				require.NoError(t, err)
-				require.Len(t, jobs, 1)
+				require.Len(t, jobs, 2)
 				assert.Equal(t, c.jobName, jobs[0].Name())
 			} else {
 				t.Logf("error: %s", err)
@@ -150,7 +189,7 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 			t.Logf("file: %s", p)
 			t.Log(pretty.Sprint(c))
 
-			jobs, err := JobsFromConfig(c, config.ParseFlagsNoCertCheck)
+			jobs, _, err := JobsFromConfig(c)
 			t.Logf("jobs: %#v", jobs)
 			require.NoError(t, err)
 
@@ -210,7 +249,7 @@ jobs:
   type: push
   connect:
     type: local
-    listener_name: foo
+    listener_name: "zdisk"
     client_identity: bar
   filesystems: {"<": true}
   %s
@@ -223,6 +262,13 @@ jobs:
     keep_receiver:
     - type: last_n
       count: 10
+
+- name: "zdisk"
+  type: "sink"
+  root_fs: "zdisk/zrepl"
+  serve:
+    type: "local"
+    listener_name: "zdisk"
 `
 
 	type Test struct {
@@ -291,19 +337,19 @@ jobs:
 
 			cstr := fill(ts.input)
 			t.Logf("testing config:\n%s", cstr)
-			c, err := config.ParseConfigBytes([]byte(cstr))
+			c, err := config.ParseConfigBytes("", []byte(cstr))
 			if ts.expectError {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 
-			jobs, err := JobsFromConfig(c, config.ParseFlagsNone)
+			jobs, _, err := JobsFromConfig(c)
 			if ts.expectOk != nil {
 				require.NoError(t, err)
 				require.NotNil(t, c)
 				require.NoError(t, err)
-				require.Len(t, jobs, 1)
+				require.Len(t, jobs, 2)
 				a := jobs[0].(*ActiveSide)
 				m := a.mode.(*modePush)
 				ts.expectOk(t, a, m)

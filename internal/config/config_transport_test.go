@@ -36,43 +36,43 @@ jobs:
 
 	testTable := []test{
 		{
-			Name:        "tcp_with_address_and_port",
+			Name:        "http_with_address_and_port",
 			ExpectError: false,
 			Connect: `
-			type: tcp
-			address: 10.0.0.23:42
+			type: "http"
+			server: "http://10.0.0.23:42"
+      listener_name: "job"
+      client_identity: "client"
 			`,
 		},
 		{
-			Name:        "tls_with_host_and_port",
+			Name:        "https_with_host_and_port",
 			ExpectError: false,
 			Connect: `
-			type: tls
-			address: "server1.foo.bar:8888"
-			ca:   /etc/zrepl/ca.crt
-			cert: /etc/zrepl/backupserver.fullchain
-			key:  /etc/zrepl/backupserver.key
-			server_cn: "server1"
+			type: "http"
+			server: "https://server1.foo.bar:8888"
+      listener_name: "job"
+      client_identity: "client"
 			`,
 		},
 		{
-			Name:        "tcp_without_port",
+			Name:        "http_without_scheme",
 			ExpectError: true,
 			Connect: `
-			type: tcp
-			address: 10.0.0.23
+			type: "http"
+			server: "10.0.0.23"
+      listener_name: "job"
+      client_identity: "client"
 			`,
 		},
 		{
-			Name:        "tls_without_port",
+			Name:        "https_without_address",
 			ExpectError: true,
 			Connect: `
-			type: tls
-			address: 10.0.0.23
-			ca:   /etc/zrepl/ca.crt
-			cert: /etc/zrepl/backupserver.fullchain
-			key:  /etc/zrepl/backupserver.key
-			server_cn: "server1"
+			type: "http"
+			server: "https://"
+      listener_name: "job"
+      client_identity: "client"
 			`,
 		},
 	}
@@ -95,5 +95,4 @@ jobs:
 			t.Logf("config=%v", config)
 		})
 	}
-
 }

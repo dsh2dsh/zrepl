@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/klauspost/compress/gzhttp"
+
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
@@ -30,4 +32,8 @@ func AppendHandler(m []Middleware, h http.Handler) http.Handler {
 
 func getLogger(r *http.Request) logger.Logger {
 	return logging.FromContext(r.Context())
+}
+
+func GzipResponse(next http.Handler) http.Handler {
+	return http.HandlerFunc(gzhttp.GzipHandler(next))
 }

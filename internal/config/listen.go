@@ -9,6 +9,7 @@ type Listen struct {
 	TLSCert string `yaml:"tls_cert" validate:"required_with=TLSKey,omitempty,filepath"`
 	TLSKey  string `yaml:"tls_key" validate:"omitempty,filepath"`
 
-	Control bool `yaml:"control" validate:"required_without=Metrics"`
-	Metrics bool `yaml:"metrics" validate:"required_without=Control"`
+	Control bool `yaml:"control" validate:"required_without_all=Metrics Zfs"`
+	Metrics bool `yaml:"metrics" validate:"required_without_all=Control Zfs"`
+	Zfs     bool `yaml:"zfs" validate:"required_without_all=Control Metrics"`
 }

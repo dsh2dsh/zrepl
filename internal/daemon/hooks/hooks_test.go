@@ -358,7 +358,7 @@ jobs:
 
 	parseHookConfig := func(t *testing.T, in string) *config.Config {
 		t.Helper()
-		conf, err := config.ParseConfigBytes([]byte(in))
+		conf, err := config.ParseConfigBytes("", []byte(in))
 		require.NoError(t, err)
 		require.NotNil(t, conf)
 		return conf

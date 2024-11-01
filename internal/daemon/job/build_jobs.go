@@ -1,45 +1,49 @@
 package job
 
 import (
-	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
 )
 
-func JobsFromConfig(c *config.Config, parseFlags config.ParseFlags) ([]Job, error) {
-	js := make([]Job, len(c.Jobs))
+func JobsFromConfig(c *config.Config) ([]Job, *Connecter, error) {
+	jobs := make([]Job, len(c.Jobs))
+	connecter := NewConnecter(c.Keys).WithTimeout(c.Global.RpcTimeout)
+
 	for i := range c.Jobs {
-		j, err := buildJob(&c.Global, c.Jobs[i], parseFlags)
+		j, err := buildJob(&c.Global, c.Jobs[i], connecter)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if j == nil || j.Name() == "" {
-			panic(fmt.Sprintf("implementation error: job builder returned nil job type %T", c.Jobs[i].Ret))
+			panic(fmt.Sprintf(
+				"implementation error: job builder returned nil job type %T",
+				c.Jobs[i].Ret))
 		}
-		js[i] = j
+		jobs[i] = j
 	}
 
-	return js, nil
+	if err := connecter.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("job inconsistency: %w", err)
+	}
+	return jobs, connecter, nil
 }
 
-func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags,
+func buildJob(c *config.Global, in config.JobEnum, connecter *Connecter,
 ) (j Job, err error) {
-	cannotBuildJob := func(e error, name string) (Job, error) {
-		return nil, fmt.Errorf("cannot build job %q: %w", name, e)
+	cannotBuildJob := func(err error, name string) (Job, error) {
+		return nil, fmt.Errorf("cannot build job %q: %w", name, err)
 	}
+
 	// FIXME prettify this
 	switch v := in.Ret.(type) {
 	case *config.SinkJob:
-		j, err = passiveSideFromConfig(c, &v.PassiveJob, v, parseFlags)
+		j, err = passiveSideFromConfig(c, &v.PassiveJob, v, connecter)
 		if err != nil {
 			return cannotBuildJob(err, v.Name)
 		}
 	case *config.SourceJob:
-		j, err = passiveSideFromConfig(c, &v.PassiveJob, v, parseFlags)
+		j, err = passiveSideFromConfig(c, &v.PassiveJob, v, connecter)
 		if err != nil {
 			return cannotBuildJob(err, v.Name)
 		}
@@ -49,12 +53,12 @@ func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags,
 			return cannotBuildJob(err, v.Name)
 		}
 	case *config.PushJob:
-		j, err = activeSide(c, &v.ActiveJob, v, parseFlags)
+		j, err = activeSide(c, &v.ActiveJob, v, connecter)
 		if err != nil {
 			return cannotBuildJob(err, v.Name)
 		}
 	case *config.PullJob:
-		j, err = activeSide(c, &v.ActiveJob, v, parseFlags)
+		j, err = activeSide(c, &v.ActiveJob, v, connecter)
 		if err != nil {
 			return cannotBuildJob(err, v.Name)
 		}
@@ -62,43 +66,4 @@ func buildJob(c *config.Global, in config.JobEnum, parseFlags config.ParseFlags,
 		panic(fmt.Sprintf("implementation error: unknown job type %T", v))
 	}
 	return j, nil
-}
-
-func validateReceivingSidesDoNotOverlap(receivingRootFSs []string) error {
-	if len(receivingRootFSs) == 0 {
-		return nil
-	}
-	rfss := make([]string, len(receivingRootFSs))
-	copy(rfss, receivingRootFSs)
-	sort.Slice(rfss, func(i, j int) bool {
-		return strings.Compare(rfss[i], rfss[j]) == -1
-	})
-	// add tailing slash because of hierarchy-simulation
-	// rootfs/ is not root of rootfs2/
-	for i := 0; i < len(rfss); i++ {
-		rfss[i] += "/"
-	}
-	// idea:
-	//   no path in rfss must be prefix of another
-	//
-	// rfss is now lexicographically sorted, which means that
-	// if i is prefix of j, i < j (in lexicographical order)
-	// thus,
-	// if any i is prefix of i+n (n >= 1), there is overlap
-	for i := 0; i < len(rfss)-1; i++ {
-		if strings.HasPrefix(rfss[i+1], rfss[i]) {
-			return errors.New("receiving jobs with overlapping root filesystems are forbidden")
-		}
-	}
-	return nil
-}
-
-func buildBandwidthLimitConfig(in *config.BandwidthLimit) (c bandwidthlimit.Config, _ error) {
-	if in.Max.ToBytes() > 0 && int64(in.Max.ToBytes()) == 0 {
-		return c, errors.New("bandwidth limit `max` is too small, must at least specify one byte")
-	}
-	return bandwidthlimit.Config{
-		Max:            int64(in.Max.ToBytes()),
-		BucketCapacity: int64(in.BucketCapacity.ToBytes()),
-	}, nil
 }

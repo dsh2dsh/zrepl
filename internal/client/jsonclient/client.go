@@ -98,6 +98,13 @@ func WithHTTPClient(doer HttpRequestDoer) ClientOption {
 	}
 }
 
+func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
+	return func(c *Client) error {
+		c.WithRequestEditorFn(fn)
+		return nil
+	}
+}
+
 // WithRequestEditorFn allows setting up a callback function, which will be
 // called right before sending the request. This can be used to mutate the
 // request.
@@ -165,38 +172,52 @@ func (self *Client) Do(req *http.Request, out any) error {
 	}
 	defer resp.Body.Close()
 
-	var b bytes.Buffer
-	if resp.StatusCode != http.StatusOK {
-		// ignore error, just display what we got
-		_, _ = io.CopyN(&b, resp.Body, 1024)
-		return fmt.Errorf("unexpected response from %q: %v (%v)",
-			req.URL, resp.Status, strings.TrimSpace(b.String()))
+	if err := checkStatusCode(resp); err != nil {
+		return fmt.Errorf("unexpected response from %q: %w", req.URL, err)
+	}
+	return unmarshalBody(resp.Body, out)
+}
+
+func checkStatusCode(resp *http.Response) error {
+	if resp.StatusCode == http.StatusOK {
+		return nil
 	}
 
-	if out != nil && out != struct{}{} {
-		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-			return fmt.Errorf("marshal response: %w", err)
-		}
+	var b bytes.Buffer
+	// ignore error, just display what we got
+	_, _ = io.CopyN(&b, resp.Body, 1024)
+	return fmt.Errorf("%v: %v", resp.Status, strings.TrimSpace(b.String()))
+}
+
+func unmarshalBody(r io.Reader, v any) error {
+	if !canUnmarshal(v) {
+		return nil
+	} else if err := json.NewDecoder(r).Decode(&v); err != nil {
+		return fmt.Errorf("unmarshal response: %w", err)
 	}
 	return nil
 }
 
+func canUnmarshal(v any) bool { return v != nil && v != struct{}{} }
+
 func (self *Client) Post(ctx context.Context, endpoint string, in, out any,
 	reqEditors ...RequestEditorFn,
 ) error {
-	var body io.Reader
-	if in != nil && in != struct{}{} {
-		var b bytes.Buffer
-		if err := json.NewEncoder(&b).Encode(in); err != nil {
-			return fmt.Errorf("marshal request: %w", err)
-		}
-		body = &b
-	}
-
-	req, err := self.NewRequest(ctx, http.MethodPost, endpoint, body,
-		reqEditors...)
+	req, err := self.postRequest(ctx, endpoint, in, reqEditors...)
 	if err != nil {
 		return err
 	}
 	return self.Do(req, out)
+}
+
+func (self *Client) postRequest(ctx context.Context, endpoint string, in any,
+	reqEditors ...RequestEditorFn,
+) (*http.Request, error) {
+	var body bytes.Buffer
+	if canUnmarshal(in) {
+		if err := json.NewEncoder(&body).Encode(in); err != nil {
+			return nil, fmt.Errorf("marshal request: %w", err)
+		}
+	}
+	return self.NewRequest(ctx, http.MethodPost, endpoint, &body, reqEditors...)
 }

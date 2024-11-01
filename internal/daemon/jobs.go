@@ -52,6 +52,10 @@ type jobs struct {
 	cancel context.CancelFunc
 }
 
+func (self *jobs) Job(name string) job.Job {
+	return self.jobs[name]
+}
+
 func (self *jobs) Cancel() {
 	self.log.Info("stop all jobs")
 	self.cancel()
@@ -86,7 +90,9 @@ func (self *jobs) Shutdown() {
 func (self *jobs) status() map[string]*job.Status {
 	ret := make(map[string]*job.Status, len(self.jobs))
 	for name, j := range self.jobs {
-		ret[name] = j.Status()
+		if st := j.Status(); st != nil {
+			ret[name] = st
+		}
 	}
 	return ret
 }
@@ -107,40 +113,43 @@ func (self *jobs) reset(job string) error {
 	return wu()
 }
 
-func (self *jobs) startJobsWithCron(confJobs []job.Job) {
-	self.cron.Start()
+func (self *jobs) startCronJobs(confJobs []job.Job) {
 	log := job.GetLogger(self.ctx)
 	for _, j := range confJobs {
+		jobName := j.Name()
+		self.mustCheckJobName(jobName)
 		if self.ctx.Err() != nil {
 			self.log.WithError(context.Cause(self.ctx)).
-				WithField("next_job", j.Name()).
+				WithField("next_job", jobName).
 				Error("break starting jobs")
 			break
 		}
-		jobName := j.Name()
-		if internalJobName(jobName) {
-			panic("internal job name used for non-internal job " + jobName)
-		} else if _, ok := self.jobs[jobName]; ok {
-			panic("duplicate job name " + jobName)
-		}
-		self.start(self.withJobSignals(jobName), j,
-			log.WithField(logging.JobField, jobName))
 		self.jobs[jobName] = j
+		j.RegisterMetrics(prometheus.DefaultRegisterer)
+		log := log.WithField(logging.JobField, jobName)
+		if j.Runnable() {
+			self.start(self.withJobSignals(jobName), j, log)
+		} else {
+			log.WithField("runnable", false).Info("job initialized")
+		}
 	}
-	self.log.
-		WithField("count", len(self.jobs)).
-		WithField("internal", len(self.internalJobs)).
-		Info("started jobs")
+	self.cron.Start()
+	self.log.WithField("count", len(self.jobs)).Info("started jobs")
 }
 
-func internalJobName(s string) bool { return strings.HasPrefix(s, "_") }
+func (self *jobs) mustCheckJobName(s string) {
+	if strings.HasPrefix(s, "_") {
+		panic("internal job name used for non-internal job " + s)
+	}
+	if _, ok := self.jobs[s]; ok {
+		panic("duplicate job name " + s)
+	}
+}
 
 func (self *jobs) start(ctx context.Context, j job.Internal, log logger.Logger,
 ) {
-	j.RegisterMetrics(prometheus.DefaultRegisterer)
 	self.g.Go(func() error {
 		log.Info("starting job")
-
 		if err := j.Run(ctx, self.cron); err != nil {
 			log.WithError(err).Error("job exited with error")
 			return err
@@ -166,6 +175,7 @@ func (self *jobs) context(jobName string) context.Context {
 }
 
 func (self *jobs) startInternal(j job.Internal) {
+	j.RegisterMetrics(prometheus.DefaultRegisterer)
 	log := job.GetLogger(self.ctx)
 	self.start(self.ctx, j, log.WithField("server", true))
 	self.internalJobs = append(self.internalJobs, j)

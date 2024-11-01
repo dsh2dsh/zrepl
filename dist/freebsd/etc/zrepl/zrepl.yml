@@ -1,6 +1,11 @@
 # zrepl main configuration file. For documentation, refer to
-# https://zrepl.github.io/ and https://github.com/dsh2dsh/zrepl
+# https://github.com/dsh2dsh/zrepl and https://zrepl.github.io/
 #
+
+# Include file with keys for accessing remote jobs and authenticate remote
+# clients. The filename is relative to filename of this configuration file.
+include_keys: "keys.yaml"
+
 global:
   # rpc_timeout: "1m"
   zfs_bin: "/sbin/zfs"
@@ -20,6 +25,10 @@ global:
       filename: "/var/log/zrepl.log"
 
 listen:
+  # Serve "sink" and "source" jobs for network access on port 8001.
+  # - addr: ":8001"
+  #   zfs: true
+
   # control socket for zrepl client, like `zrepl signal` or `zrepl status`.
   - unix: "/var/run/zrepl/control"
     unix_mode: 0o660            # write perm for group (optional)
@@ -65,9 +74,6 @@ jobs:
   - name: "zdisk"
     type: "sink"
     root_fs: "zdisk/zrepl"
-    serve:
-      type: "local"
-      listener_name: "zdisk"
     recv:
       # execpipe:
       #   # mbuffer |zfs receive

@@ -1,0 +1,16 @@
+include_keys: "keys.yaml"
+
+jobs:
+  - name: "foo"
+    type: "push"
+    connect:
+      type: "local"
+      listener_name: "foo"
+      client_identity: "bar"
+    filesystems:
+      "<": true
+    snapshotting:
+      type: "manual"
+    pruning:
+      keep_sender:
+        - type: "not_replicated"

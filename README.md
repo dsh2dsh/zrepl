@@ -15,6 +15,85 @@ Stable version of this project can be easy installed on FreeBSD using
 pkg install zrepl-dsh2dsh
 ```
 
+## Breaking changes!!!
+
+  * The project has switched from gRPC to REST API.
+
+    This change isn't compatible with old job configurations. Instead of
+    configuring `serv:` for every job, it configures in one place:
+
+    ```yaml
+    # Include file with keys for accessing remote jobs and authenticate remote
+    # clients. The filename is relative to filename of this configuration file.
+    include_keys: "keys.yaml"
+
+    listen:
+      # Serve "sink" and "source" jobs for network access.
+      - addr: ":8888"
+        tls_cert: "/usr/local/etc/ssl/cert.pem"
+        tls_key: "/usr/local/etc/ssl/key.pem"
+        zfs: true
+    ```
+
+    This configuration serves http and https API requests. `tls_cert` and
+    `tls_key` are optional and needed for serving https requests.
+
+    `keys.yaml` contains authentication keys of remote clients:
+
+    ```yaml
+    # Clients with defined authentication keys have network access to "sink" and
+    # "source" jobs. The key name is their client identity name.
+
+    # Authentication token and client_identity for me.
+    - name: "a.domain.com"          # client_identity
+      key: "long and secret token"
+    ```
+
+  * All transports has been replaced by `local` and `http` transports.
+
+    `local` transport configuration looks almost the same:
+
+    ```yaml
+    jobs:
+      - name: "zroot-to-zdisk"
+        type: "push"
+        connect:
+          type: "local"
+          listener_name: "zdisk"
+          client_identity: "localhost"
+    ```
+
+    with one exception. `listener_name` now is a remote job name actually.
+
+    The new `http` transport replaced all network transports. Its configuration
+    look like:
+
+    ```yaml
+    jobs:
+      - name: "zroot-to-server"
+        type: "push"
+        connect:
+          type: "http"
+          server: "https://server:8888"
+          listener_name: "zdisk"
+          client_identity: "serverkey"
+
+      - name: "server-to-zdisk"
+        type: "pull"
+        connect:
+          type: "http"
+          server: "https://server:8888"
+          listener_name: "zroot-to-client"
+          client_identity: "serverkey"
+    ```
+
+    `listener_name` is a job name on the server with type of `sink` or `source`.
+
+    `client_identity` is a key name from `keys.yaml`. That key will be sent to
+    the server for authentication and the server must have a key with the same
+    `key` content in `keys.yaml`. `name` can be different, because `sink` and
+    `source` jobs use key name as `client_identity`.
+
 ## Changes from [upstream](https://github.com/zrepl/zrepl):
 
   * Fresh dependencies

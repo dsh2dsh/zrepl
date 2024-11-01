@@ -1,0 +1,5 @@
+# Clients with defined authentication keys have network access to "sink" and
+# "source" jobs. The key name is their client identity name.
+
+# - name: "localhost"           # client identity name
+#   key: "long long and secret key"

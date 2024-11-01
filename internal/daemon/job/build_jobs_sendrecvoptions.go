@@ -7,6 +7,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
+	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -49,6 +50,16 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 	}
 
 	return sc, nil
+}
+
+func buildBandwidthLimitConfig(in *config.BandwidthLimit) (c bandwidthlimit.Config, _ error) {
+	if in.Max.ToBytes() > 0 && int64(in.Max.ToBytes()) == 0 {
+		return c, errors.New("bandwidth limit `max` is too small, must at least specify one byte")
+	}
+	return bandwidthlimit.Config{
+		Max:            int64(in.Max.ToBytes()),
+		BucketCapacity: int64(in.BucketCapacity.ToBytes()),
+	}, nil
 }
 
 type ReceivingJobConfig interface {

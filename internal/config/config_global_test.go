@@ -23,7 +23,7 @@ jobs:
     }
   root_fs: zroot/foo
 `
-	_, err := ParseConfigBytes([]byte(jobdef))
+	_, err := ParseConfigBytes("", []byte(jobdef))
 	require.NoError(t, err)
 	return testValidConfig(t, s+jobdef)
 }

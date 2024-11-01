@@ -100,6 +100,13 @@ func TestListen_Validator(t *testing.T) {
 				Metrics: true,
 			},
 		},
+		{
+			name: "with zfs",
+			listen: Listen{
+				Addr: "127.0.0.1:80",
+				Zfs:  true,
+			},
+		},
 	}
 
 	for _, tt := range tests {

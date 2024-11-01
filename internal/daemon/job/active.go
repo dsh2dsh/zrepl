@@ -22,9 +22,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
-	"github.com/dsh2dsh/zrepl/internal/rpc"
-	"github.com/dsh2dsh/zrepl/internal/transport"
-	"github.com/dsh2dsh/zrepl/internal/transport/fromconfig"
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -32,7 +29,7 @@ import (
 type ActiveSide struct {
 	mode      activeMode
 	name      endpoint.JobID
-	connecter transport.Connecter
+	connected Connected
 
 	replicationDriverConfig driver.Config
 
@@ -94,7 +91,7 @@ func (a *ActiveSide) updateTasks(u func(*activeSideTasks)) activeSideTasks {
 }
 
 type activeMode interface {
-	ConnectEndpoints(ctx context.Context, connecter transport.Connecter)
+	ConnectEndpoints(ctx context.Context, cn Connected)
 	DisconnectEndpoints()
 	SenderReceiver() (logic.Sender, logic.Receiver)
 	Type() Type
@@ -109,126 +106,6 @@ type activeMode interface {
 	Shutdown()
 	Wait()
 	Running() (time.Duration, bool)
-}
-
-type modePush struct {
-	setupMtx      sync.Mutex
-	sender        *endpoint.Sender
-	receiver      *rpc.Client
-	senderConfig  *endpoint.SenderConfig
-	plannerPolicy *logic.PlannerPolicy
-	snapper       snapper.Snapper
-	cronSpec      string
-
-	wg sync.WaitGroup
-
-	localReceiver  *endpoint.Receiver
-	localListener  string
-	clientIdentity string
-}
-
-func (m *modePush) ConnectEndpoints(ctx context.Context, cn transport.Connecter,
-) {
-	m.setupMtx.Lock()
-	defer m.setupMtx.Unlock()
-
-	if m.receiver != nil || m.sender != nil || m.localReceiver != nil {
-		panic("inconsistent use of ConnectEndpoints and DisconnectEndpoints")
-	}
-
-	m.sender = endpoint.NewSender(*m.senderConfig)
-	m.initReceiver(ctx, cn)
-}
-
-func (m *modePush) initReceiver(ctx context.Context, cn transport.Connecter) {
-	if cn != nil {
-		m.receiver = rpc.NewClient(cn, rpc.GetLoggersOrPanic(ctx))
-		return
-	}
-
-	GetLogger(ctx).WithField("mode", "push").
-		WithField("listener_name", m.localListener).
-		WithField("client_identity", m.clientIdentity).
-		Info("use local receiver")
-
-	r := getLocalReceiver(m.localListener, m.clientIdentity)
-	if r == nil {
-		panic(fmt.Sprintf("local receiver %q not found", m.localListener))
-	}
-	m.localReceiver = r
-}
-
-func (m *modePush) DisconnectEndpoints() {
-	m.setupMtx.Lock()
-	defer m.setupMtx.Unlock()
-	if m.receiver != nil {
-		m.receiver.Close()
-	}
-	m.sender = nil
-	m.receiver = nil
-	m.localReceiver = nil
-}
-
-func (m *modePush) SenderReceiver() (logic.Sender, logic.Receiver) {
-	m.setupMtx.Lock()
-	defer m.setupMtx.Unlock()
-	if m.localReceiver != nil {
-		return m.sender, m.localReceiver
-	}
-	return m.sender, m.receiver
-}
-
-func (m *modePush) Type() Type { return TypePush }
-
-func (m *modePush) PlannerPolicy() logic.PlannerPolicy { return *m.plannerPolicy }
-
-func (m *modePush) Cron() string { return m.cronSpec }
-
-func (m *modePush) PeriodicSnapshots() bool { return m.snapper.Periodic() }
-
-func (m *modePush) RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
-	cron *cron.Cron,
-) <-chan struct{} {
-	if m.PeriodicSnapshots() {
-		m.wg.Add(1)
-		go func() {
-			defer m.wg.Done()
-			m.snapper.Run(ctx, wakeUpCommon, cron)
-		}()
-		return make(chan struct{})
-	}
-	GetLogger(ctx).Info("periodic snapshotting disabled")
-	return wakeup.Wait(ctx)
-}
-
-func (m *modePush) SnapperReport() *snapper.Report {
-	r := m.snapper.Report()
-	return &r
-}
-
-func (m *modePush) ResetConnectBackoff() {
-	m.setupMtx.Lock()
-	defer m.setupMtx.Unlock()
-	if m.receiver != nil {
-		m.receiver.ResetConnectBackoff()
-	}
-}
-
-func (m *modePush) Shutdown() {
-	if m.snapper.Periodic() {
-		m.snapper.Shutdown()
-	}
-}
-
-func (m *modePush) Wait() {
-	m.wg.Wait()
-}
-
-func (m *modePush) Running() (time.Duration, bool) {
-	if m.snapper.Periodic() {
-		return m.snapper.Running()
-	}
-	return 0, false
 }
 
 func modePushFromConfig(g *config.Global, in *config.PushJob,
@@ -254,7 +131,8 @@ func modePushFromConfig(g *config.Global, in *config.PushJob,
 		return nil, fmt.Errorf("sender config: %w", err)
 	}
 
-	replicationConfig, err := logic.ReplicationConfigFromConfig(&in.Replication)
+	replicationConfig, err := logic.ReplicationConfigFromConfig(
+		&in.Replication)
 	if err != nil {
 		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
@@ -278,39 +156,130 @@ func modePushFromConfig(g *config.Global, in *config.PushJob,
 	if err != nil {
 		return nil, fmt.Errorf("cannot build snapper: %w", err)
 	}
-
-	if v, ok := in.Connect.Ret.(*config.LocalConnect); ok {
-		m.localListener = v.ListenerName
-		m.clientIdentity = v.ClientIdentity
-	}
 	return m, nil
+}
+
+type modePush struct {
+	setupMtx      sync.Mutex
+	sender        *endpoint.Sender
+	receiver      Endpoint
+	senderConfig  *endpoint.SenderConfig
+	plannerPolicy *logic.PlannerPolicy
+	snapper       snapper.Snapper
+	cronSpec      string
+
+	wg sync.WaitGroup
+}
+
+func (m *modePush) ConnectEndpoints(ctx context.Context, cn Connected) {
+	m.setupMtx.Lock()
+	defer m.setupMtx.Unlock()
+
+	if m.receiver != nil || m.sender != nil {
+		panic("inconsistent use of ConnectEndpoints and DisconnectEndpoints")
+	}
+
+	GetLogger(ctx).
+		WithField("mode", "push").
+		WithField("to", cn.Name()).
+		Info("connect to receiver")
+
+	m.receiver = cn.Endpoint()
+	m.sender = endpoint.NewSender(*m.senderConfig)
+}
+
+func (m *modePush) DisconnectEndpoints() {
+	m.setupMtx.Lock()
+	defer m.setupMtx.Unlock()
+	m.receiver = nil
+	m.sender = nil
+}
+
+func (m *modePush) SenderReceiver() (logic.Sender, logic.Receiver) {
+	m.setupMtx.Lock()
+	defer m.setupMtx.Unlock()
+	return m.sender, m.receiver
+}
+
+func (m *modePush) Type() Type { return TypePush }
+
+func (m *modePush) PlannerPolicy() logic.PlannerPolicy {
+	return *m.plannerPolicy
+}
+
+func (m *modePush) Cron() string { return m.cronSpec }
+
+func (m *modePush) PeriodicSnapshots() bool { return m.snapper.Periodic() }
+
+func (m *modePush) RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
+	cron *cron.Cron,
+) <-chan struct{} {
+	if !m.PeriodicSnapshots() {
+		GetLogger(ctx).Info("periodic snapshotting disabled")
+		return wakeup.Wait(ctx)
+
+	}
+
+	m.wg.Add(1)
+	go func() {
+		m.snapper.Run(ctx, wakeUpCommon, cron)
+		m.wg.Done()
+	}()
+	return make(chan struct{})
+}
+
+func (m *modePush) SnapperReport() *snapper.Report {
+	r := m.snapper.Report()
+	return &r
+}
+
+func (m *modePush) ResetConnectBackoff() {}
+
+func (m *modePush) Shutdown() {
+	if m.snapper.Periodic() {
+		m.snapper.Shutdown()
+	}
+}
+
+func (m *modePush) Wait() { m.wg.Wait() }
+
+func (m *modePush) Running() (time.Duration, bool) {
+	if !m.snapper.Periodic() {
+		return 0, false
+	}
+	return m.snapper.Running()
 }
 
 type modePull struct {
 	setupMtx       sync.Mutex
 	receiver       *endpoint.Receiver
 	receiverConfig endpoint.ReceiverConfig
-	sender         *rpc.Client
+	sender         Endpoint
 	plannerPolicy  *logic.PlannerPolicy
 	cronSpec       string
 }
 
-func (m *modePull) ConnectEndpoints(ctx context.Context, connecter transport.Connecter) {
+func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
 	m.setupMtx.Lock()
 	defer m.setupMtx.Unlock()
 	if m.receiver != nil || m.sender != nil {
 		panic("inconsistent use of ConnectEndpoints and DisconnectEndpoints")
 	}
+
+	GetLogger(ctx).
+		WithField("mode", "pull").
+		WithField("from", cn.Name()).
+		Info("connect to sender")
+
 	m.receiver = endpoint.NewReceiver(m.receiverConfig)
-	m.sender = rpc.NewClient(connecter, rpc.GetLoggersOrPanic(ctx))
+	m.sender = cn.Endpoint()
 }
 
 func (m *modePull) DisconnectEndpoints() {
 	m.setupMtx.Lock()
 	defer m.setupMtx.Unlock()
-	m.sender.Close()
-	m.sender = nil
 	m.receiver = nil
+	m.sender = nil
 }
 
 func (m *modePull) SenderReceiver() (logic.Sender, logic.Receiver) {
@@ -321,7 +290,9 @@ func (m *modePull) SenderReceiver() (logic.Sender, logic.Receiver) {
 
 func (*modePull) Type() Type { return TypePull }
 
-func (m *modePull) PlannerPolicy() logic.PlannerPolicy { return *m.plannerPolicy }
+func (m *modePull) PlannerPolicy() logic.PlannerPolicy {
+	return *m.plannerPolicy
+}
 
 func (m *modePull) Cron() string { return m.cronSpec }
 
@@ -334,17 +305,9 @@ func (m *modePull) RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
 	return wakeup.Wait(ctx)
 }
 
-func (m *modePull) SnapperReport() *snapper.Report {
-	return nil
-}
+func (m *modePull) SnapperReport() *snapper.Report { return nil }
 
-func (m *modePull) ResetConnectBackoff() {
-	m.setupMtx.Lock()
-	defer m.setupMtx.Unlock()
-	if m.sender != nil {
-		m.sender.ResetConnectBackoff()
-	}
-}
+func (m *modePull) ResetConnectBackoff() {}
 
 func (m *modePull) Shutdown() {}
 
@@ -354,7 +317,7 @@ func (m *modePull) Running() (time.Duration, bool) { return 0, false }
 
 func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 ) (m *modePull, err error) {
-	if _, ok := in.Connect.Ret.(*config.LocalConnect); ok {
+	if in.Connect.Type == "local" || in.Connect.Server == "" {
 		return nil, fmt.Errorf("pull job %q cannot use local connect", jobID)
 	}
 
@@ -367,7 +330,8 @@ func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 		m.cronSpec = cronSpec
 	}
 
-	replicationConfig, err := logic.ReplicationConfigFromConfig(&in.Replication)
+	replicationConfig, err := logic.ReplicationConfigFromConfig(
+		&in.Replication)
 	if err != nil {
 		return nil, fmt.Errorf("field `replication`: %w", err)
 	}
@@ -407,8 +371,8 @@ func replicationDriverConfigFromConfig(in *config.Replication) (driver.Config,
 	return c, c.Validate()
 }
 
-func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{},
-	parseFlags config.ParseFlags,
+func activeSide(g *config.Global, in *config.ActiveJob, configJob any,
+	connecter *Connecter,
 ) (*ActiveSide, error) {
 	name, err := endpoint.MakeJobID(in.Name)
 	if err != nil {
@@ -460,11 +424,6 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{},
 		ConstLabels: prometheus.Labels{"zrepl_job": j.name.String()},
 	})
 
-	j.connecter, err = fromconfig.ConnecterFromConfig(g, in.Connect, parseFlags)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build client: %w", err)
-	}
-
 	j.promPruneSecs = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace:   "zrepl",
 		Subsystem:   "pruning",
@@ -489,6 +448,10 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob interface{},
 	if in.Hooks.Post != nil {
 		j.postHook = NewHookFromConfig(in.Hooks.Post).WithPostHook(true)
 	}
+
+	if j.connected, err = connecter.FromConfig(&in.Connect); err != nil {
+		return nil, fmt.Errorf("cannot build connect: %w", err)
+	}
 	return j, nil
 }
 
@@ -501,6 +464,8 @@ func (j *ActiveSide) RegisterMetrics(registerer prometheus.Registerer) {
 }
 
 func (j *ActiveSide) Name() string { return j.name.String() }
+
+func (j *ActiveSide) Runnable() bool { return true }
 
 func (j *ActiveSide) Status() *Status {
 	tasks := j.updateTasks(nil)
@@ -711,7 +676,8 @@ func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 func (j *ActiveSide) SenderConfig() *endpoint.SenderConfig {
 	push, ok := j.mode.(*modePush)
 	if !ok {
-		_ = j.mode.(*modePull) // make sure we didn't introduce a new job type
+		// make sure we didn't introduce a new job type
+		_ = j.mode.(*modePull)
 		return nil
 	}
 	return push.senderConfig
@@ -787,7 +753,7 @@ func (j *ActiveSide) do(ctx context.Context, cnt int) {
 	ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", cnt))
 	defer endSpan()
 
-	j.mode.ConnectEndpoints(ctx, j.connecter)
+	j.mode.ConnectEndpoints(ctx, j.connected)
 	defer j.mode.DisconnectEndpoints()
 
 	// allow cancellation of an invocation (this function)

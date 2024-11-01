@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,56 +10,26 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/rpc"
-	"github.com/dsh2dsh/zrepl/internal/transport"
-	"github.com/dsh2dsh/zrepl/internal/transport/fromconfig"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 type PassiveSide struct {
-	mode   passiveMode
-	name   endpoint.JobID
-	listen transport.AuthenticatedListenerFactory
+	mode passiveMode
+	name endpoint.JobID
 
-	wg       sync.WaitGroup
-	shutdown context.CancelCauseFunc
+	wg sync.WaitGroup
 }
 
 type passiveMode interface {
-	Handler() rpc.Handler
+	Endpoint(clientIdentity string) Endpoint
 	Periodic() bool
 	RunPeriodic(ctx context.Context, cron *cron.Cron)
 	SnapperReport() *snapper.Report // may be nil
 	Type() Type
 	Shutdown()
-}
-
-type modeSink struct {
-	receiverConfig endpoint.ReceiverConfig
-}
-
-func (m *modeSink) Type() Type { return TypeSink }
-
-func (m *modeSink) Handler() rpc.Handler {
-	return endpoint.NewReceiver(m.receiverConfig)
-}
-
-func (m *modeSink) Periodic() bool { return false }
-
-func (m *modeSink) RunPeriodic(_ context.Context, cron *cron.Cron) {}
-
-func (m *modeSink) SnapperReport() *snapper.Report { return nil }
-
-func (m *modeSink) Shutdown() {}
-
-func (m *modeSink) Receiver(clientIdentity string) *endpoint.Receiver {
-	return endpoint.NewReceiver(m.receiverConfig).
-		WithClientIdentity(clientIdentity)
 }
 
 func modeSinkFromConfig(in *config.SinkJob, jobID endpoint.JobID,
@@ -70,25 +39,33 @@ func modeSinkFromConfig(in *config.SinkJob, jobID endpoint.JobID,
 		return nil, err
 	}
 	m := &modeSink{receiverConfig: c}
-
-	if v, ok := in.Serve.Ret.(*config.LocalServe); ok {
-		addLocalReceiver(v.ListenerName, m.Receiver)
-	}
 	return m, nil
 }
 
-type modeSource struct {
-	senderConfig *endpoint.SenderConfig
-	snapper      snapper.Snapper
+type modeSink struct {
+	receiverConfig endpoint.ReceiverConfig
+}
+
+var _ passiveMode = (*modeSink)(nil)
+
+func (m *modeSink) Type() Type { return TypeSink }
+
+func (m *modeSink) Periodic() bool { return false }
+
+func (m *modeSink) RunPeriodic(_ context.Context, cron *cron.Cron) {}
+
+func (m *modeSink) SnapperReport() *snapper.Report { return nil }
+
+func (m *modeSink) Shutdown() {}
+
+func (m *modeSink) Endpoint(clientIdentity string) Endpoint {
+	return endpoint.NewReceiver(m.receiverConfig).
+		WithClientIdentity(clientIdentity)
 }
 
 func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 	jobID endpoint.JobID,
 ) (m *modeSource, err error) {
-	if _, ok := in.Serve.Ret.(*config.LocalServe); ok {
-		return nil, fmt.Errorf("source job %q with local serve", jobID)
-	}
-
 	// FIXME exact dedup of modePush
 	m = &modeSource{}
 	if m.senderConfig, err = buildSenderConfig(in, jobID); err != nil {
@@ -102,13 +79,20 @@ func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 	return m, nil
 }
 
+type modeSource struct {
+	senderConfig *endpoint.SenderConfig
+	snapper      snapper.Snapper
+}
+
+var _ passiveMode = (*modeSource)(nil)
+
 func (m *modeSource) Type() Type { return TypeSource }
 
-func (m *modeSource) Handler() rpc.Handler {
+func (m *modeSource) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewSender(*m.senderConfig)
 }
 
-func (m *modeSource) Periodic() bool { return true }
+func (m *modeSource) Periodic() bool { return m.snapper.Periodic() }
 
 func (m *modeSource) RunPeriodic(ctx context.Context, cron *cron.Cron) {
 	m.snapper.Run(ctx, nil, cron)
@@ -119,18 +103,16 @@ func (m *modeSource) SnapperReport() *snapper.Report {
 	return &r
 }
 
-func (m *modeSource) Shutdown() {
-	m.snapper.Shutdown()
-}
+func (m *modeSource) Shutdown() { m.snapper.Shutdown() }
 
 func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
-	configJob any, parseFlags config.ParseFlags,
+	configJob any, connecter *Connecter,
 ) (*PassiveSide, error) {
-	name, err := endpoint.MakeJobID(in.Name)
+	jobID, err := endpoint.MakeJobID(in.Name)
 	if err != nil {
 		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
-	s := &PassiveSide{name: name}
+	s := &PassiveSide{name: jobID}
 
 	switch v := configJob.(type) {
 	case *config.SinkJob:
@@ -142,20 +124,23 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
 		return nil, err // no wrapping necessary
 	}
 
-	s.listen, err = fromconfig.ListenerFactoryFromConfig(g, in.Serve, parseFlags)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build listener factory: %w", err)
-	}
+	connecter.AddJob(s.Name(), s)
 	return s, nil
 }
 
 func (j *PassiveSide) Name() string { return j.name.String() }
 
+func (j *PassiveSide) Runnable() bool { return j.mode.Periodic() }
+
 func (s *PassiveSide) Status() *Status {
-	st := &PassiveStatus{
-		Snapper: s.mode.SnapperReport(),
+	snapperReport := s.mode.SnapperReport()
+	if snapperReport == nil || snapperReport.Type == snapper.TypeManual {
+		return nil
 	}
-	return &Status{Type: s.mode.Type(), JobSpecific: st}
+	return &Status{
+		Type:        s.mode.Type(),
+		JobSpecific: &PassiveStatus{Snapper: snapperReport},
+	}
 }
 
 type PassiveStatus struct {
@@ -211,10 +196,12 @@ func (self *PassiveStatus) Progress() (uint64, uint64) {
 	return 0, 0
 }
 
-func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
+func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool,
+) {
 	sink, ok := j.mode.(*modeSink)
 	if !ok {
-		_ = j.mode.(*modeSource) // make sure we didn't introduce a new job type
+		// make sure we didn't introduce a new job type
+		_ = j.mode.(*modeSource)
 		return nil, false
 	}
 	return sink.receiverConfig.RootWithoutClientComponent.Copy(), true
@@ -223,98 +210,29 @@ func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) 
 func (j *PassiveSide) SenderConfig() *endpoint.SenderConfig {
 	source, ok := j.mode.(*modeSource)
 	if !ok {
-		_ = j.mode.(*modeSink) // make sure we didn't introduce a new job type
+		// make sure we didn't introduce a new job type
+		_ = j.mode.(*modeSink)
 		return nil
 	}
 	return source.senderConfig
 }
 
+func (j *PassiveSide) Endpoint(clientIdentity string) Endpoint {
+	return j.mode.Endpoint(clientIdentity)
+}
+
 func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}
 
 func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) error {
-	ctx, endTask := trace.WithTaskAndSpan(ctx, "passive-side-job", j.Name())
-	defer endTask()
-
-	log := GetLogger(ctx)
-	defer log.Info("job exiting")
-
-	j.goModePeriodic(ctx, cron)
-
-	ctx, j.shutdown = context.WithCancelCause(ctx)
-	defer j.shutdown(nil)
-
-	if err := j.serve(ctx, log); err != nil {
-		return fmt.Errorf("passive job: %w", err)
-	}
-	j.wait(log)
-	return nil
-}
-
-func (j *PassiveSide) goModePeriodic(ctx context.Context, cron *cron.Cron) {
 	if !j.mode.Periodic() {
-		return
+		return fmt.Errorf("running not periodic job: %s", j.Name())
 	}
 
-	j.wg.Add(1)
-	go func() {
-		defer j.wg.Done()
-		ctx, endTask := trace.WithTask(ctx, "periodic")
-		j.mode.RunPeriodic(ctx, cron)
-		endTask()
-	}()
-}
-
-func (j *PassiveSide) serve(ctx context.Context, log logger.Logger) error {
-	if j.listen == nil {
-		log.Info("serving local")
-		return nil
-	}
-
-	handler := j.mode.Handler()
-	if handler == nil {
-		panic(fmt.Sprintf(
-			"implementation error: j.mode.Handler() returned nil: %#v", j))
-	}
-
-	rpcLoggers := rpc.GetLoggersOrPanic(ctx) // WithSubsystemLoggers above
-	server := rpc.NewServer(handler, rpcLoggers, j.ctxInterceptor(ctx))
-
-	listener, err := j.listen()
-	if err != nil {
-		return fmt.Errorf("cannot listen: %w", err)
-	}
-
-	server.Serve(ctx, listener)
+	ctx, endTask := trace.WithTaskAndSpan(ctx, "passive-side-job", j.Name())
+	j.mode.RunPeriodic(ctx, cron)
+	GetLogger(ctx).Info("job exiting")
+	endTask()
 	return nil
 }
 
-func (j *PassiveSide) ctxInterceptor(ctx context.Context,
-) rpc.HandlerContextInterceptor {
-	return func(handlerCtx context.Context,
-		info rpc.HandlerContextInterceptorData, handler func(ctx context.Context),
-	) {
-		// the handlerCtx is clean => need to inherit logging and tracing config
-		// from job context
-		handlerCtx = logging.WithInherit(handlerCtx, ctx)
-		handlerCtx = trace.WithInherit(handlerCtx, ctx)
-		handlerCtx, endTask := trace.WithTaskAndSpan(handlerCtx, "handler",
-			fmt.Sprintf("job=%q client=%q method=%q", j.Name(),
-				info.ClientIdentity(), info.FullMethod()))
-		handler(handlerCtx)
-		endTask()
-	}
-}
-
-func (j *PassiveSide) wait(l logger.Logger) {
-	if j.mode.Periodic() {
-		l = l.WithField("mode", j.mode.Type())
-		l.Info("waiting for mode job exit")
-		defer l.Info("mode job exited")
-	}
-	j.wg.Wait()
-}
-
-func (j *PassiveSide) Shutdown() {
-	j.mode.Shutdown()
-	j.shutdown(errors.New("shutdown received"))
-}
+func (j *PassiveSide) Shutdown() { j.mode.Shutdown() }

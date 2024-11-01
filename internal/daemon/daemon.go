@@ -32,7 +32,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		return fmt.Errorf("daemon: cannot build logging from config: %w", err)
 	}
 
-	confJobs, err := job.JobsFromConfig(conf, config.ParseFlagsNone)
+	confJobs, connector, err := job.JobsFromConfig(conf)
 	if err != nil {
 		return fmt.Errorf("daemon: cannot build jobs from config: %w", err)
 	}
@@ -44,11 +44,11 @@ func Run(ctx context.Context, conf *config.Config) error {
 
 	log.Info("starting daemon")
 	jobs := newJobs(ctx, cancel)
-	if err := startServer(log, conf, jobs, outlets); err != nil {
+	// start regular jobs
+	jobs.startCronJobs(confJobs)
+	if err := startServer(log, conf, jobs, outlets, connector); err != nil {
 		return fmt.Errorf("daemon: %w", err)
 	}
-	// start regular jobs
-	jobs.startJobsWithCron(confJobs)
 
 	wait := jobs.wait()
 	select {
@@ -80,9 +80,11 @@ func registerTraceCallbacks() {
 }
 
 func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
-	logOutlets *logger.Outlets,
+	logOutlets *logger.Outlets, connecter *job.Connecter,
 ) error {
-	server := newServerJob(log, newControlJob(jobs))
+	server := newServerJob(log,
+		newControlJob(jobs),
+		newZfsJob(connecter, conf.Keys).WithTimeout(conf.Global.RpcTimeout))
 
 	var hasControl, hasMetrics bool
 	for i := range conf.Listen {

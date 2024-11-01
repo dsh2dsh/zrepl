@@ -45,6 +45,8 @@ func (j *SnapJob) Name() string { return j.name.String() }
 
 func (j *SnapJob) Type() Type { return TypeSnap }
 
+func (j *SnapJob) Runnable() bool { return j.snapper.Periodic() }
+
 func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob, err error) {
 	j = &SnapJob{}
 	fsf, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
