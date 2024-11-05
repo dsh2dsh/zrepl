@@ -4,13 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log/syslog"
-	"os"
-	"reflect"
-	"strings"
 	"time"
 
 	"github.com/creasty/defaults"
-	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 
 	"github.com/dsh2dsh/zrepl/internal/util/datasizeunit"
@@ -24,8 +20,15 @@ const (
 	ParseFlagsNoCertCheck ParseFlags = 1 << iota
 )
 
-func New() *Config {
-	return new(Config)
+type Option func(self *Config)
+
+func WithSkipKeys() Option {
+	return func(self *Config) { self.skipKeys = true }
+}
+
+func New(opts ...Option) *Config {
+	c := new(Config)
+	return c.init(opts...)
 }
 
 type Config struct {
@@ -35,11 +38,23 @@ type Config struct {
 
 	Keys        []AuthKey `yaml:"keys" validate:"dive"`
 	IncludeKeys string    `yaml:"include_keys" validate:"omitempty,filepath"`
+
+	skipKeys bool
+}
+
+func (c *Config) init(opts ...Option) *Config {
+	for _, fn := range opts {
+		fn(c)
+	}
+	return c
 }
 
 func (c *Config) lateInit(path string) error {
 	if len(c.Global.Logging) == 0 {
 		c.Global.Logging.SetDefaults()
+	}
+	if c.skipKeys {
+		return nil
 	}
 	return includeYAML(path, c.IncludeKeys, &c.Keys)
 }
@@ -719,73 +734,4 @@ func (t *SyslogFacility) UnmarshalYAML(value *yaml.Node) (err error) {
 		return err
 	}
 	return t.UnmarshalJSON([]byte(s))
-}
-
-var ConfigFileDefaultLocations = []string{
-	"/etc/zrepl/zrepl.yml",
-	"/usr/local/etc/zrepl/zrepl.yml",
-}
-
-func ParseConfig(path string) (*Config, error) {
-	if path == "" {
-		// Try default locations
-		for _, l := range ConfigFileDefaultLocations {
-			stat, statErr := os.Stat(l)
-			if statErr != nil {
-				continue
-			}
-			if !stat.Mode().IsRegular() {
-				return nil, fmt.Errorf(
-					"file at default location is not a regular file: %s", l)
-			}
-			path = l
-			break
-		}
-	}
-
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return ParseConfigBytes(path, b)
-}
-
-func ParseConfigBytes(path string, bytes []byte) (*Config, error) {
-	c := New()
-	if err := defaults.Set(c); err != nil {
-		return nil, fmt.Errorf("init config with defaults: %w", err)
-	} else if err := yaml.Unmarshal(bytes, &c); err != nil {
-		return nil, fmt.Errorf("config unmarshal: %w", err)
-	} else if c == nil {
-		return nil, errors.New("There was no yaml document in the file")
-	}
-
-	if err := c.lateInit(path); err != nil {
-		return nil, fmt.Errorf("config: %w", err)
-	} else if err := Validator().Struct(c); err != nil {
-		return nil, fmt.Errorf("validate config: %w", err)
-	}
-	return c, nil
-}
-
-func Validator() *validator.Validate {
-	if validate == nil {
-		validate = newValidator()
-	}
-	return validate
-}
-
-var validate *validator.Validate
-
-func newValidator() *validator.Validate {
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		name := strings.SplitN(fld.Tag.Get("yaml"), ",", 2)[0]
-		// skip if tag key says it should be ignored
-		if name == "-" {
-			return ""
-		}
-		return name
-	})
-	return validate
 }

@@ -31,7 +31,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&rootArgs.configPath, "config", "", "config file path")
+	rootCmd.PersistentFlags().StringVar(
+		&rootArgs.configPath, "config", "", "config file path")
 }
 
 var genCompletionCmd = &cobra.Command{
@@ -81,12 +82,13 @@ func init() {
 }
 
 type Subcommand struct {
-	Use              string
-	Short            string
-	Long             string
-	Example          string
-	NoRequireConfig  bool
-	Run              func(ctx context.Context, subcommand *Subcommand, args []string) error
+	Use             string
+	Short           string
+	Long            string
+	Example         string
+	NoRequireConfig bool
+	Run             func(ctx context.Context, subcommand *Subcommand,
+		args []string) error
 	SetupFlags       func(f *pflag.FlagSet)
 	SetupSubcommands func() []*Subcommand
 	SetupCobra       func(c *cobra.Command)
@@ -120,7 +122,8 @@ func (s *Subcommand) run(cmd *cobra.Command, args []string) {
 }
 
 func (s *Subcommand) tryParseConfig() {
-	config, err := config.ParseConfig(rootArgs.configPath)
+	config, err := config.ParseConfig(rootArgs.configPath,
+		config.WithSkipKeys())
 	s.configErr = err
 	if err != nil {
 		if s.NoRequireConfig {
