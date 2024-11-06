@@ -198,13 +198,13 @@ func (self *Client) ReplicationCursor(ctx context.Context,
 
 	if resp.Result.Notexist {
 		return &pdu.ReplicationCursorRes{
-			Result: &pdu.ReplicationCursorRes_Notexist{
+			Result: &pdu.ReplicationCursorRes_Result{
 				Notexist: resp.Result.Notexist,
 			},
 		}, nil
 	}
 
 	return &pdu.ReplicationCursorRes{
-		Result: &pdu.ReplicationCursorRes_Guid{Guid: resp.Result.Guid},
+		Result: &pdu.ReplicationCursorRes_Result{Guid: resp.Result.Guid},
 	}, nil
 }

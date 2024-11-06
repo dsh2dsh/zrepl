@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/kr/pretty"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
@@ -874,13 +872,6 @@ func (a *attempt) errorReport() *errorReport {
 		}
 		for _, err := range r.flattened {
 			if neterr, ok := err.Err.(net.Error); ok && neterr.Timeout() {
-				putClass(err, errorClassTemporaryConnectivityRelated)
-				continue
-			}
-			if st, ok := status.FromError(err.Err); ok && st.Code() == codes.Unavailable {
-				// technically, codes.Unavailable could be returned by the gRPC endpoint, indicating overload, etc.
-				// for now, let's assume it only happens for connectivity issues, as specified in
-				// https://grpc.io/grpc/core/md_doc_statuscodes.html
 				putClass(err, errorClassTemporaryConnectivityRelated)
 				continue
 			}

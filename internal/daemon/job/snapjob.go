@@ -274,14 +274,14 @@ func (h alwaysUpToDateReplicationCursorHistory) ReplicationCursor(ctx context.Co
 	}
 	fsvs := res.GetVersions()
 	if len(fsvs) <= 0 {
-		return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Notexist{Notexist: true}}, nil
+		return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Notexist: true}}, nil
 	}
 	// always return must recent version
 	sort.Slice(fsvs, func(i, j int) bool {
 		return fsvs[i].CreateTXG < fsvs[j].CreateTXG
 	})
 	mostRecent := fsvs[len(fsvs)-1]
-	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Guid{Guid: mostRecent.GetGuid()}}, nil
+	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Guid: mostRecent.GetGuid()}}, nil
 }
 
 func (h alwaysUpToDateReplicationCursorHistory) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error) {

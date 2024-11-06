@@ -55,8 +55,6 @@ func (c *SenderConfig) Validate() error {
 
 // Sender implements replication.ReplicationEndpoint for a sending side
 type Sender struct {
-	pdu.UnsafeReplicationServer // prefer compilation errors over default 'method X not implemented' impl
-
 	FSFilter zfs.DatasetFilter
 	jobId    JobID
 	config   SenderConfig
@@ -405,17 +403,6 @@ func (p *Sender) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshots
 	return doDestroySnapshots(ctx, dp, req.Snapshots)
 }
 
-func (p *Sender) Ping(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	res := pdu.PingRes{
-		Echo: req.GetMessage(),
-	}
-	return &res, nil
-}
-
-func (p *Sender) PingDataconn(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	return p.Ping(ctx, req)
-}
-
 func (p *Sender) WaitForConnectivity(ctx context.Context) error {
 	return nil
 }
@@ -431,9 +418,9 @@ func (p *Sender) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCurs
 		return nil, err
 	}
 	if cursor == nil {
-		return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Notexist{Notexist: true}}, nil
+		return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Notexist: true}}, nil
 	}
-	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Guid{Guid: cursor.Guid}}, nil
+	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Guid: cursor.Guid}}, nil
 }
 
 func (p *Sender) Receive(ctx context.Context, r *pdu.ReceiveReq, _ io.ReadCloser) (*pdu.ReceiveRes, error) {
@@ -542,9 +529,6 @@ func NewReceiver(config ReceiverConfig) *Receiver {
 
 // Receiver implements replication.ReplicationEndpoint for a receiving side
 type Receiver struct {
-	// prefer compilation errors over default 'method X not implemented' impl
-	pdu.UnsafeReplicationServer
-
 	conf                  ReceiverConfig // validated
 	bwLimit               bandwidthlimit.Wrapper
 	recvParentCreationMtx *chainlock.L
@@ -704,17 +688,6 @@ func (s *Receiver) ListFilesystemVersions(ctx context.Context, req *pdu.ListFile
 	}
 
 	return &pdu.ListFilesystemVersionsRes{Versions: rfsvs}, nil
-}
-
-func (s *Receiver) Ping(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	res := pdu.PingRes{
-		Echo: req.GetMessage(),
-	}
-	return &res, nil
-}
-
-func (s *Receiver) PingDataconn(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	return s.Ping(ctx, req)
 }
 
 func (s *Receiver) WaitForConnectivity(ctx context.Context) error {
