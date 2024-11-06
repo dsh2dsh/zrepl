@@ -86,6 +86,7 @@ func ReadJsonPayload(h http.Header, r io.Reader, out any) error {
 	if err = json.NewDecoder(lr).Decode(out); err != nil {
 		return fmt.Errorf("jsonclient: decoding json payload %w", err)
 	}
+	_, _ = io.Copy(io.Discard, lr)
 	return nil
 }
 
