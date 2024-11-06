@@ -338,5 +338,12 @@ func (c *Cmd) WaitPipe() error {
 			pipeErr = fmt.Errorf("wait %q: %w", cmd.String(), err)
 		}
 	}
-	return pipeErr
+
+	if pipeErr != nil {
+		if errors.Is(context.Cause(c.ctx), context.DeadlineExceeded) {
+			return fmt.Errorf("timed out: %w", pipeErr)
+		}
+		return pipeErr
+	}
+	return nil
 }
