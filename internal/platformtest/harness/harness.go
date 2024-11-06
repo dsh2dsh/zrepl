@@ -13,8 +13,6 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
-
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
@@ -110,7 +108,6 @@ func HarnessRun(args HarnessArgs) error {
 		panic(err)
 	}
 	ctx := context.Background()
-	defer trace.WithTaskFromStackUpdateCtx(&ctx)()
 	ctx = logging.WithLogger(ctx, logger)
 	ex := platformtest.NewEx(logger)
 

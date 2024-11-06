@@ -15,8 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 )
 
 func CommandContext(ctx context.Context, name string, args ...string) *Cmd {
@@ -33,7 +31,6 @@ type Cmd struct {
 	ctx                                      context.Context
 	mtx                                      sync.RWMutex
 	startedAt, waitStartedAt, waitReturnedAt time.Time
-	waitReturnEndSpanCb                      trace.DoneFunc
 
 	usage        usage
 	stderrOutput []byte
@@ -65,7 +62,7 @@ func (c *Cmd) WithStderrOutput(b []byte) *Cmd {
 
 // err.(*exec.ExitError).Stderr will NOT be set
 func (c *Cmd) CombinedOutput() (o []byte, err error) {
-	c.startPre(false)
+	c.startPre()
 	c.startPost(nil)
 	c.waitPre()
 	o, err = c.cmd.CombinedOutput()
@@ -76,7 +73,7 @@ func (c *Cmd) CombinedOutput() (o []byte, err error) {
 
 // err.(*exec.ExitError).Stderr will be set
 func (c *Cmd) Output() (o []byte, err error) {
-	c.startPre(false)
+	c.startPre()
 	c.startPost(nil)
 	c.waitPre()
 	o, err = c.cmd.Output()
@@ -127,15 +124,10 @@ func (c *Cmd) log() Logger {
 
 // Start the command.
 //
-// This creates a new trace.WithTask as a child task of the ctx passed to
-// CommandContext. If the process is successfully started (err == nil), it is
-// the CALLER'S RESPONSIBILITY to ensure that the spawned process does not
-// outlive the ctx's trace.Task.
-//
 // If this method returns an error, the Cmd instance is invalid. Start must not
 // be called repeatedly.
 func (c *Cmd) Start() error {
-	c.startPre(true)
+	c.startPre()
 	err := c.StartPipe()
 	if err != nil {
 		_ = c.WaitPipe()
@@ -165,13 +157,7 @@ func (c *Cmd) Wait() (err error) {
 	return err
 }
 
-func (c *Cmd) startPre(newTask bool) {
-	if newTask {
-		// avoid explosion of tasks with name c.String()
-		c.ctx, c.waitReturnEndSpanCb = trace.WithTaskAndSpan(c.ctx, "zfscmd", c.String())
-	} else {
-		c.ctx, c.waitReturnEndSpanCb = trace.WithSpan(c.ctx, c.String())
-	}
+func (c *Cmd) startPre() {
 	startPreLogging(c, time.Now())
 }
 
@@ -181,10 +167,6 @@ func (c *Cmd) startPost(err error) {
 
 	startPostReport(c, err, now)
 	startPostLogging(c, err, now)
-
-	if err != nil {
-		c.waitReturnEndSpanCb()
-	}
 }
 
 func (c *Cmd) waitPre() {
@@ -252,9 +234,6 @@ func (c *Cmd) waitPost(err error) {
 		c.LogError(err, false)
 	}
 	waitPostPrometheus(c, c.usage, err, now)
-
-	// must be last because c.ctx might be used by other waitPost calls
-	c.waitReturnEndSpanCb()
 }
 
 func (c *Cmd) LogError(err error, debug bool) {

@@ -2,14 +2,13 @@ package semaphore
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 )
 
 func TestSemaphore(t *testing.T) {
@@ -25,9 +24,17 @@ func TestSemaphore(t *testing.T) {
 		beforeT, afterT uint32
 	}
 
-	rootCtx, endRoot := trace.WithTaskFromStack(context.Background())
-	defer endRoot()
-	_, add, waitEnd := trace.WithTaskGroup(rootCtx, "TestSemaphore")
+	ctx := context.Background()
+
+	var wg sync.WaitGroup
+	add := func(f func(context.Context)) {
+		wg.Add(1)
+		go func() {
+			f(ctx)
+			wg.Done()
+		}()
+	}
+	waitEnd := func() { wg.Wait() }
 
 	for i := 0; i < numGoroutines; i++ {
 		// not capturing i so no need for local copy

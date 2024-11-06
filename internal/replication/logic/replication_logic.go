@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	. "github.com/dsh2dsh/zrepl/internal/replication/logic/diff"
@@ -78,8 +77,6 @@ func (p *Planner) WaitForConnectivity(ctx context.Context) error {
 	var wg sync.WaitGroup
 	doPing := func(endpoint Endpoint, errOut *error) {
 		defer wg.Done()
-		ctx, endTask := trace.WithTaskFromStack(ctx)
-		defer endTask()
 		err := endpoint.WaitForConnectivity(ctx)
 		if err != nil {
 			*errOut = err
@@ -282,8 +279,6 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		ctx, endTask := trace.WithTask(ctx, "list sender filesystems")
-		defer endTask()
 		slfssres, err := p.sender.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
 		if err != nil {
 			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
@@ -295,8 +290,6 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	})
 
 	g.Go(func() error {
-		ctx, endTask := trace.WithTask(ctx, "list receiver filesystems")
-		defer endTask()
 		rlfssres, err := p.receiver.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
 		if err != nil {
 			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
@@ -359,7 +352,7 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 				// all good, fall through
 				log(ctx).Debug("receiver filesystem is placeholder")
 			} else {
-				err := fmt.Errorf("sender filesystem is placeholder, but receiver filesystem is not")
+				err := errors.New("sender filesystem is placeholder, but receiver filesystem is not")
 				log(ctx).Error(err.Error())
 				return nil, err
 			}
@@ -548,15 +541,24 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 	log(ctx).Debug("compute send size estimate")
 	errs := make(chan error, len(steps))
 	fanOutCtx, fanOutCancel := context.WithCancel(ctx)
-	taskCtx, fanOutAdd, fanOutWait := trace.WithTaskGroup(fanOutCtx,
-		"compute-size-estimate")
+
+	var wg sync.WaitGroup
+	fanOutAdd := func(f func(context.Context)) {
+		wg.Add(1)
+		go func() {
+			f(fanOutCtx)
+			wg.Done()
+		}()
+	}
+	fanOutWait := func() { wg.Wait() }
+
 	defer fanOutCancel()
 	for _, step := range steps {
 		// TODO: instead of the semaphore, rely on resource-exhaustion signaled by
 		// the remote endpoint to limit size-estimate requests. Send is handled
 		// over rpc/dataconn ATM, which doesn't support the resource exhaustion
 		// status codes that gRPC defines.
-		guard, err := fs.sizeEstimateRequestSem.Acquire(taskCtx)
+		guard, err := fs.sizeEstimateRequestSem.Acquire(fanOutCtx)
 		if err != nil {
 			fanOutCancel()
 			break

@@ -14,7 +14,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -73,8 +72,7 @@ func curry(f comparisonAssertionFunc, expected interface{}, right bool) (ret val
 }
 
 func TestHooks(t *testing.T) {
-	ctx, end := trace.WithTaskFromStack(context.Background())
-	defer end()
+	ctx := context.Background()
 
 	testFSName := "testpool/testdataset"
 	testSnapshotName := "testsnap"

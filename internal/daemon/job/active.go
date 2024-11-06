@@ -13,7 +13,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/reset"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
@@ -684,21 +683,15 @@ func (j *ActiveSide) SenderConfig() *endpoint.SenderConfig {
 }
 
 func (j *ActiveSide) Run(ctx context.Context, cron *cron.Cron) error {
-	ctx, endTask := trace.WithTaskAndSpan(ctx, "active-side-job", j.Name())
-	defer endTask()
-
 	log := GetLogger(ctx)
 	defer log.Info("job exiting")
 
-	periodicCtx, endTask := trace.WithTask(ctx, "periodic")
-	defer endTask()
 	periodicDone := make(chan struct{})
-	wakeupSig := j.runPeriodic(periodicCtx, periodicDone, cron)
+	wakeupSig := j.runPeriodic(ctx, periodicDone, cron)
 
 	j.running, j.shutdown = context.WithCancel(context.Background())
 	defer j.shutdown()
 
-	cnt := 0
 forLoop:
 	for {
 		log.Info("wait for wakeups")
@@ -713,9 +706,7 @@ forLoop:
 			log.Info("shutdown received")
 			break forLoop
 		}
-
-		cnt++
-		j.do(ctx, cnt)
+		j.do(ctx)
 	}
 	j.wait(log)
 	return nil
@@ -749,10 +740,7 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 	return wakeup.Wait(ctx) // caller will handle wakeup signal
 }
 
-func (j *ActiveSide) do(ctx context.Context, cnt int) {
-	ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("invocation-%d", cnt))
-	defer endSpan()
-
+func (j *ActiveSide) do(ctx context.Context) {
 	j.mode.ConnectEndpoints(ctx, j.connected)
 	defer j.mode.DisconnectEndpoints()
 
@@ -841,9 +829,6 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 	log := GetLogger(ctx)
 	log.Info("start replication")
 
-	ctx, endSpan := trace.WithSpan(ctx, "replication")
-	defer endSpan()
-
 	var repWait driver.WaitFunc
 	sender, receiver := j.mode.SenderReceiver()
 	j.updateTasks(func(tasks *activeSideTasks) {
@@ -869,9 +854,6 @@ func (j *ActiveSide) pruneSender(ctx context.Context) error {
 	log := GetLogger(ctx)
 	log.Info("start pruning sender")
 
-	ctx, endSpan := trace.WithSpan(ctx, "prune_sender")
-	defer endSpan()
-
 	sender, _ := j.mode.SenderReceiver()
 	tasks := j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.state = ActiveSidePruneSender
@@ -887,9 +869,6 @@ func (j *ActiveSide) pruneSender(ctx context.Context) error {
 func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
 	log := GetLogger(ctx)
 	log.Info("start pruning receiver")
-
-	ctx, endSpan := trace.WithSpan(ctx, "prune_recever")
-	defer endSpan()
 
 	sender, receiver := j.mode.SenderReceiver()
 	tasks := j.updateTasks(func(tasks *activeSideTasks) {

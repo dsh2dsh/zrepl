@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
@@ -193,9 +191,6 @@ func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
 func (j *SnapJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
 func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) error {
-	ctx, endTask := trace.WithTaskAndSpan(ctx, "snap-job", j.Name())
-	defer endTask()
-
 	log := GetLogger(ctx)
 	defer log.Info("job exiting")
 	wakeUp := j.goSnap(ctx, cron)
@@ -204,7 +199,6 @@ func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) error {
 	defer cancel(nil)
 	j.shutdown = cancel
 
-	cnt := 0
 forLoop:
 	for {
 		log.Info("wait for wakeups")
@@ -214,9 +208,7 @@ forLoop:
 			break forLoop
 		case <-wakeUp:
 		}
-
-		cnt++
-		j.prune(ctx, cnt)
+		j.prune(ctx)
 	}
 	j.wait(log)
 	return nil
@@ -231,18 +223,12 @@ func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
 	j.wg.Add(1)
 	go func() {
 		defer j.wg.Done()
-		ctx, endTask := trace.WithTask(ctx, "snapshotting")
 		j.snapper.Run(ctx, snapshots, cron)
-		endTask()
 	}()
 	return snapshots
 }
 
-func (j *SnapJob) prune(ctx context.Context, cnt int) {
-	ctx, endSpan := trace.WithSpan(ctx, "invocation-"+strconv.Itoa(cnt))
-	j.doPrune(ctx)
-	endSpan()
-}
+func (j *SnapJob) prune(ctx context.Context) { j.doPrune(ctx) }
 
 func (j *SnapJob) wait(l logger.Logger) {
 	if j.snapper.Periodic() {
@@ -303,8 +289,6 @@ func (h alwaysUpToDateReplicationCursorHistory) ListFilesystems(ctx context.Cont
 }
 
 func (j *SnapJob) doPrune(ctx context.Context) {
-	ctx, endSpan := trace.WithSpan(ctx, "snap-job-do-prune")
-	defer endSpan()
 	log := GetLogger(ctx)
 	sender := endpoint.NewSender(endpoint.SenderConfig{
 		JobID: j.name,

@@ -16,7 +16,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -139,7 +138,6 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 	defer cancel(nil)
 	s.shutdown = cancel
 
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	getLogger(ctx).Debug("start")
 	defer getLogger(ctx).Debug("stop")
 

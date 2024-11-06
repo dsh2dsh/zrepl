@@ -11,7 +11,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/version"
 )
@@ -40,7 +39,6 @@ func Run(ctx context.Context, conf *config.Config) error {
 	log := logger.NewLogger(outlets, 1*time.Second)
 	log.Info(version.NewZreplVersionInformation().String())
 	ctx = logging.WithLogger(ctx, log)
-	registerTraceCallbacks()
 
 	log.Info("starting daemon")
 	jobs := newJobs(ctx, cancel)
@@ -61,22 +59,6 @@ func Run(ctx context.Context, conf *config.Config) error {
 	<-wait.Done()
 	log.Info("daemon exiting")
 	return nil
-}
-
-func registerTraceCallbacks() {
-	trace.RegisterCallback(trace.Callback{
-		OnBegin: func(ctx context.Context) {
-			logging.GetLogger(ctx, logging.SubsysTraceData).Debug("begin span")
-		},
-		OnEnd: func(ctx context.Context, spanInfo trace.SpanInfo) {
-			logging.
-				GetLogger(ctx, logging.SubsysTraceData).
-				WithField("duration_s",
-					spanInfo.EndedAt().Sub(spanInfo.StartedAt()).Seconds()).
-				Debug("finished span " +
-					spanInfo.TaskAndSpanStack(trace.SpanStackKindAnnotation))
-		},
-	})
 }
 
 func startServer(log logger.Logger, conf *config.Config, jobs *jobs,

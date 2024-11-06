@@ -10,7 +10,6 @@ import (
 	"os"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/tlsconf"
 )
@@ -68,7 +67,6 @@ const (
 	SubsysRPCControl   Subsystem = "rpc.ctrl"
 	SubsysRPCData      Subsystem = "rpc.data"
 	SubsysZFSCmd       Subsystem = "zfs.cmd"
-	SubsysTraceData    Subsystem = "trace.data"
 	SubsysPlatformtest Subsystem = "platformtest"
 )
 
@@ -87,7 +85,6 @@ var AllSubsystems = []Subsystem{
 	SubsysRPCControl,
 	SubsysRPCData,
 	SubsysZFSCmd,
-	SubsysTraceData,
 	SubsysPlatformtest,
 }
 
@@ -101,10 +98,7 @@ func WithLogger(ctx context.Context, l logger.Logger) context.Context {
 }
 
 func GetLogger(ctx context.Context, subsys Subsystem) logger.Logger {
-	return FromContext(ctx).
-		WithField(SubsysField, subsys).
-		WithField(SpanField,
-			trace.GetSpanStackOrDefault(ctx, *trace.StackKindId, "NOSPAN"))
+	return FromContext(ctx).WithField(SubsysField, subsys)
 }
 
 func FromContext(ctx context.Context) logger.Logger {

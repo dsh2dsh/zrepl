@@ -12,7 +12,6 @@ import (
 
 	"github.com/kr/pretty"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
 	"github.com/dsh2dsh/zrepl/internal/util/chainedio"
@@ -98,8 +97,6 @@ func (s *Sender) filterCheckFS(fs string) (*zfs.DatasetPath, error) {
 }
 
 func (s *Sender) ListFilesystems(ctx context.Context, r *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	fss, err := zfs.ZFSListMapping(ctx, s.FSFilter)
 	if err != nil {
 		return nil, err
@@ -132,8 +129,6 @@ func (s *Sender) ListFilesystems(ctx context.Context, r *pdu.ListFilesystemReq) 
 }
 
 func (s *Sender) ListFilesystemVersions(ctx context.Context, r *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	lp, err := s.filterCheckFS(r.GetFilesystem())
 	if err != nil {
 		return nil, err
@@ -200,8 +195,6 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 }
 
 func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	sendArgs, err := s.sendMakeArgs(ctx, r)
 	if err != nil {
 		return nil, nil, err
@@ -263,9 +256,6 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 		liveAbs = append(liveAbs, destroyTypes.ExtractBookmark(dp, sendArgs.FromVersion))
 	}
 	func() {
-		ctx, endSpan := trace.WithSpan(ctx, "cleanup-stale-abstractions")
-		defer endSpan()
-
 		keep := func(a Abstraction) (keep bool) {
 			keep = false
 			for _, k := range liveAbs {
@@ -337,8 +327,6 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 
 func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq,
 ) (*pdu.SendRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	sendArgs, err := s.sendMakeArgs(ctx, r)
 	if err != nil {
 		return nil, err
@@ -359,8 +347,6 @@ func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq,
 }
 
 func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	orig := r.GetOriginalReq() // may be nil, always use proto getters
 	fsp, err := p.filterCheckFS(orig.GetFilesystem())
 	if err != nil {
@@ -412,8 +398,6 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*p
 }
 
 func (p *Sender) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	dp, err := p.filterCheckFS(req.Filesystem)
 	if err != nil {
 		return nil, err
@@ -422,8 +406,6 @@ func (p *Sender) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshots
 }
 
 func (p *Sender) Ping(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	res := pdu.PingRes{
 		Echo: req.GetMessage(),
 	}
@@ -431,20 +413,14 @@ func (p *Sender) Ping(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, erro
 }
 
 func (p *Sender) PingDataconn(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	return p.Ping(ctx, req)
 }
 
 func (p *Sender) WaitForConnectivity(ctx context.Context) error {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	return nil
 }
 
 func (p *Sender) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	dp, err := p.filterCheckFS(req.Filesystem)
 	if err != nil {
 		return nil, err
@@ -658,8 +634,6 @@ func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
 }
 
 func (s *Receiver) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	// first make sure that root_fs is imported
 	if rphs, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, s.conf.RootWithoutClientComponent); err != nil {
 		return nil, fmt.Errorf("cannot determine whether root_fs exists: %w", err)
@@ -712,8 +686,6 @@ func (s *Receiver) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemR
 }
 
 func (s *Receiver) ListFilesystemVersions(ctx context.Context, req *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	root := s.clientRootFromCtx(ctx)
 	lp, err := subroot{root}.MapToLocal(req.GetFilesystem())
 	if err != nil {
@@ -735,8 +707,6 @@ func (s *Receiver) ListFilesystemVersions(ctx context.Context, req *pdu.ListFile
 }
 
 func (s *Receiver) Ping(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	res := pdu.PingRes{
 		Echo: req.GetMessage(),
 	}
@@ -744,27 +714,22 @@ func (s *Receiver) Ping(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, er
 }
 
 func (s *Receiver) PingDataconn(ctx context.Context, req *pdu.PingReq) (*pdu.PingRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	return s.Ping(ctx, req)
 }
 
 func (s *Receiver) WaitForConnectivity(ctx context.Context) error {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	return nil
 }
 
 func (s *Receiver) ReplicationCursor(ctx context.Context, _ *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	return nil, errors.New("ReplicationCursor not implemented for Receiver")
 }
 
 func (s *Receiver) Send(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	return nil, nil, errors.New("receiver does not implement Send()")
 }
 
 func (s *Receiver) SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	return nil, errors.New("receiver does not implement SendDry()")
 }
 
@@ -796,8 +761,6 @@ func (s *Receiver) receive_GetPlaceholderCreationEncryptionValue(client_root, pa
 }
 
 func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.ReadCloser) (*pdu.ReceiveRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	getLogger(ctx).Debug("incoming Receive")
 	defer receive.Close()
 
@@ -1068,8 +1031,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 }
 
 func (s *Receiver) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	root := s.clientRootFromCtx(ctx)
 	lp, err := subroot{root}.MapToLocal(req.Filesystem)
 	if err != nil {
@@ -1079,8 +1040,6 @@ func (s *Receiver) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapsho
 }
 
 func (p *Receiver) SendCompleted(ctx context.Context, _ *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	return &pdu.SendCompletedRes{}, nil
 }
 

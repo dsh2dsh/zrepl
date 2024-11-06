@@ -3,14 +3,12 @@ package job
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -19,8 +17,6 @@ import (
 type PassiveSide struct {
 	mode passiveMode
 	name endpoint.JobID
-
-	wg sync.WaitGroup
 }
 
 type passiveMode interface {
@@ -228,10 +224,8 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) error {
 		return fmt.Errorf("running not periodic job: %s", j.Name())
 	}
 
-	ctx, endTask := trace.WithTaskAndSpan(ctx, "passive-side-job", j.Name())
 	j.mode.RunPeriodic(ctx, cron)
 	GetLogger(ctx).Info("job exiting")
-	endTask()
 	return nil
 }
 

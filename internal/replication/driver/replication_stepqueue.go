@@ -5,7 +5,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 )
 
@@ -158,7 +157,6 @@ func (q *stepQueue) sendAndWaitForWakeup(ident interface{}, targetDate time.Time
 
 // Wait for the ident with targetDate to be selected to run.
 func (q *stepQueue) WaitReady(ctx context.Context, ident interface{}, targetDate time.Time) StepCompletedFunc {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	if targetDate.IsZero() {
 		panic("targetDate of zero is reserved for marking Done")
 	}

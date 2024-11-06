@@ -14,7 +14,6 @@ import (
 	jsondiff "github.com/yudai/gojsondiff"
 	jsondiffformatter "github.com/yudai/gojsondiff/formatter"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 )
 
@@ -147,7 +146,6 @@ func (f *mockStep) ReportInfo() *report.StepInfo {
 // For the time being, let's just exercise the code a bit.
 func TestReplication(t *testing.T) {
 	ctx := context.Background()
-	defer trace.WithTaskFromStackUpdateCtx(&ctx)()
 
 	mp := &mockPlanner{}
 	driverConfig := Config{

@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/rpc/grpcclientidentity/grpchelper"
 	"github.com/dsh2dsh/zrepl/internal/version"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -114,10 +113,7 @@ func (s *Subcommand) Config() *config.Config {
 func (s *Subcommand) run(cmd *cobra.Command, args []string) {
 	s.tryParseConfig()
 	ctx := context.Background()
-	endTask := trace.WithTaskFromStackUpdateCtx(&ctx)
-	defer endTask()
 	err := s.Run(ctx, s, args)
-	endTask()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)

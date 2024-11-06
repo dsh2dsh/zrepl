@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/util/semaphore"
@@ -622,12 +621,20 @@ func ListAbstractionsStreamed(ctx context.Context, query ListZFSHoldsAndBookmark
 	}
 
 	sem := semaphore.New(int64(query.Concurrency))
-	ctx, endTask := trace.WithTask(ctx, "list-abstractions-streamed-producer")
 	go func() {
 		defer close(out)
 		defer close(outErrs)
 
-		_, add, wait := trace.WithTaskGroup(ctx, "list-abstractions-impl-fs")
+		var wg sync.WaitGroup
+		add := func(f func(context.Context)) {
+			wg.Add(1)
+			go func() {
+				f(ctx)
+				wg.Done()
+			}()
+		}
+		wait := func() { wg.Wait() }
+
 		defer wait()
 		for _, fs := range fss {
 			add(func(ctx context.Context) {
@@ -644,9 +651,7 @@ func ListAbstractionsStreamed(ctx context.Context, query ListZFSHoldsAndBookmark
 		}
 	}()
 
-	drainDone = func() {
-		endTask()
-	}
+	drainDone = func() {}
 
 	return out, outErrs, drainDone, nil
 }

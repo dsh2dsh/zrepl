@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -339,9 +338,6 @@ func (a *attempt) do(ctx context.Context, prev *attempt,
 func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
 	running context.Context,
 ) map[*fs]*fs {
-	ctx, endSpan := trace.WithSpan(ctx, "plan")
-	defer endSpan()
-
 	pfss, err := a.planner.Plan(ctx)
 	errTime := time.Now()
 	defer a.l.Lock().Unlock()
@@ -461,8 +457,6 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
 func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
 	running context.Context,
 ) {
-	ctx, endSpan := trace.WithSpan(ctx, "do-repl")
-	defer endSpan()
 	defer a.l.Lock().Unlock()
 
 	stepQueue := newStepQueue()
@@ -474,9 +468,6 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
 		go func(f *fs) {
 			defer fssesDone.Done()
 			// avoid explosion of tasks with name f.report().Info.Name
-			ctx, endTask := trace.WithTaskAndSpan(ctx, "repl-fs",
-				f.report().Info.Name)
-			defer endTask()
 			f.do(ctx, stepQueue, prevs[f], a.config.OneStep, running)
 			f.l.HoldWhile(func() {
 				// every return from f means it's unblocked...
@@ -719,9 +710,6 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 			f.l.HoldWhile(func() { f.blockedOn = report.FsBlockedOnNothing })
 			// do the step
 			if ctx.Err() == nil && running.Err() == nil {
-				ctx, endSpan := trace.WithSpan(ctx, fmt.Sprintf("%#v",
-					s.step.ReportInfo()))
-				defer endSpan()
 				err = s.step.Step(ctx) // no shadow
 			}
 			errTime = time.Now()

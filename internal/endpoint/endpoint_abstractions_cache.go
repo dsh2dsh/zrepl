@@ -7,7 +7,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 )
 
@@ -88,7 +87,6 @@ func (s *abstractionsCache) InvalidateFSCache(fs string) {
 // That means that for precise results, all abstractions created by the endpoint must be .Put into this cache.
 func (s *abstractionsCache) GetAndDeleteByJobIDAndFS(ctx context.Context, jobID JobID, fs string, types AbstractionTypeSet, keep func(a Abstraction) bool) (ret []Abstraction) {
 	defer s.mtx.Lock().Unlock()
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	var zeroJobId JobID
 	if jobID == zeroJobId {
 		panic("must not pass zero-value job id")
@@ -150,8 +148,6 @@ func (s *abstractionsCache) tryLoadOnDiskAbstractions(ctx context.Context, fs st
 
 // caller should _not hold s.mtx
 func (s *abstractionsCache) tryLoadOnDiskAbstractionsImpl(ctx context.Context, fs string) ([]Abstraction, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
-
 	q := ListZFSHoldsAndBookmarksQuery{
 		FS: ListZFSHoldsAndBookmarksQueryFilesystemFilter{
 			FS: &fs,
@@ -178,8 +174,6 @@ func (s *abstractionsCache) tryLoadOnDiskAbstractionsImpl(ctx context.Context, f
 
 func (s *abstractionsCache) TryBatchDestroy(ctx context.Context, jobId JobID, fs string, types AbstractionTypeSet, keep func(a Abstraction) bool, check func(willDestroy []Abstraction)) {
 	// no s.mtx, we only use the public interface in this function
-
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 
 	obsoleteAbs := s.GetAndDeleteByJobIDAndFS(ctx, jobId, fs, types, keep)
 

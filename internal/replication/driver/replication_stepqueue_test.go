@@ -13,22 +13,18 @@ import (
 	"github.com/montanaflynn/stats"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/util/zreplcircleci"
 )
 
 func TestPqNotconcurrent(t *testing.T) {
 	zreplcircleci.SkipOnCircleCI(t, "because it relies on scheduler responsiveness < 500ms")
 
-	ctx, end := trace.WithTaskFromStack(context.Background())
-	defer end()
+	ctx := context.Background()
 	var ctr uint32
 	q := newStepQueue()
 	var wg sync.WaitGroup
 	wg.Add(4)
 	go func() {
-		ctx, end := trace.WithTaskFromStack(ctx)
-		defer end()
 		defer wg.Done()
 		defer q.WaitReady(ctx, "1", time.Unix(9999, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
@@ -42,24 +38,18 @@ func TestPqNotconcurrent(t *testing.T) {
 
 	// while "1" is still running, queue in "2", "3" and "4"
 	go func() {
-		ctx, end := trace.WithTaskFromStack(ctx)
-		defer end()
 		defer wg.Done()
 		defer q.WaitReady(ctx, "2", time.Unix(2, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
 		assert.Equal(t, uint32(2), ret)
 	}()
 	go func() {
-		ctx, end := trace.WithTaskFromStack(ctx)
-		defer end()
 		defer wg.Done()
 		defer q.WaitReady(ctx, "3", time.Unix(3, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
 		assert.Equal(t, uint32(3), ret)
 	}()
 	go func() {
-		ctx, end := trace.WithTaskFromStack(ctx)
-		defer end()
 		defer wg.Done()
 		defer q.WaitReady(ctx, "4", time.Unix(4, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
@@ -94,8 +84,7 @@ func TestPqConcurrent(t *testing.T) {
 	t.Skip("is this test broken?")
 	zreplcircleci.SkipOnCircleCI(t, "because it relies on scheduler responsiveness < 500ms")
 
-	ctx, end := trace.WithTaskFromStack(context.Background())
-	defer end()
+	ctx := context.Background()
 
 	q := newStepQueue()
 	var wg sync.WaitGroup
@@ -109,8 +98,6 @@ func TestPqConcurrent(t *testing.T) {
 	records := make(chan []record, filesystems)
 	for fs := 0; fs < filesystems; fs++ {
 		go func(fs int) {
-			ctx, end := trace.WithTaskFromStack(ctx)
-			defer end()
 			defer wg.Done()
 			recs := make([]record, 0)
 			for step := 0; step < stepsPerFS; step++ {

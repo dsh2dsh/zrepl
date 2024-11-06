@@ -4,8 +4,6 @@ import (
 	"context"
 
 	wsemaphore "golang.org/x/sync/semaphore"
-
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 )
 
 type S struct {
@@ -23,7 +21,6 @@ type AcquireGuard struct {
 
 // The returned AcquireGuard is not goroutine-safe.
 func (s *S) Acquire(ctx context.Context) (*AcquireGuard, error) {
-	defer trace.WithSpanFromStackUpdateCtx(&ctx)()
 	if err := s.ws.Acquire(ctx, 1); err != nil {
 		return nil, err
 	} else if err := ctx.Err(); err != nil {

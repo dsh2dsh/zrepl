@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging/trace"
 	"github.com/dsh2dsh/zrepl/internal/daemon/middleware"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
@@ -34,7 +33,6 @@ func mustRegisterMetrics(registerer prometheus.Registerer) {
 	// register global (=non job-local) metrics
 	version.PrometheusRegister(registerer)
 	zfscmd.RegisterMetrics(registerer)
-	trace.RegisterMetrics(registerer)
 	endpoint.RegisterMetrics(registerer)
 
 	registerer.MustRegister(metricLogEntries)
