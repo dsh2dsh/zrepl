@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kr/pretty"
-
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
@@ -788,7 +786,7 @@ func (a *attempt) report() *report.AttemptReport {
 			}
 		}
 	} else {
-		panic(fmt.Sprintf("attempt.planErr and attempt.fss must not both be != nil:\n%s\n%s", pretty.Sprint(a.planErr), pretty.Sprint(a.fss)))
+		panic(fmt.Sprintf("attempt.planErr and attempt.fss must not both be != nil:\n%#v\n%#v", a.planErr, a.fss))
 	}
 	r.State = state
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/kr/pretty"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
@@ -281,7 +280,7 @@ initial_then_incremental:
 		for j := 0; j < 3; j++ {
 
 			lastReport = rep.Do(ctx)
-			ctx.Logf("\nreport=%s", pretty.Sprint(lastReport))
+			ctx.Logf("\nreport=%#v", lastReport)
 			require.Len(ctx, lastReport.Attempts, 1)
 			require.Len(ctx, lastReport.Attempts[0].Filesystems, 1)
 			lastReportFS := lastReport.Attempts[0].Filesystems[0]
@@ -319,7 +318,7 @@ initial_then_incremental:
 
 					rep.skipSendArgsValidation = true
 					setupResumeReport := rep.Do(ctx)
-					ctx.Logf("setupResumeReport=%s", pretty.Sprint(setupResumeReport))
+					ctx.Logf("setupResumeReport=%#v", setupResumeReport)
 					rep.skipSendArgsValidation = false
 					rt, err := zfs.ZFSGetReceiveResumeTokenOrEmptyStringIfNotSupported(ctx, mustDatasetPath(rfs))
 					require.NoError(ctx, err)

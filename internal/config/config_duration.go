@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kr/pretty"
 	"gopkg.in/yaml.v3"
 )
 
@@ -68,7 +67,7 @@ func parseDuration(e string) (d time.Duration, err error) {
 		return
 	}
 	if len(comps) != 3 {
-		panic(pretty.Sprint(comps))
+		panic(fmt.Sprintf("%#v", comps))
 	}
 
 	durationFactor, err := strconv.ParseInt(comps[1], 10, 64)

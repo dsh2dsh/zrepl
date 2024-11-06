@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kr/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -187,7 +186,7 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 			}
 
 			t.Logf("file: %s", p)
-			t.Log(pretty.Sprint(c))
+			t.Logf("%#v", c)
 
 			jobs, _, err := JobsFromConfig(c)
 			t.Logf("jobs: %#v", jobs)

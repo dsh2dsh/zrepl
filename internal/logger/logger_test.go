@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kr/pretty"
-
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
@@ -42,5 +40,5 @@ func TestLogger_Basic(t *testing.T) {
 
 	l.WithError(errors.New("fooerror")).Error("error")
 
-	t.Log(pretty.Sprint(outlet_arr))
+	t.Logf("%#v", outlet_arr)
 }

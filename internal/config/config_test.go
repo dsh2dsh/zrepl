@@ -10,7 +10,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/kr/pretty"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +34,7 @@ func TestSampleConfigsAreParsedWithoutErrors(t *testing.T) {
 			}
 
 			t.Logf("file: %s", p)
-			t.Log(pretty.Sprint(c))
+			t.Logf("%#v", c)
 		})
 
 	}

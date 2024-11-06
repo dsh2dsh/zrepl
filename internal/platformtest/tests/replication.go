@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
@@ -155,7 +154,7 @@ func ReplicationIncrementalIsPossibleIfCommonSnapshotIsDestroyed(ctx *platformte
 
 	// first replication
 	report := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 
 	// assert @1 exists on receiver
 	_ = fsversion(ctx, rfs, "@1")
@@ -175,7 +174,7 @@ func ReplicationIncrementalIsPossibleIfCommonSnapshotIsDestroyed(ctx *platformte
 	// second replication of a new snapshot, should use the cursor
 	mustSnapshot(ctx, sfs+"@2")
 	report = rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 	_ = fsversion(ctx, rfs, "@2")
 }
 
@@ -217,7 +216,7 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 
 	// first replication
 	report := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 
 	// assert most recent send-side version @3 exists on receiver (=replication succeeded)
 	rSnap3 := fsversion(ctx, rfs, "@3")
@@ -306,7 +305,7 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 	checkOjidAbstractionsExist()
 
 	report = rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 
 	checkOjidAbstractionsExist()
 
@@ -352,7 +351,7 @@ func implReplicationIncrementalCleansUpStaleAbstractions(ctx *platformtest.Conte
 			require.Contains(ctx, bmNames, "2")
 		} else {
 			require.Len(ctx, sBms, 6)
-			ctx.Logf("%s", pretty.Sprint(sBms))
+			ctx.Logf("%#v", sBms)
 			require.Contains(ctx, bmNames, snap5SjidCursorName)
 			require.Contains(ctx, bmNames, snap2SjidCursorName)
 			require.Contains(ctx, bmNames, snap2OjidCursorName)
@@ -407,7 +406,7 @@ func ReplicationIncrementalHandlesFromVersionEqTentativeCursorCorrectly(ctx *pla
 
 	// Do initial replication to set up the test.
 	rep1 := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(rep1))
+	ctx.Logf("\n%#v", rep1)
 	sfsDs := mustDatasetPath(sfs)
 	snap1_sender := mustGetFilesystemVersion(ctx, sfs+"@1")
 	snap1_replicationCursor_name, err := endpoint.ReplicationCursorBookmarkName(sfs, snap1_sender.Guid, sjid)
@@ -438,7 +437,7 @@ func ReplicationIncrementalHandlesFromVersionEqTentativeCursorCorrectly(ctx *pla
 	mustGetFilesystemVersion(ctx, sfs+"@2")
 	// do the replication
 	rep2 := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(rep2))
+	ctx.Logf("\n%#v", rep2)
 
 	// Ensure that the tentative cursor was used.
 	require.Len(ctx, rep2.Attempts, 1)
@@ -555,7 +554,7 @@ func implReplicationIsResumableFullSend(ctx *platformtest.Context, setup replica
 
 	for i := 2; i < 10; i++ {
 		report := rep.Do(ctx)
-		ctx.Logf("\n%s", pretty.Sprint(report))
+		ctx.Logf("\n%#v", report)
 
 		// always attempt to destroy the incremental source
 		err := zfs.ZFSDestroy(ctx, snap1.FullPath(sfs))
@@ -628,7 +627,7 @@ func ReplicationIncrementalDestroysStepHoldsIffIncrementalStepHoldsAreDisabledBu
 		}
 		rfs := rep.ReceiveSideFilesystem()
 		report := rep.Do(ctx)
-		ctx.Logf("\n%s", pretty.Sprint(report))
+		ctx.Logf("\n%#v", report)
 		// assert this worked (not the main subject of the test)
 		_ = fsversion(ctx, rfs, "@1")
 	}
@@ -658,7 +657,7 @@ func ReplicationIncrementalDestroysStepHoldsIffIncrementalStepHoldsAreDisabledBu
 		}
 		rfs := rep.ReceiveSideFilesystem()
 		report := rep.Do(ctx)
-		ctx.Logf("\n%s", pretty.Sprint(report))
+		ctx.Logf("\n%#v", report)
 		// assert this partial receive worked
 		_, err := zfs.ZFSGetFilesystemVersion(ctx, rfs+"@2")
 		ctx.Logf("%T %s", err, err)
@@ -706,7 +705,7 @@ func ReplicationIncrementalDestroysStepHoldsIffIncrementalStepHoldsAreDisabledBu
 	for i := 0; ; i++ {
 		require.Less(ctx, i, 5)
 		report := rep.Do(ctx)
-		ctx.Logf("retry run=%v\n%s", i, pretty.Sprint(report))
+		ctx.Logf("retry run=%v\n%#v", i, report)
 		_, err := zfs.ZFSGetFilesystemVersion(ctx, rfs+"@2")
 		if err == nil {
 			break
@@ -810,7 +809,7 @@ func replicationStepCompletedLostBehavior_impl(ctx *platformtest.Context, guaran
 		}
 		rfs := rep.ReceiveSideFilesystem()
 		report := rep.Do(ctx)
-		ctx.Logf("\n%s", pretty.Sprint(report))
+		ctx.Logf("\n%#v", report)
 		// assert this worked (not the main subject of the test)
 		_ = fsversion(ctx, rfs, "@1")
 	}
@@ -831,7 +830,7 @@ func replicationStepCompletedLostBehavior_impl(ctx *platformtest.Context, guaran
 	}
 	rfs := rep.ReceiveSideFilesystem()
 	report := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 
 	// assert the replication worked
 	_ = fsversion(ctx, rfs, "@2")
@@ -875,7 +874,7 @@ func replicationStepCompletedLostBehavior_impl(ctx *platformtest.Context, guaran
 			guarantee: pdu.ReplicationConfigProtectionWithKind(guaranteeKind),
 		}
 		report := rep.Do(ctx)
-		ctx.Logf("expecting failure:\n%s", pretty.Sprint(report))
+		ctx.Logf("expecting failure:\n%#v", report)
 		require.Len(ctx, report.Attempts, 1)
 		require.Len(ctx, report.Attempts[0].Filesystems, 1)
 		return &replicationStepCompletedLost_scenario{
@@ -958,7 +957,7 @@ func ReplicationReceiverErrorWhileStillSending(ctx *platformtest.Context) {
 
 	// first replication
 	report := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 
 	require.Len(ctx, report.Attempts, 1)
 	attempt := report.Attempts[0]
@@ -1012,7 +1011,7 @@ func ReplicationFailingInitialParentProhibitsChildReplication(ctx *platformtest.
 	}
 
 	r := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(r))
+	ctx.Logf("\n%#v", r)
 
 	require.Len(ctx, r.Attempts, 1)
 	attempt := r.Attempts[0]
@@ -1131,7 +1130,7 @@ func ReplicationPropertyReplicationWorks(ctx *platformtest.Context) {
 	}
 
 	r := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(r))
+	ctx.Logf("\n%#v", r)
 
 	require.Len(ctx, r.Attempts, 1)
 	attempt := r.Attempts[0]
@@ -1224,7 +1223,7 @@ func ReplicationPlaceholderEncryption__UnspecifiedLeadsToFailureAtRuntimeWhenCre
 	}
 
 	r := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(r))
+	ctx.Logf("\n%#v", r)
 
 	require.Len(ctx, r.Attempts, 1)
 	attempt := r.Attempts[0]
@@ -1302,7 +1301,7 @@ func ReplicationPlaceholderEncryption__UnspecifiedIsOkForClientIdentityPlacehold
 	}
 
 	r := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(r))
+	ctx.Logf("\n%#v", r)
 
 	require.Len(ctx, r.Attempts, 1)
 	attempt := r.Attempts[0]
@@ -1365,7 +1364,7 @@ func replicationPlaceholderEncryption__EncryptOnReceiverUseCase__impl(ctx *platf
 	}
 
 	r := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(r))
+	ctx.Logf("\n%#v", r)
 
 	require.Len(ctx, r.Attempts, 1)
 	attempt := r.Attempts[0]
@@ -1428,7 +1427,7 @@ func replicationInitialImpl(ctx *platformtest.Context, iras logic.InitialReplica
 
 	// first replication
 	report := rep.Do(ctx)
-	ctx.Logf("\n%s", pretty.Sprint(report))
+	ctx.Logf("\n%#v", report)
 
 	versions, err := zfs.ZFSListFilesystemVersions(ctx, mustDatasetPath(rfs), zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
 	if _, ok := err.(*zfs.DatasetDoesNotExist); ok {
@@ -1551,7 +1550,7 @@ func ReplicationOfPlaceholderFilesystemsInChainedReplicationScenario(ctx *platfo
 		}
 
 		r := rep.Do(ctx)
-		ctx.Logf("\n%s", pretty.Sprint(r))
+		ctx.Logf("\n%#v", r)
 	}
 
 	do_repl(h1_to_h2)

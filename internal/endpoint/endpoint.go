@@ -10,8 +10,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/kr/pretty"
-
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
 	"github.com/dsh2dsh/zrepl/internal/util/chainedio"
@@ -295,7 +293,7 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 			}
 			var msg strings.Builder
 			fmt.Fprintf(&msg, "cleaning up send stale would destroy send args:\n")
-			fmt.Fprintf(&msg, "  SendArgs: %s\n", pretty.Sprint(sendArgs))
+			fmt.Fprintf(&msg, "  SendArgs: %#v\n", sendArgs)
 			for _, check := range problems {
 				fmt.Fprintf(&msg, "would delete %s %s because it was deemed an obsolete abstraction: %s\n",
 					check.sendArgsWhat, check.fullpath, check.obsoleteAbs)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
-	"github.com/kr/pretty"
 	"github.com/spf13/pflag"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
@@ -235,7 +234,7 @@ func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, f
 		return migrateReplicationCursorSkipSentinel
 	}
 
-	fmt.Printf("found v1 replication cursor:\n%s\n", pretty.Sprint(oldCursor))
+	fmt.Printf("found v1 replication cursor:\n%#v\n", oldCursor)
 
 	mostRecentNew, err := endpoint.GetMostRecentReplicationCursorOfJob(ctx, fs.ToString(), owningJob.SenderConfig().JobID)
 	if err != nil {

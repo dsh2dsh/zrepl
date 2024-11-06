@@ -13,7 +13,6 @@ require (
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/juju/ratelimit v1.0.2
 	github.com/klauspost/compress v1.17.11
-	github.com/kr/pretty v0.3.1
 	github.com/montanaflynn/stats v0.7.1
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.20.5
