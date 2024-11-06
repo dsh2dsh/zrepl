@@ -78,7 +78,6 @@ func (self *Client) endpoint(i int) string { return self.endpoints[i] }
 func (self *Client) json() *jsonclient.Client { return self.jsonClient }
 
 func (self *Client) ListFilesystems(ctx context.Context,
-	_ *pdu.ListFilesystemReq,
 ) (*pdu.ListFilesystemRes, error) {
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()

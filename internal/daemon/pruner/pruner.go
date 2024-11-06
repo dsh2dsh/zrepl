@@ -27,7 +27,7 @@ import (
 // Try to keep it compatible with github.com/dsh2dsh/zrepl/endpoint.Endpoint
 type Sender interface {
 	ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error)
-	ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error)
+	ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error)
 }
 
 // The pruning target, i.e., on which snapshots are destroyed.
@@ -35,7 +35,7 @@ type Sender interface {
 //
 // Try to keep it compatible with github.com/dsh2dsh/zrepl/endpoint.Endpoint
 type Target interface {
-	ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error)
+	ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error)
 	ListFilesystemVersions(ctx context.Context, req *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error)
 	DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error)
 }
@@ -405,7 +405,7 @@ func (s snapshot) Date() time.Time { return s.date }
 func doOneAttempt(a *args, u updater) {
 	ctx, target, sender := a.ctx, a.target, a.sender
 
-	sfssres, err := sender.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
+	sfssres, err := sender.ListFilesystems(ctx)
 	if err != nil {
 		u(func(p *Pruner) {
 			p.state = PlanErr
@@ -418,7 +418,7 @@ func doOneAttempt(a *args, u updater) {
 		sfss[sfs.GetPath()] = sfs
 	}
 
-	tfssres, err := target.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
+	tfssres, err := target.ListFilesystems(ctx)
 	if err != nil {
 		u(func(p *Pruner) {
 			p.state = PlanErr

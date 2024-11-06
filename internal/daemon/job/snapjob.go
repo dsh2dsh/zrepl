@@ -284,8 +284,8 @@ func (h alwaysUpToDateReplicationCursorHistory) ReplicationCursor(ctx context.Co
 	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Guid: mostRecent.GetGuid()}}, nil
 }
 
-func (h alwaysUpToDateReplicationCursorHistory) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error) {
-	return h.target.ListFilesystems(ctx, req)
+func (h alwaysUpToDateReplicationCursorHistory) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error) {
+	return h.target.ListFilesystems(ctx)
 }
 
 func (j *SnapJob) doPrune(ctx context.Context) {

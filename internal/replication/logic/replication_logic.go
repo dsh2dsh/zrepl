@@ -28,7 +28,7 @@ import (
 // named interfaces defined in this package.
 type Endpoint interface {
 	// Does not include placeholder filesystems
-	ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error)
+	ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error)
 	ListFilesystemVersions(ctx context.Context, req *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error)
 	DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error)
 	WaitForConnectivity(ctx context.Context) error
@@ -279,7 +279,7 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		slfssres, err := p.sender.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
+		slfssres, err := p.sender.ListFilesystems(ctx)
 		if err != nil {
 			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
 				Error("error listing sender filesystems")
@@ -290,7 +290,7 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	})
 
 	g.Go(func() error {
-		rlfssres, err := p.receiver.ListFilesystems(ctx, &pdu.ListFilesystemReq{})
+		rlfssres, err := p.receiver.ListFilesystems(ctx)
 		if err != nil {
 			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
 				Error("error listing receiver filesystems")

@@ -88,8 +88,7 @@ func (self *zfsJob) listFilesystems(ctx context.Context,
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
 
-	var req pdu.ListFilesystemReq
-	resp, err := ep.ListFilesystems(ctx, &req)
+	resp, err := ep.ListFilesystems(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list filesystems: %w", err)
 	}

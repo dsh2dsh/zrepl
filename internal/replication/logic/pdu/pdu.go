@@ -1,7 +1,5 @@
 package pdu
 
-type ListFilesystemReq struct{}
-
 type ListFilesystemRes struct {
 	Filesystems []*Filesystem `json:"Filesystems,omitempty"`
 }

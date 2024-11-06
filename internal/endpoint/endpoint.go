@@ -92,7 +92,7 @@ func (s *Sender) filterCheckFS(fs string) (*zfs.DatasetPath, error) {
 	return dp, nil
 }
 
-func (s *Sender) ListFilesystems(ctx context.Context, r *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error) {
+func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error) {
 	fss, err := zfs.ZFSListMapping(ctx, s.FSFilter)
 	if err != nil {
 		return nil, err
@@ -615,7 +615,7 @@ func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
 	return c, nil
 }
 
-func (s *Receiver) ListFilesystems(ctx context.Context, req *pdu.ListFilesystemReq) (*pdu.ListFilesystemRes, error) {
+func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error) {
 	// first make sure that root_fs is imported
 	if rphs, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, s.conf.RootWithoutClientComponent); err != nil {
 		return nil, fmt.Errorf("cannot determine whether root_fs exists: %w", err)
