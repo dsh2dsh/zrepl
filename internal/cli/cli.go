@@ -82,12 +82,15 @@ func init() {
 }
 
 type Subcommand struct {
-	Use             string
-	Short           string
-	Long            string
-	Example         string
+	Use     string
+	Short   string
+	Long    string
+	Example string
+
 	NoRequireConfig bool
-	Run             func(ctx context.Context, subcommand *Subcommand,
+	ConfigWithKeys  bool
+
+	Run func(ctx context.Context, subcommand *Subcommand,
 		args []string) error
 	SetupFlags       func(f *pflag.FlagSet)
 	SetupSubcommands func() []*Subcommand
@@ -122,8 +125,12 @@ func (s *Subcommand) run(cmd *cobra.Command, args []string) {
 }
 
 func (s *Subcommand) tryParseConfig() {
-	config, err := config.ParseConfig(rootArgs.configPath,
-		config.WithSkipKeys())
+	opts := make([]config.Option, 0, 1)
+	if !s.ConfigWithKeys {
+		opts = append(opts, config.WithSkipKeys())
+	}
+
+	config, err := config.ParseConfig(rootArgs.configPath, opts...)
 	s.configErr = err
 	if err != nil {
 		if s.NoRequireConfig {
