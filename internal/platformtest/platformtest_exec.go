@@ -1,12 +1,11 @@
 package platformtest
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os/exec"
-
-	"github.com/dsh2dsh/zrepl/internal/util/circlog"
 )
 
 type ex struct {
@@ -30,8 +29,8 @@ func (e *ex) runNoOutput(expectSuccess bool, ctx context.Context, cmd string, ar
 	log.Debug("begin executing")
 	defer log.Debug("done executing")
 	ecmd := exec.CommandContext(ctx, cmd, args...)
-	buf, _ := circlog.NewCircularLog(32 << 10)
-	ecmd.Stdout, ecmd.Stderr = buf, buf
+	var buf bytes.Buffer
+	ecmd.Stdout, ecmd.Stderr = &buf, &buf
 	err := ecmd.Run()
 	log.WithField("output", buf.String()).Debug("command output")
 	if _, ok := err.(*exec.ExitError); err != nil && !ok {

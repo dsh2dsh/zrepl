@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/internal/util/circlog"
 )
 
 func TestCmdStderrBehaviorOutput(t *testing.T) {
@@ -92,11 +90,11 @@ func TestSigpipe(t *testing.T) {
 	cmd := CommandContext(ctx, "sh", "-c", "sleep 5; echo invalid input; exit 23")
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	output := circlog.MustNewCircularLog(1 << 20)
+	var output bytes.Buffer
 	cmd.SetStdio(Stdio{
 		Stdin:  r,
-		Stdout: output,
-		Stderr: output,
+		Stdout: &output,
+		Stderr: &output,
 	})
 	err = cmd.Start()
 	require.NoError(t, err)

@@ -12,13 +12,9 @@ import (
 
 	"github.com/montanaflynn/stats"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dsh2dsh/zrepl/internal/util/zreplcircleci"
 )
 
 func TestPqNotconcurrent(t *testing.T) {
-	zreplcircleci.SkipOnCircleCI(t, "because it relies on scheduler responsiveness < 500ms")
-
 	ctx := context.Background()
 	var ctr uint32
 	q := newStepQueue()
@@ -82,7 +78,6 @@ func (r record) String() string {
 // times for each step are close together.
 func TestPqConcurrent(t *testing.T) {
 	t.Skip("is this test broken?")
-	zreplcircleci.SkipOnCircleCI(t, "because it relies on scheduler responsiveness < 500ms")
 
 	ctx := context.Background()
 

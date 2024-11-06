@@ -12,7 +12,6 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/platformtest"
-	"github.com/dsh2dsh/zrepl/internal/util/limitio"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -139,8 +138,8 @@ func makeResumeSituation(ctx *platformtest.Context, src dummySnapshotSituation, 
 		return situation
 	}
 
-	limitedCopier := limitio.ReadCloser(copier, src.dummyDataLen/2)
-	defer limitedCopier.Close()
+	limitedCopier := io.NopCloser(io.LimitReader(copier, src.dummyDataLen/2))
+	defer copier.Close()
 
 	require.NotNil(ctx, sendArgs.To)
 	err = zfs.ZFSRecv(ctx, recvFS, sendArgs.To, limitedCopier, recvOptions)

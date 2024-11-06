@@ -22,7 +22,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
-	"github.com/dsh2dsh/zrepl/internal/util/limitio"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
@@ -464,7 +463,7 @@ var _ logic.Sender = (*PartialSender)(nil)
 
 func (s *PartialSender) Send(ctx context.Context, r *pdu.SendReq) (r1 *pdu.SendRes, r2 io.ReadCloser, r3 error) {
 	r1, r2, r3 = s.Sender.Send(ctx, r)
-	r2 = limitio.ReadCloser(r2, s.failAfterByteCount)
+	r2 = io.NopCloser(io.LimitReader(r2, s.failAfterByteCount))
 	return r1, r2, r3
 }
 
