@@ -10,7 +10,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/middleware"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/rpc/dataconn/frameconn"
 	"github.com/dsh2dsh/zrepl/internal/version"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
@@ -37,8 +36,6 @@ func mustRegisterMetrics(registerer prometheus.Registerer) {
 
 	registerer.MustRegister(metricLogEntries)
 	if err := zfs.PrometheusRegister(registerer); err != nil {
-		panic(err)
-	} else if err := frameconn.PrometheusRegister(registerer); err != nil {
 		panic(err)
 	}
 }

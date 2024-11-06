@@ -3,7 +3,6 @@ module github.com/dsh2dsh/zrepl
 go 1.23
 
 require (
-	github.com/bits-and-blooms/bitset v1.14.3
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.2
 	github.com/charmbracelet/lipgloss v0.13.1
@@ -11,26 +10,21 @@ require (
 	github.com/dsh2dsh/cron/v3 v3.0.3
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.18.0
-	github.com/gitchander/permutation v0.0.0-20210517125447-a5d73722e1b1
 	github.com/go-playground/validator/v10 v10.22.1
-	github.com/google/uuid v1.6.0
-	github.com/jinzhu/copier v0.4.0
 	github.com/juju/ratelimit v1.0.2
 	github.com/klauspost/compress v1.17.11
 	github.com/kr/pretty v0.3.1
 	github.com/montanaflynn/stats v0.7.1
 	github.com/muesli/reflow v0.3.0
-	github.com/problame/go-netssh v0.0.0-20201229122201-330ad6c9cc6f
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sahilm/fuzzy v0.1.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	github.com/yudai/gojsondiff v1.0.0
-	golang.org/x/net v0.30.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/sys v0.26.0
-	golang.org/x/tools v0.26.0
+	golang.org/x/tools v0.22.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.1
 )
@@ -51,7 +45,8 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/common v0.60.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
-	golang.org/x/mod v0.21.0 // indirect
+	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/net v0.30.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
 )
 
@@ -59,7 +54,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/ftrvxmtrx/fd v0.0.0-20150925145434-c6d800382fff // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -75,7 +69,6 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect; go1.12 thinks it needs this
-	github.com/theckman/goconstraint v1.11.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	golang.org/x/crypto v0.28.0 // indirect

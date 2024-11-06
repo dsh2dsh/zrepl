@@ -13,13 +13,6 @@ import (
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 )
 
-type ParseFlags uint
-
-const (
-	ParseFlagsNone        ParseFlags = 0
-	ParseFlagsNoCertCheck ParseFlags = 1 << iota
-)
-
 type Option func(self *Config)
 
 func WithSkipKeys() Option {
@@ -117,7 +110,7 @@ func (j JobEnum) MonitorSnapshots() MonitorSnapshots {
 type ActiveJob struct {
 	Type               string                   `yaml:"type" validate:"required"`
 	Name               string                   `yaml:"name" validate:"required"`
-	Connect            LocalConnect             `yaml:"connect"`
+	Connect            Connect                  `yaml:"connect"`
 	Pruning            PruningSenderReceiver    `yaml:"pruning" validate:"required"`
 	Replication        Replication              `yaml:"replication"`
 	ConflictResolution ConflictResolution       `yaml:"conflict_resolution"`
@@ -390,86 +383,13 @@ type Global struct {
 	Logging    LoggingOutletEnumList  `yaml:"logging" validate:"min=1"`
 	Monitoring []PrometheusMonitoring `yaml:"monitoring" validate:"dive"`
 	Control    GlobalControl          `yaml:"control"`
-	Serve      GlobalServe            `yaml:"serve"`
 }
 
-type ConnectEnum struct {
-	Ret any `validate:"required"`
-}
-
-type ConnectCommon struct {
-	Type string `yaml:"type" validate:"required,oneof=http local"`
-}
-
-type TCPConnect struct {
-	ConnectCommon `yaml:",inline"`
-	Address       string        `yaml:"address" validate:"required,hostname_port"`
-	DialTimeout   time.Duration `yaml:"dial_timeout" default:"10s" validate:"min=0s"`
-}
-
-type TLSConnect struct {
-	ConnectCommon `yaml:",inline"`
-	Address       string        `yaml:"address" validate:"required,hostname_port"`
-	Ca            string        `yaml:"ca" validate:"required"`
-	Cert          string        `yaml:"cert" validate:"required"`
-	Key           string        `yaml:"key" validate:"required"`
-	ServerCN      string        `yaml:"server_cn" validate:"required"`
-	DialTimeout   time.Duration `yaml:"dial_timeout" default:"10s" validate:"min=0s"`
-}
-
-type SSHStdinserverConnect struct {
-	ConnectCommon        `yaml:",inline"`
-	Host                 string        `yaml:"host" validate:"required"`
-	User                 string        `yaml:"user" validate:"required"`
-	Port                 uint16        `yaml:"port" validate:"required"`
-	IdentityFile         string        `yaml:"identity_file" validate:"required"`
-	TransportOpenCommand []string      `yaml:"transport_open_command"` // TODO unused
-	SSHCommand           string        `yaml:"ssh_command"`            // TODO unused
-	Options              []string      `yaml:"options" validate:"dive,required"`
-	DialTimeout          time.Duration `yaml:"dial_timeout" default:"10s" validate:"min=0s"`
-}
-
-type LocalConnect struct {
-	ConnectCommon  `yaml:",inline"`
+type Connect struct {
+	Type           string `yaml:"type" validate:"required,oneof=http local"`
 	Server         string `yaml:"server" validate:"required_if=Type http,omitempty,url"`
 	ListenerName   string `yaml:"listener_name" validate:"required"`
 	ClientIdentity string `yaml:"client_identity" validate:"required"`
-}
-
-type ServeEnum struct {
-	Ret any `validate:"required"`
-}
-
-type ServeCommon struct {
-	Type string `yaml:"type" validate:"required"`
-}
-
-type TCPServe struct {
-	ServeCommon    `yaml:",inline"`
-	Listen         string            `yaml:"listen" validate:"required,hostname_port"`
-	ListenFreeBind bool              `yaml:"listen_freebind"`
-	Clients        map[string]string `yaml:"clients" validate:"dive,required"`
-}
-
-type TLSServe struct {
-	ServeCommon      `yaml:",inline"`
-	Listen           string        `yaml:"listen" validate:"required,hostname_port"`
-	ListenFreeBind   bool          `yaml:"listen_freebind"`
-	Ca               string        `yaml:"ca" validate:"required"`
-	Cert             string        `yaml:"cert" validate:"required"`
-	Key              string        `yaml:"key" validate:"required"`
-	ClientCNs        []string      `yaml:"client_cns" validate:"dive,required"`
-	HandshakeTimeout time.Duration `yaml:"handshake_timeout" default:"10s" validate:"min=0s"`
-}
-
-type StdinserverServer struct {
-	ServeCommon      `yaml:",inline"`
-	ClientIdentities []string `yaml:"client_identities" validate:"dive,required"`
-}
-
-type LocalServe struct {
-	ServeCommon  `yaml:",inline"`
-	ListenerName string `yaml:"listener_name" validate:"required"`
 }
 
 type PruningEnum struct {
@@ -600,14 +520,6 @@ type GlobalControl struct {
 	SockMode uint32 `yaml:"sockmode" validate:"lte=0o777"`
 }
 
-type GlobalServe struct {
-	StdinServer *GlobalStdinServer `yaml:"stdinserver" default:"{}" validate:"required"`
-}
-
-type GlobalStdinServer struct {
-	SockDir string `yaml:"sockdir" default:"/var/run/zrepl/stdinserver" validate:"required"`
-}
-
 type HookCommand struct {
 	Path        string            `yaml:"path" validate:"required"`
 	Args        []string          `yaml:"args" validate:"dive,required"`
@@ -663,30 +575,6 @@ func (t *JobEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 		"sink":   new(SinkJob),
 		"pull":   new(PullJob),
 		"source": new(SourceJob),
-	})
-	return
-}
-
-var _ yaml.Unmarshaler = (*ConnectEnum)(nil)
-
-func (t *ConnectEnum) UnmarshalYAML(value *yaml.Node) (err error) {
-	t.Ret, err = enumUnmarshal(value, map[string]any{
-		"tcp":             new(TCPConnect),
-		"tls":             new(TLSConnect),
-		"ssh+stdinserver": new(SSHStdinserverConnect),
-		"local":           new(LocalConnect),
-	})
-	return
-}
-
-var _ yaml.Unmarshaler = (*ServeEnum)(nil)
-
-func (t *ServeEnum) UnmarshalYAML(value *yaml.Node) (err error) {
-	t.Ret, err = enumUnmarshal(value, map[string]any{
-		"tcp":         new(TCPServe),
-		"tls":         new(TLSServe),
-		"stdinserver": new(StdinserverServer),
-		"local":       new(LocalServe),
 	})
 	return
 }

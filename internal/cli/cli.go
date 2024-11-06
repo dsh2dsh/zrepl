@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/rpc/grpcclientidentity/grpchelper"
 	"github.com/dsh2dsh/zrepl/internal/version"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -138,7 +137,6 @@ func (s *Subcommand) tryParseConfig() {
 		}
 	}
 	s.config = config
-	grpchelper.CallTimeout = config.Global.RpcTimeout
 	zfs.ZfsBin = config.Global.ZfsBin
 }
 

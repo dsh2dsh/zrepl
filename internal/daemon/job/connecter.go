@@ -52,7 +52,7 @@ func (self *Connecter) AddJob(listnerName string, j *PassiveSide) {
 
 func (self *Connecter) Job(name string) *PassiveSide { return self.jobs[name] }
 
-func (self *Connecter) FromConfig(in *config.LocalConnect) (Connected, error) {
+func (self *Connecter) FromConfig(in *config.Connect) (Connected, error) {
 	switch {
 	case in.Type == "local":
 		return self.newLocal(in.ListenerName, in.ClientIdentity), nil
