@@ -49,7 +49,7 @@ type Receiver interface {
 	Endpoint
 	// Receive sends r and sendStream (the latter containing a ZFS send stream)
 	// to the parent github.com/dsh2dsh/zrepl/replication.Endpoint.
-	Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.ReadCloser) (*pdu.ReceiveRes, error)
+	Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.ReadCloser) error
 }
 
 type Planner struct {
@@ -665,7 +665,7 @@ func (s *Step) doReplication(ctx context.Context) error {
 		ReplicationConfig: s.parent.policy.ReplicationConfig,
 	}
 	log.Debug("initiate receive request")
-	_, err = s.receiver.Receive(ctx, rr, byteCountingStream)
+	err = s.receiver.Receive(ctx, rr, byteCountingStream)
 	if err != nil {
 		log.
 			WithError(err).

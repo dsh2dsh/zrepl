@@ -422,8 +422,10 @@ func (p *Sender) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCurs
 	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Guid: cursor.Guid}}, nil
 }
 
-func (p *Sender) Receive(ctx context.Context, r *pdu.ReceiveReq, _ io.ReadCloser) (*pdu.ReceiveRes, error) {
-	return nil, errors.New("sender does not implement Receive()")
+func (p *Sender) Receive(ctx context.Context, r *pdu.ReceiveReq,
+	_ io.ReadCloser,
+) error {
+	return errors.New("sender does not implement Receive()")
 }
 
 type FSFilter interface { // FIXME unused
@@ -732,22 +734,24 @@ func (s *Receiver) receive_GetPlaceholderCreationEncryptionValue(client_root, pa
 	}
 }
 
-func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.ReadCloser) (*pdu.ReceiveRes, error) {
+func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
+	receive io.ReadCloser,
+) error {
 	getLogger(ctx).Debug("incoming Receive")
 	defer receive.Close()
 
 	root := s.clientRootFromCtx(ctx)
 	lp, err := subroot{root}.MapToLocal(req.Filesystem)
 	if err != nil {
-		return nil, fmt.Errorf("`Filesystem` invalid: %w", err)
+		return fmt.Errorf("`Filesystem` invalid: %w", err)
 	}
 
 	to := uncheckedSendArgsFromPDU(req.GetTo())
 	if to == nil {
-		return nil, errors.New("`To` must not be nil")
+		return errors.New("`To` must not be nil")
 	}
 	if !to.IsSnapshot() {
-		return nil, errors.New("`To` must be a snapshot")
+		return errors.New("`To` must be a snapshot")
 	}
 
 	// create placeholder parent filesystems as appropriate
@@ -824,7 +828,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	}()
 	getLogger(ctx).WithField("visitErr", visitErr).Debug("complete tree-walk")
 	if visitErr != nil {
-		return nil, visitErr
+		return visitErr
 	}
 
 	log := getLogger(ctx).WithField("proto_fs", req.GetFilesystem()).WithField("local_fs", lp.ToString())
@@ -834,7 +838,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	var recvOpts zfs.RecvOptions
 	ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, lp)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get placeholder state: %w", err)
+		return fmt.Errorf("cannot get placeholder state: %w", err)
 	}
 	log.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).Debug("placeholder state")
 
@@ -849,20 +853,20 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	if clearPlaceholderProperty {
 		log.Info("clearing placeholder property")
 		if err := zfs.ZFSSetPlaceholder(ctx, lp, false); err != nil {
-			return nil, fmt.Errorf("cannot clear placeholder property for forced receive: %s", err)
+			return fmt.Errorf("cannot clear placeholder property for forced receive: %s", err)
 		}
 	}
 
 	if req.ClearResumeToken && ph.FSExists {
 		log.Info("clearing resume token")
 		if err := zfs.ZFSRecvClearResumeToken(ctx, lp.ToString()); err != nil {
-			return nil, fmt.Errorf("cannot clear resume token: %w", err)
+			return fmt.Errorf("cannot clear resume token: %w", err)
 		}
 	}
 
 	recvOpts.SavePartialRecvState, err = zfs.ResumeRecvSupported(ctx, lp)
 	if err != nil {
-		return nil, fmt.Errorf("cannot determine whether we can use resumable send & recv: %w", err)
+		return fmt.Errorf("cannot determine whether we can use resumable send & recv: %w", err)
 	}
 
 	// apply rate limit
@@ -917,7 +921,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 			tempStartFullRecvFSDP, dpErr := zfs.NewDatasetPath(tempStartFullRecvFS)
 			if dpErr != nil {
 				log.WithError(dpErr).Error("cannot determine temporary filesystem name for initial encrypted recv workaround")
-				return nil, err // yes, err, not dpErr
+				return err // yes, err, not dpErr
 			}
 
 			log := log.WithField("temp_recv_fs", tempStartFullRecvFS)
@@ -928,11 +932,11 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 			tempPH, phErr := zfs.ZFSGetFilesystemPlaceholderState(ctx, tempStartFullRecvFSDP)
 			if phErr != nil {
 				log.WithError(phErr).Error("cannot determine placeholder state of temp_recv_fs")
-				return nil, err // yes, err, not dpErr
+				return err // yes, err, not dpErr
 			}
 			if tempPH.FSExists {
 				log.Error("temp_recv_fs already exists, assuming a (partial) initial recv to that filesystem has already been done")
-				return nil, err
+				return err
 			}
 
 			recvOpts.RollbackAndForceRecv = false
@@ -946,7 +950,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 			}
 
 			log.Error(`if you would like to see improvements to this situation, please open an issue on GitHub`)
-			return nil, err
+			return err
 		}
 
 		log.
@@ -954,7 +958,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 			WithField("opts", fmt.Sprintf("%#v", recvOpts)).
 			Error("zfs receive failed")
 
-		return nil, err
+		return err
 	}
 
 	// validate that we actually received what the sender claimed
@@ -963,17 +967,17 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 		msg := "receive request's `To` version does not match what we received in the stream"
 		log.WithError(err).WithField("snap", snapFullPath).Error(msg)
 		log.Error("aborting recv request, but keeping received snapshot for inspection")
-		return nil, fmt.Errorf("%s: %w", msg, err)
+		return fmt.Errorf("%s: %w", msg, err)
 	}
 
 	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(req.GetReplicationConfig().Protection)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	replicationGuaranteeStrategy := replicationGuaranteeOptions.Strategy(ph.FSExists)
 	liveAbs, err := replicationGuaranteeStrategy.ReceiverPostRecv(ctx, s.conf.JobID, lp.ToString(), toRecvd)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, a := range liveAbs {
 		if a != nil {
@@ -999,7 +1003,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq, receive io.
 	}
 	abstractionsCacheSingleton.TryBatchDestroy(ctx, s.conf.JobID, lp.ToString(), destroyTypes, keep, check)
 
-	return &pdu.ReceiveRes{}, nil
+	return nil
 }
 
 func (s *Receiver) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {

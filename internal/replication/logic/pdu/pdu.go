@@ -332,5 +332,3 @@ func (x *ReceiveReq) GetReplicationConfig() *ReplicationConfig {
 	}
 	return nil
 }
-
-type ReceiveRes struct{}

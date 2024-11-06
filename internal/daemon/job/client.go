@@ -131,13 +131,13 @@ func (self *Client) WaitForConnectivity(ctx context.Context) error {
 
 func (self *Client) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	receive io.ReadCloser,
-) (*pdu.ReceiveRes, error) {
+) error {
 	defer receive.Close()
 	ep := self.endpoint(EpReceive)
 	if err := self.json().PostStream(ctx, ep, req, nil, receive); err != nil {
-		return nil, fmt.Errorf("endpoint %q: %w", ep, err)
+		return fmt.Errorf("endpoint %q: %w", ep, err)
 	}
-	return new(pdu.ReceiveRes), nil
+	return nil
 }
 
 func (self *Client) Send(ctx context.Context, req *pdu.SendReq,

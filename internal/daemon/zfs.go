@@ -158,7 +158,7 @@ func (self *zfsJob) receive(ctx context.Context, req *pdu.ReceiveReq,
 		return err
 	}
 
-	if _, err = ep.Receive(ctx, req, r); err != nil {
+	if err = ep.Receive(ctx, req, r); err != nil {
 		return fmt.Errorf("create snapshot %q on %q: %w",
 			req.To.Name, req.Filesystem, err)
 	}

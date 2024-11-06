@@ -891,8 +891,8 @@ type ErroringReceiver struct {
 	*endpoint.Receiver
 }
 
-func (r *ErroringReceiver) Receive(ctx context.Context, req *pdu.ReceiveReq, stream io.ReadCloser) (*pdu.ReceiveRes, error) {
-	return nil, r.recvErr
+func (r *ErroringReceiver) Receive(ctx context.Context, req *pdu.ReceiveReq, stream io.ReadCloser) error {
+	return r.recvErr
 }
 
 type NeverEndingSender struct {
@@ -1247,7 +1247,7 @@ type ClientIdentityReceiver struct {
 	*endpoint.Receiver
 }
 
-func (r *ClientIdentityReceiver) Receive(ctx context.Context, req *pdu.ReceiveReq, stream io.ReadCloser) (*pdu.ReceiveRes, error) {
+func (r *ClientIdentityReceiver) Receive(ctx context.Context, req *pdu.ReceiveReq, stream io.ReadCloser) error {
 	ctx = context.WithValue(ctx, endpoint.ClientIdentityKey, r.clientIdentity)
 	return r.Receiver.Receive(ctx, req, stream)
 }
