@@ -91,7 +91,8 @@ func (self *Connecter) newServer(server, listenerName, clientIdentity string,
 		return nil, fmt.Errorf("build jsonclient for %q: %w", name, err)
 	}
 
-	cn := newServerConnected(name, NewClient(listenerName, jsonClient))
+	client := NewClient(listenerName, jsonClient).WithTimeout(self.timeout)
+	cn := newServerConnected(name, client)
 	return cn, nil
 }
 
