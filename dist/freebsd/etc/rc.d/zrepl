@@ -36,18 +36,18 @@ name="zrepl"
 rcvar="${name}_enable"
 load_rc_config "$name"
 
-: ${zrepl_enable:="NO"}
-: ${zrepl_config:="/usr/local/etc/zrepl/zrepl.yml"}
-: ${zrepl_user:="root"}
-: ${zrepl_group:="wheel"}
-: ${zrepl_flags:=""}
-: ${zrepl_facility:="local0"}
-: ${zrepl_priority:="alert"}
-: ${zrepl_options:="$zrepl_flags --config $zrepl_config"}
-: ${zrepl_gracefully:="NO"}
+: "${zrepl_enable:=NO}"
+: "${zrepl_config:=/usr/local/etc/zrepl/zrepl.yml}"
+: "${zrepl_user:=root}"
+: "${zrepl_group:=wheel}"
+: "${zrepl_flags:=}"
+: "${zrepl_facility:=local0}"
+: "${zrepl_priority:=alert}"
+: "${zrepl_options:=$zrepl_flags --config $zrepl_config}"
+: "${zrepl_gracefully:=NO}"
 
-: ${zrepl_control_group:="$zrepl_group"}
-: ${zrepl_control_mode:="0700"}
+: "${zrepl_control_group:=$zrepl_group}"
+: "${zrepl_control_mode:=0700}"
 
 pidfile="/var/run/zrepl.pid"
 command="/usr/sbin/daemon"
@@ -64,15 +64,13 @@ extra_commands="configtest graceful gracefulstop"
 
 zrepl_checkconfig() {
     echo "Performing sanity check on zrepl configuration:"
-    eval "$procname" $zrepl_options configcheck
+    eval "$procname" "$zrepl_options" configcheck
 }
 
 zrepl_precmd() {
-    if [ ! -d "/var/run/zrepl/stdinserver" ]; then
+    if [ ! -d "/var/run/zrepl" ]; then
         install -d -g "$zrepl_control_group" -o "$zrepl_user" \
                 -m "$zrepl_control_mode"   "/var/run/zrepl"
-        install -d -g "$zrepl_control_group" -o "$zrepl_user" \
-                -m  "$zrepl_control_mode"  "/var/run/zrepl/stdinserver"
     fi
     zrepl_checkconfig
 }
