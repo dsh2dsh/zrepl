@@ -166,15 +166,15 @@ func (self *Client) SendDry(ctx context.Context, req *pdu.SendReq,
 
 func (self *Client) SendCompleted(ctx context.Context,
 	req *pdu.SendCompletedReq,
-) (*pdu.SendCompletedRes, error) {
+) error {
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
 
 	ep := self.endpoint(EpSendCompleted)
 	if err := self.json().Post(ctx, ep, req, nil); err != nil {
-		return nil, fmt.Errorf("endpoint %q: %w", ep, err)
+		return fmt.Errorf("endpoint %q: %w", ep, err)
 	}
-	return new(pdu.SendCompletedRes), nil
+	return nil
 }
 
 func (self *Client) ReplicationCursor(ctx context.Context,

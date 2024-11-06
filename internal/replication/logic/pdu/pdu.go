@@ -246,8 +246,6 @@ func (x *SendCompletedReq) GetOriginalReq() *SendReq {
 	return nil
 }
 
-type SendCompletedRes struct{}
-
 type DestroySnapshotsReq struct {
 	Filesystem string `json:"Filesystem,omitempty"`
 	// Path to filesystem, snapshot or bookmark to be destroyed

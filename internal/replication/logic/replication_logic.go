@@ -41,7 +41,7 @@ type Sender interface {
 	// If the send request is for dry run the io.ReadCloser will be nil
 	Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error)
 	SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error)
-	SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error)
+	SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) error
 	ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error)
 }
 
@@ -681,9 +681,7 @@ func (s *Step) doReplication(ctx context.Context) error {
 	log.Debug("receive finished")
 
 	log.Debug("tell sender replication completed")
-	_, err = s.sender.SendCompleted(ctx, &pdu.SendCompletedReq{
-		OriginalReq: sr,
-	})
+	err = s.sender.SendCompleted(ctx, &pdu.SendCompletedReq{OriginalReq: sr})
 	if err != nil {
 		log.WithError(err).Error("error telling sender that replication completed successfully")
 		return err

@@ -200,8 +200,9 @@ func (self *zfsJob) sendDry(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes
 	return resp, nil
 }
 
-func (self *zfsJob) sendCompleted(ctx context.Context, req *pdu.SendCompletedReq,
-) (*pdu.SendCompletedRes, error) {
+func (self *zfsJob) sendCompleted(ctx context.Context,
+	req *pdu.SendCompletedReq,
+) (*struct{}, error) {
 	ep, err := self.jobEndpoint(ctx)
 	if err != nil {
 		return nil, err
@@ -210,13 +211,12 @@ func (self *zfsJob) sendCompleted(ctx context.Context, req *pdu.SendCompletedReq
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
 
-	resp, err := ep.SendCompleted(ctx, req)
-	if err != nil {
+	if err := ep.SendCompleted(ctx, req); err != nil {
 		req := req.OriginalReq
 		return nil, fmt.Errorf("complete send %q from %q to %q: %w",
 			req.Filesystem, req.From.Name, req.To.Name, err)
 	}
-	return resp, nil
+	return nil, nil
 }
 
 func (self *zfsJob) replicationCursor(ctx context.Context,

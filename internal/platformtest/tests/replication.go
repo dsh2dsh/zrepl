@@ -773,8 +773,8 @@ type FailSendCompletedSender struct {
 
 var _ logic.Sender = (*FailSendCompletedSender)(nil)
 
-func (p *FailSendCompletedSender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error) {
-	return nil, errors.New("[mock] SendCompleted not delivered to actual endpoint")
+func (p *FailSendCompletedSender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) error {
+	return errors.New("[mock] SendCompleted not delivered to actual endpoint")
 }
 
 type replicationStepCompletedLost_scenario struct {

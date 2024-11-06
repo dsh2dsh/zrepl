@@ -342,11 +342,12 @@ func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq,
 	return res, nil
 }
 
-func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error) {
+func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
+) error {
 	orig := r.GetOriginalReq() // may be nil, always use proto getters
 	fsp, err := p.filterCheckFS(orig.GetFilesystem())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	fs := fsp.ToString()
 
@@ -354,22 +355,22 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*p
 	if orig.GetFrom() != nil {
 		f, err := sendArgsFromPDUAndValidateExistsAndGetVersion(ctx, fs, orig.GetFrom()) // no shadow
 		if err != nil {
-			return nil, fmt.Errorf("validate `from` exists: %w", err)
+			return fmt.Errorf("validate `from` exists: %w", err)
 		}
 		from = &f
 	}
 	to, err := sendArgsFromPDUAndValidateExistsAndGetVersion(ctx, fs, orig.GetTo())
 	if err != nil {
-		return nil, fmt.Errorf("validate `to` exists: %w", err)
+		return fmt.Errorf("validate `to` exists: %w", err)
 	}
 
 	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(orig.GetReplicationConfig().Protection)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	liveAbs, err := replicationGuaranteeOptions.Strategy(from != nil).SenderPostRecvConfirmed(ctx, p.jobId, fs, to)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, a := range liveAbs {
 		if a != nil {
@@ -390,7 +391,7 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) (*p
 	}
 	abstractionsCacheSingleton.TryBatchDestroy(ctx, p.jobId, fs, destroyTypes, keep, nil)
 
-	return &pdu.SendCompletedRes{}, nil
+	return nil
 }
 
 func (p *Sender) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
@@ -1010,8 +1011,9 @@ func (s *Receiver) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapsho
 	return doDestroySnapshots(ctx, lp, req.Snapshots)
 }
 
-func (p *Receiver) SendCompleted(ctx context.Context, _ *pdu.SendCompletedReq) (*pdu.SendCompletedRes, error) {
-	return &pdu.SendCompletedRes{}, nil
+func (p *Receiver) SendCompleted(ctx context.Context, _ *pdu.SendCompletedReq,
+) error {
+	return nil
 }
 
 func doDestroySnapshots(ctx context.Context, lp *zfs.DatasetPath, snaps []*pdu.FilesystemVersion) (*pdu.DestroySnapshotsRes, error) {
