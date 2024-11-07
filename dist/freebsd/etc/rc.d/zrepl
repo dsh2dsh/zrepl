@@ -64,7 +64,7 @@ reload_cmd="zrepl_reload"
 extra_commands="configtest graceful gracefulstop reload"
 
 zrepl_checkconfig() {
-    echo "Performing sanity check on zrepl configuration:"
+    echo "Performing sanity check on $name configuration:"
     eval "$procname" "$zrepl_options" configcheck
 }
 
@@ -87,13 +87,23 @@ zrepl_graceful() {
 
 zrepl_gracefulstop() {
     if [ -z "$rc_pid" ]; then
-        echo 1>&2 "${name} not running? (check $pidfile)."
+        echo 1>&2 "$name not running? (check $pidfile)."
         return 1
     fi
 
-    echo "Gracefully stopping ${name}."
+    echo "Gracefully stopping $name."
     eval "$procname" signal shutdown
     wait_for_pids "$rc_pid"
+}
+
+zrepl_reload() {
+    if [ -z "$rc_pid" ]; then
+        echo 1>&2 "$name not running? (check $pidfile)."
+        return 1
+    fi
+
+    echo "Reloading $name."
+    eval "$procname" signal reload
 }
 
 if checkyesno zrepl_gracefully; then
