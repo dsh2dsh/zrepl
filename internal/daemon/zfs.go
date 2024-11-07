@@ -106,12 +106,27 @@ func (self *zfsJob) jobEndpoint(ctx context.Context) (job.Endpoint, error) {
 		return nil, fmt.Errorf("job %q not found", jobName)
 	}
 
-	ep := j.Endpoint(middleware.ClientIdentityFrom(ctx))
+	clientIdentity, err := self.clientIdentity(ctx, j)
+	if err != nil {
+		return nil, err
+	}
+
+	ep := j.Endpoint(clientIdentity)
 	if ep == nil {
 		return nil, middleware.NewHttpError(http.StatusNotFound,
 			fmt.Errorf("job %q has no endpoint", jobName))
 	}
 	return ep, nil
+}
+
+func (self *zfsJob) clientIdentity(ctx context.Context, j *job.PassiveSide,
+) (string, error) {
+	clientIdentity := middleware.ClientIdentityFrom(ctx)
+	if j.KnownClient(clientIdentity) {
+		return clientIdentity, nil
+	}
+	return "", middleware.NewHttpError(http.StatusUnauthorized,
+		fmt.Errorf("client %q not authorized for job %q", clientIdentity, j.Name()))
 }
 
 func (self *zfsJob) listFilesystemVersions(ctx context.Context,

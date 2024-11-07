@@ -74,6 +74,10 @@ jobs:
   - name: "zdisk"
     type: "sink"
     root_fs: "zdisk/zrepl"
+    # Restrict access to this job for listed remote clients
+    # client_keys:
+    #   - "key1"
+    #   # and nobody else.
     recv:
       # execpipe:
       #   # mbuffer |zfs receive

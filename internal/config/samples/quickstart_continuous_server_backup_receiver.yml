@@ -10,3 +10,5 @@ jobs:
   - name: "sink"
     type: "sink"
     root_fs: "storage/zrepl/sink"
+    client_keys:
+      - "server1"

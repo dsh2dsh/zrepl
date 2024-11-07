@@ -17,6 +17,8 @@ import (
 type PassiveSide struct {
 	mode passiveMode
 	name endpoint.JobID
+
+	clientKeys map[string]struct{}
 }
 
 type passiveMode interface {
@@ -108,7 +110,14 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
 	if err != nil {
 		return nil, fmt.Errorf("invalid job name: %w", err)
 	}
-	s := &PassiveSide{name: jobID}
+	s := &PassiveSide{
+		name:       jobID,
+		clientKeys: make(map[string]struct{}, len(in.ClientKeys)),
+	}
+
+	for _, clientIdentity := range in.ClientKeys {
+		s.clientKeys[clientIdentity] = struct{}{}
+	}
 
 	switch v := configJob.(type) {
 	case *config.SinkJob:
@@ -215,6 +224,14 @@ func (j *PassiveSide) SenderConfig() *endpoint.SenderConfig {
 
 func (j *PassiveSide) Endpoint(clientIdentity string) Endpoint {
 	return j.mode.Endpoint(clientIdentity)
+}
+
+func (j *PassiveSide) KnownClient(clientIdentity string) bool {
+	if len(j.clientKeys) == 0 {
+		return true
+	}
+	_, ok := j.clientKeys[clientIdentity]
+	return ok
 }
 
 func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}

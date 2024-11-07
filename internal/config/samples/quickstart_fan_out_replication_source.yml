@@ -37,6 +37,8 @@ jobs:
     # Snapshots are handled by the separate snap job
     snapshotting:
       type: "manual"
+    client_keys:
+      - "a.example.com"
 
   # Source job for target C
   - name: "target_c"
@@ -47,6 +49,8 @@ jobs:
     # Snapshots are handled by the separate snap job
     snapshotting:
       type: "manual"
+    client_keys:
+      - "a.example.com"
 
   # Source jobs for remaining targets.
   # ...

@@ -49,6 +49,20 @@ pkg install zrepl-dsh2dsh
       key: "long and secret token"
     ```
 
+    By default all authenticated clients have remote access to `sink` and
+    `source` jobs. But it can be restricted using `client_keys` like:
+
+    ```yaml
+    jobs:
+      - name: "zdisk"
+        type: "sink"
+        # Restrict access to this job for listed remote clients
+        client_keys:
+          - "key1"
+          - "key2"
+          # and nobody else.
+    ```
+
   * All transports has been replaced by `local` and `http` transports.
 
     `local` transport configuration looks almost the same:

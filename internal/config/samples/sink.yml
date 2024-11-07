@@ -10,3 +10,7 @@ jobs:
   - type: "sink"
     name: "laptop_sink"
     root_fs: "pool2/backup_laptops"
+    client_keys:
+      - "laptop1"
+      - "laptop2"
+      # and nobody else
