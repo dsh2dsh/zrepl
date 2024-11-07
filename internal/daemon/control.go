@@ -73,16 +73,18 @@ func (j *controlJob) signal(ctx context.Context, req *signalRequest,
 
 	var err error
 	switch req.Op {
-	case "wakeup":
-		err = j.jobs.wakeup(req.Name)
+	case "reload":
+		j.jobs.Reload()
 	case "reset":
 		err = j.jobs.reset(req.Name)
-	case "stop":
-		j.jobs.Cancel()
 	case "shutdown":
 		j.jobs.Shutdown()
+	case "stop":
+		j.jobs.Cancel()
+	case "wakeup":
+		err = j.jobs.wakeup(req.Name)
 	default:
 		err = fmt.Errorf("invalid operation %q", req.Op)
 	}
-	return &struct{}{}, err
+	return nil, err
 }

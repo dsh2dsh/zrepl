@@ -31,6 +31,7 @@ func newJobs(ctx context.Context, cancel context.CancelFunc) *jobs {
 
 		jobs:         make(map[string]job.Job, 2),
 		internalJobs: make([]job.Internal, 0, 1),
+		reloaders:    make([]func(), 0, 1),
 
 		cancel: cancel,
 	}
@@ -48,6 +49,7 @@ type jobs struct {
 
 	jobs         map[string]job.Job
 	internalJobs []job.Internal
+	reloaders    []func()
 
 	cancel context.CancelFunc
 }
@@ -179,4 +181,16 @@ func (self *jobs) startInternal(j job.Internal) {
 	log := job.GetLogger(self.ctx)
 	self.start(self.ctx, j, log.WithField("server", true))
 	self.internalJobs = append(self.internalJobs, j)
+}
+
+func (self *jobs) Reload() {
+	self.log.Info("reloading")
+	for _, fn := range self.reloaders {
+		fn()
+	}
+	self.log.Info("reloaded")
+}
+
+func (self *jobs) OnReload(fn func()) {
+	self.reloaders = append(self.reloaders, fn)
 }

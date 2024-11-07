@@ -11,25 +11,26 @@ import (
 )
 
 var SignalCmd = &cli.Subcommand{
-	Use:   "signal {stop | shutdown | wakeup JOB | reset JOB}",
+	Use:   "signal {reload | reset JOB | shutdown | stop | wakeup JOB}",
 	Short: "send a signal to the daemon",
 	Long: `Send a signal to the daemon.
 
 Expected signals:
-  stop     Stop the daemon right now
-  shutdown Stop the daemon gracefully
-  wakeup   Wake up a job from wait state
-  reset    Abort jobs current invocation
+  reload   Reload TLS certificates
+  reset    Abort job's current invocation
+  shutdown Stop daemon gracefully
+  stop     Stop daemon right now
+  wakeup   Wake up job from wait state
 `,
 
 	SetupCobra: func(cmd *cobra.Command) {
-		cmd.ValidArgs = []string{"stop", "shutdown", "wakeup", "reset"}
+		cmd.ValidArgs = []string{"reload", "reset", "shutdown", "stop", "wakeup"}
 		cmd.Args = cobra.MatchAll(cobra.MinimumNArgs(1),
 			func(cmd *cobra.Command, args []string) error {
 				switch args[0] {
-				case "stop", "shutdown":
+				case "reload", "shutdown", "stop":
 					return cobra.ExactArgs(1)(cmd, args)
-				case "wakeup", "reset":
+				case "reset", "wakeup":
 					return cobra.ExactArgs(2)(cmd, args)
 				}
 				return cobra.OnlyValidArgs(cmd, args)

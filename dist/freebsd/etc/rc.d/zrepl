@@ -60,7 +60,8 @@ restart_precmd="zrepl_checkconfig"
 configtest_cmd="zrepl_checkconfig"
 graceful_cmd="zrepl_graceful"
 gracefulstop_cmd="zrepl_gracefulstop"
-extra_commands="configtest graceful gracefulstop"
+reload_cmd="zrepl_reload"
+extra_commands="configtest graceful gracefulstop reload"
 
 zrepl_checkconfig() {
     echo "Performing sanity check on zrepl configuration:"

@@ -98,15 +98,14 @@ func (self *serverJob) AddServer(c *config.Listen) error {
 			ReadHeaderTimeout: 10 * time.Second,
 			IdleTimeout:       30 * time.Second,
 		},
-		cert: c.TLSCert,
-		key:  c.TLSKey,
+		certFile: c.TLSCert,
+		keyFile:  c.TLSKey,
 	}
 
 	if c.Unix != "" {
 		if s.Addr != "" {
 			self.servers = append(self.servers, s)
-			cloned := *s
-			s = &cloned
+			s = s.Clone()
 		}
 		if err := s.WithUnix(c.Unix, c.UnixMode); err != nil {
 			return fmt.Errorf("add server: %w", err)
@@ -172,4 +171,22 @@ func (self *serverJob) Shutdown() {
 		self.log.Info("cancel context on shutdown")
 		self.shutdown()
 	}
+}
+
+func (self *serverJob) OnReload() { _ = self.Reload(false) }
+
+func (self *serverJob) Reload(breakOnError bool) error {
+	self.log.Info("reload all listeners")
+	for _, s := range self.servers {
+		l := self.log.WithField("addr", s.Addr)
+		l.Info("reload listener")
+		if err := s.Reload(l); err != nil {
+			l.WithError(err).Error("failed reload listener")
+			if breakOnError {
+				return err
+			}
+		}
+	}
+	self.log.Info("all listeners reloaded")
+	return nil
 }

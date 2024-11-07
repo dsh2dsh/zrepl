@@ -72,7 +72,7 @@ func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
 	for i := range conf.Listen {
 		listen := &conf.Listen[i]
 		if err := server.AddServer(listen); err != nil {
-			return fmt.Errorf("add server from listen[%d]: %w", i, err)
+			return fmt.Errorf("failed add server from listen[%d]: %w", i, err)
 		}
 		hasControl = hasControl || listen.Control
 		hasMetrics = hasMetrics || listen.Metrics
@@ -89,7 +89,11 @@ func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
 	}
 
 	log.Info("starting server")
+	if err := server.Reload(true); err != nil {
+		return fmt.Errorf("failed start server: %w", err)
+	}
 	jobs.startInternal(server)
+	jobs.OnReload(server.OnReload)
 	return nil
 }
 
