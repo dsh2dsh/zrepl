@@ -12,6 +12,7 @@ linters:
     - "nolintlint"
     - "perfsprint"
     - "prealloc"
+    - "revive"
     - "testifylint"
 
 linters-settings:
@@ -33,6 +34,10 @@ linters-settings:
     # Enable to require nolint directives to mention the specific linter being suppressed.
     # Default: false
     require-specific: true
+
+  revive:
+    rules:
+      - name: "time-equal"
 
   wrapcheck:
     # An array of glob patterns which, if any match the package of the function
