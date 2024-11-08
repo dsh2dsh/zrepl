@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2034
 
 # PROVIDE: zrepl
 # REQUIRE: LOGIN
@@ -30,6 +31,7 @@
 #                          gracefully.
 #                          Default: NO
 
+# shellcheck disable=SC1094
 . /etc/rc.subr
 
 name="zrepl"
@@ -60,7 +62,7 @@ restart_precmd="zrepl_checkconfig"
 configtest_cmd="zrepl_checkconfig"
 graceful_cmd="zrepl_graceful"
 gracefulstop_cmd="zrepl_gracefulstop"
-reload_cmd="zrepl_reload"
+reload_precmd="zrepl_reload_precmd"
 extra_commands="configtest graceful gracefulstop reload"
 
 zrepl_checkconfig() {
@@ -76,6 +78,7 @@ zrepl_precmd() {
     zrepl_checkconfig
 }
 
+# shellcheck disable=SC2086,SC2154
 zrepl_graceful() {
     local _rc_prefix _return
 		( run_rc_command gracefulstop $rc_extra_args )
@@ -96,14 +99,8 @@ zrepl_gracefulstop() {
     wait_for_pids "$rc_pid"
 }
 
-zrepl_reload() {
-    if [ -z "$rc_pid" ]; then
-        echo 1>&2 "$name not running? (check $pidfile)."
-        return 1
-    fi
-
+zrepl_reload_precmd() {
     echo "Reloading $name."
-    eval "$procname" signal reload
 }
 
 if checkyesno zrepl_gracefully; then

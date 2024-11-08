@@ -16,15 +16,8 @@ import (
 )
 
 func Run(ctx context.Context, conf *config.Config) error {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		cancel()
-	}()
 
 	outlets, err := logging.OutletsFromConfig(conf.Global.Logging)
 	if err != nil {
@@ -48,16 +41,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		return fmt.Errorf("daemon: %w", err)
 	}
 
-	wait := jobs.wait()
-	select {
-	case <-wait.Done():
-	case <-ctx.Done():
-		log.WithError(ctx.Err()).Info("context canceled")
-	}
-
-	log.Info("waiting for jobs to finish")
-	<-wait.Done()
-	log.Info("daemon exiting")
+	waitDone(ctx, log, jobs)
 	return nil
 }
 
@@ -130,4 +114,28 @@ func defaultMetrics(exists bool, api *serverJob, conf *config.Config,
 		exists = true
 	}
 	return exists, nil
+}
+
+func waitDone(ctx context.Context, log logger.Logger, jobs *jobs) {
+	sigReload := make(chan os.Signal, 1)
+	signal.Notify(sigReload, syscall.SIGHUP)
+
+	wait := jobs.wait()
+waiting:
+	for {
+		select {
+		case <-wait.Done():
+			break waiting
+		case <-ctx.Done():
+			log.WithError(context.Cause(ctx)).Info("context canceled")
+			break waiting
+		case <-sigReload:
+			log.Info("got HUP signal")
+			jobs.Reload()
+		}
+	}
+
+	log.Info("waiting for jobs to finish")
+	<-wait.Done()
+	log.Info("daemon exiting")
 }
