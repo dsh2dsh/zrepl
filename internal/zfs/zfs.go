@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
@@ -1006,28 +1004,12 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 	if err != nil {
 		return nil, NewZfsError(err, output)
 	}
-	var si DrySendInfo
+
+	si := new(DrySendInfo)
 	if err := si.unmarshalZFSOutput(output); err != nil {
 		return nil, fmt.Errorf("could not parse zfs send -n output: %s", err)
 	}
-
-	// There is a bug in OpenZFS where it estimates the size incorrectly.
-	// - zrepl: https://github.com/zrepl/zrepl/issues/463
-	// - resulting upstream bug: https://github.com/openzfs/zfs/issues/12265
-	//
-	// The wrong estimates are easy to detect because they are absurdly large.
-	//
-	// NB: we're doing the workaround for this late so that the test cases are not
-	// affected.
-	sizeEstimateThreshold := envconst.Uint64(
-		"ZREPL_ZFS_SEND_SIZE_ESTIMATE_INCORRECT_THRESHOLD", math.MaxInt64)
-	if sizeEstimateThreshold != 0 && si.SizeEstimate >= sizeEstimateThreshold {
-		debug("size estimate exceeds threshold %v, working around it: %#v %q",
-			sizeEstimateThreshold, si, args)
-		si.SizeEstimate = 0
-	}
-
-	return &si, nil
+	return si, nil
 }
 
 type ErrRecvResumeNotSupported struct {

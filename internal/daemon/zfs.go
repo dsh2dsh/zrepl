@@ -196,9 +196,8 @@ func (self *zfsJob) send(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes,
 	return resp, stream, nil
 }
 
-func (self *zfsJob) sendDry(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes,
-	error,
-) {
+func (self *zfsJob) sendDry(ctx context.Context, req *pdu.SendDryReq,
+) (*pdu.SendDryRes, error) {
 	ep, err := self.jobEndpoint(ctx)
 	if err != nil {
 		return nil, err
@@ -209,8 +208,7 @@ func (self *zfsJob) sendDry(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes
 
 	resp, err := ep.SendDry(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("dry send %q from %q to %q: %w",
-			req.Filesystem, req.From.Name, req.To.Name, err)
+		return nil, fmt.Errorf("send dry http endpoint: %w", err)
 	}
 	return resp, nil
 }

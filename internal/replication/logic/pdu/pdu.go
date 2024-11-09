@@ -332,3 +332,12 @@ func (x *ReceiveReq) GetReplicationConfig() *ReplicationConfig {
 	}
 	return nil
 }
+
+type SendDryReq struct {
+	Items       []SendReq `json:"Items"`
+	Concurrency int       `json:"Concurrency"`
+}
+
+type SendDryRes struct {
+	Items []SendRes `json:"Items"`
+}

@@ -151,13 +151,13 @@ func (self *Client) Send(ctx context.Context, req *pdu.SendReq,
 	return resp, r, nil
 }
 
-func (self *Client) SendDry(ctx context.Context, req *pdu.SendReq,
-) (*pdu.SendRes, error) {
+func (self *Client) SendDry(ctx context.Context, req *pdu.SendDryReq,
+) (*pdu.SendDryRes, error) {
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
 
 	ep := self.endpoint(EpSendDry)
-	resp := new(pdu.SendRes)
+	resp := new(pdu.SendDryRes)
 	if err := self.json().Post(ctx, ep, req, resp); err != nil {
 		return nil, fmt.Errorf("endpoint %q: %w", ep, err)
 	}

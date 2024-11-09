@@ -454,7 +454,6 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
 	running context.Context,
 ) {
 	defer a.l.Lock().Unlock()
-
 	stepQueue := newStepQueue()
 	defer stepQueue.Start(a.config.StepQueueConcurrency)()
 
@@ -471,9 +470,8 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
 			})
 		}(f)
 	}
-	a.l.DropWhile(func() {
-		fssesDone.Wait()
-	})
+
+	a.l.DropWhile(func() { fssesDone.Wait() })
 	a.finishedAt = time.Now()
 }
 
@@ -524,6 +522,7 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 		}
 		errTime = time.Now() // no shadow
 	})
+
 	switch {
 	case err != nil:
 		f.planning.err = newTimedError(err, errTime)
@@ -556,7 +555,9 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 		// also find a step in our current plan
 		prevUncompleted := prev.planned.steps[prev.planned.step:]
 		if len(prevUncompleted) == 0 || len(f.planned.steps) == 0 {
-			f.debug("no steps planned in previous attempt or this attempt, no correlation necessary len(prevUncompleted)=%d len(f.planned.steps)=%d", len(prevUncompleted), len(f.planned.steps))
+			f.debug(
+				"no steps planned in previous attempt or this attempt, no correlation necessary len(prevUncompleted)=%d len(f.planned.steps)=%d",
+				len(prevUncompleted), len(f.planned.steps))
 		} else {
 			var target struct{ prev, cur int }
 			target.prev = -1

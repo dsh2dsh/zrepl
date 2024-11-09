@@ -18,6 +18,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
+	"golang.org/x/sync/errgroup"
 )
 
 type SenderConfig struct {
@@ -321,25 +322,71 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 	return res, sendStream, nil
 }
 
-func (s *Sender) SendDry(ctx context.Context, r *pdu.SendReq,
-) (*pdu.SendRes, error) {
-	sendArgs, err := s.sendMakeArgs(ctx, r)
+func (s *Sender) SendDry(ctx context.Context, req *pdu.SendDryReq,
+) (*pdu.SendDryRes, error) {
+	if len(req.Items) == 0 {
+		return &pdu.SendDryRes{}, nil
+	}
+
+	sendArgs, err := s.makeSendArgsList(ctx, req.Items)
 	if err != nil {
 		return nil, err
+	} else if len(req.Items) == 1 {
+		item, err := s.zfsSendDry(ctx, &req.Items[0], sendArgs[0])
+		if err != nil {
+			return nil, err
+		}
+		return &pdu.SendDryRes{Items: []pdu.SendRes{item}}, nil
 	}
 
-	si, err := zfs.ZFSSendDry(ctx, sendArgs)
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(min(len(req.Items), req.Concurrency))
+
+	resp := &pdu.SendDryRes{Items: make([]pdu.SendRes, len(req.Items))}
+	for i := range req.Items {
+		if ctx.Err() != nil {
+			break
+		}
+		g.Go(func() (err error) {
+			resp.Items[i], err = s.zfsSendDry(ctx, &req.Items[i], sendArgs[i])
+			return
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	} else if ctx.Err() != nil {
+		return nil, context.Cause(ctx)
+	}
+	return resp, nil
+}
+
+func (s *Sender) makeSendArgsList(ctx context.Context, items []pdu.SendReq,
+) ([]zfs.ZFSSendArgsValidated, error) {
+	sendArgs := make([]zfs.ZFSSendArgsValidated, len(items))
+	for i := range items {
+		args, err := s.sendMakeArgs(ctx, &items[i])
+		if err != nil {
+			return nil, err
+		}
+		sendArgs[i] = args
+	}
+	return sendArgs, nil
+}
+
+func (s *Sender) zfsSendDry(ctx context.Context, r *pdu.SendReq,
+	args zfs.ZFSSendArgsValidated,
+) (resp pdu.SendRes, err error) {
+	si, err := zfs.ZFSSendDry(ctx, args)
 	if err != nil {
-		return nil, fmt.Errorf("zfs send dry failed: %w", err)
+		err = fmt.Errorf("zfs send dry failed: %w", err)
+		return
 	}
-
-	// From now on, assume that sendArgs has been validated by ZFSSendDry (because
-	// validation involves shelling out, it's actually a little expensive)
-	res := &pdu.SendRes{
+	resp = pdu.SendRes{
 		ExpectedSize:    si.SizeEstimate,
 		UsedResumeToken: r.ResumeToken != "",
 	}
-	return res, nil
+	return
 }
 
 func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
@@ -703,7 +750,8 @@ func (s *Receiver) Send(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes, io
 	return nil, nil, errors.New("receiver does not implement Send()")
 }
 
-func (s *Receiver) SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error) {
+func (s *Receiver) SendDry(ctx context.Context, req *pdu.SendDryReq,
+) (*pdu.SendDryRes, error) {
 	return nil, errors.New("receiver does not implement SendDry()")
 }
 

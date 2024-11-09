@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/dsh2dsh/zrepl/internal/client/jsonclient"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	. "github.com/dsh2dsh/zrepl/internal/replication/logic/diff"
@@ -18,7 +19,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/bytecounter"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
-	"github.com/dsh2dsh/zrepl/internal/util/semaphore"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -40,7 +40,7 @@ type Sender interface {
 	// any next call to the parent github.com/dsh2dsh/zrepl/replication.Endpoint.
 	// If the send request is for dry run the io.ReadCloser will be nil
 	Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error)
-	SendDry(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, error)
+	SendDry(ctx context.Context, r *pdu.SendDryReq) (*pdu.SendDryRes, error)
 	SendCompleted(ctx context.Context, r *pdu.SendCompletedReq) error
 	ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error)
 }
@@ -119,8 +119,6 @@ type Filesystem struct {
 	Path                 string             // compat
 	receiverFS, senderFS *pdu.Filesystem    // receiverFS may be nil, senderFS never nil
 	promBytesReplicated  prometheus.Counter // compat
-
-	sizeEstimateRequestSem *semaphore.S
 }
 
 func (f *Filesystem) EqualToPreviousAttempt(other driver.FS) bool {
@@ -304,9 +302,6 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 		return nil, err
 	}
 
-	sizeEstimateRequestSem := semaphore.New(int64(
-		p.policy.SizeEstimationConcurrency))
-
 	q := make([]*Filesystem, 0, len(sfss))
 	for _, fs := range sfss {
 		var receiverFS *pdu.Filesystem
@@ -322,52 +317,48 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 		}
 
 		q = append(q, &Filesystem{
-			sender:                 p.sender,
-			receiver:               p.receiver,
-			policy:                 p.policy,
-			Path:                   fs.Path,
-			senderFS:               fs,
-			receiverFS:             receiverFS,
-			promBytesReplicated:    ctr,
-			sizeEstimateRequestSem: sizeEstimateRequestSem,
+			sender:              p.sender,
+			receiver:            p.receiver,
+			policy:              p.policy,
+			Path:                fs.Path,
+			senderFS:            fs,
+			receiverFS:          receiverFS,
+			promBytesReplicated: ctr,
 		})
 	}
 
 	return q, nil
 }
 
-func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
-	error,
-) {
+func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
+) ([]*Step, error) {
 	log := func(ctx context.Context) logger.Logger {
 		return getLogger(ctx).WithField("filesystem", fs.Path)
 	}
-
 	log(ctx).Debug("assessing filesystem")
 
 	if fs.senderFS.IsPlaceholder {
 		log(ctx).Debug("sender filesystem is placeholder")
 		if fs.receiverFS != nil {
-			if fs.receiverFS.IsPlaceholder {
-				// all good, fall through
-				log(ctx).Debug("receiver filesystem is placeholder")
-			} else {
-				err := errors.New("sender filesystem is placeholder, but receiver filesystem is not")
+			if !fs.receiverFS.IsPlaceholder {
+				err := errors.New(
+					"sender filesystem is placeholder, but receiver filesystem is not")
 				log(ctx).Error(err.Error())
 				return nil, err
 			}
+			// all good, fall through
+			log(ctx).Debug("receiver filesystem is placeholder")
 		}
 		log(ctx).Debug("no steps required for replicating placeholders, the endpoint.Receiver will create a placeholder when we receive the first non-placeholder child filesystem")
 		return nil, nil
 	}
 
-	sfsvsres, err := fs.sender.ListFilesystemVersions(ctx, &pdu.ListFilesystemVersionsReq{Filesystem: fs.Path})
+	fsvsResps, err := fs.listBothVersions(ctx)
 	if err != nil {
-		log(ctx).WithError(err).Error("cannot get remote filesystem versions")
+		log(ctx).WithError(err).Error("cannot get filesystem versions")
 		return nil, err
 	}
-	sfsvs := sfsvsres.GetVersions()
-
+	sfsvs := fsvsResps[0].GetVersions()
 	if len(sfsvs) < 1 {
 		err := errors.New("sender does not have any versions")
 		log(ctx).Error(err.Error())
@@ -376,12 +367,7 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 
 	var rfsvs []*pdu.FilesystemVersion
 	if fs.receiverFS != nil && !fs.receiverFS.GetIsPlaceholder() {
-		rfsvsres, err := fs.receiver.ListFilesystemVersions(ctx, &pdu.ListFilesystemVersionsReq{Filesystem: fs.Path})
-		if err != nil {
-			log(ctx).WithError(err).Error("receiver error")
-			return nil, err
-		}
-		rfsvs = rfsvsres.GetVersions()
+		rfsvs = fsvsResps[1].GetVersions()
 	} else {
 		rfsvs = []*pdu.FilesystemVersion{}
 	}
@@ -536,121 +522,116 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool) ([]*Step,
 
 	if len(steps) == 0 {
 		log(ctx).Info("planning determined that no replication steps are required")
+		return steps, nil
 	}
 
 	log(ctx).Debug("compute send size estimate")
-	errs := make(chan error, len(steps))
-	fanOutCtx, fanOutCancel := context.WithCancel(ctx)
-
-	var wg sync.WaitGroup
-	fanOutAdd := func(f func(context.Context)) {
-		wg.Add(1)
-		go func() {
-			f(fanOutCtx)
-			wg.Done()
-		}()
+	if err := fs.updateSizeEstimates(ctx, steps); err != nil {
+		log(ctx).WithError(err).Error("error computing size estimate")
 	}
-	fanOutWait := func() { wg.Wait() }
-
-	defer fanOutCancel()
-	for _, step := range steps {
-		// TODO: instead of the semaphore, rely on resource-exhaustion signaled by
-		// the remote endpoint to limit size-estimate requests. Send is handled
-		// over rpc/dataconn ATM, which doesn't support the resource exhaustion
-		// status codes that gRPC defines.
-		guard, err := fs.sizeEstimateRequestSem.Acquire(fanOutCtx)
-		if err != nil {
-			fanOutCancel()
-			break
-		}
-		fanOutAdd(func(ctx context.Context) {
-			defer guard.Release()
-			err := step.updateSizeEstimate(ctx)
-			if err != nil {
-				log(ctx).WithError(err).WithField("step", step).Error(
-					"error computing size estimate")
-				fanOutCancel()
-			}
-			errs <- err
-		})
-	}
-	fanOutWait()
-	close(errs)
-	var significantErr error = nil
-	for err := range errs {
-		if err != nil {
-			if significantErr == nil || significantErr == context.Canceled {
-				significantErr = err
-			}
-		}
-	}
-	if significantErr != nil {
-		return nil, significantErr
-	}
-
 	log(ctx).Debug("filesystem planning finished")
 	return steps, nil
 }
 
-func (s *Step) updateSizeEstimate(ctx context.Context) error {
-	sr := s.buildSendRequest()
+func (fs *Filesystem) listBothVersions(ctx context.Context,
+) (resps [2]*pdu.ListFilesystemVersionsRes, err error) {
+	req := pdu.ListFilesystemVersionsReq{Filesystem: fs.Path}
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		resp, err := fs.sender.ListFilesystemVersions(ctx, &req)
+		if err != nil {
+			return fmt.Errorf("sender: %w", err)
+		}
+		resps[0] = resp
+		return nil
+	})
+
+	g.Go(func() error {
+		resp, err := fs.receiver.ListFilesystemVersions(ctx, &req)
+		if err != nil {
+			return fmt.Errorf("receiver: %w", err)
+		}
+		resps[1] = resp
+		return nil
+	})
+	return resps, g.Wait()
+}
+
+func (fs *Filesystem) updateSizeEstimates(ctx context.Context, steps []*Step,
+) error {
+	req := pdu.SendDryReq{
+		Items:       make([]pdu.SendReq, len(steps)),
+		Concurrency: fs.policy.SizeEstimationConcurrency,
+	}
+	for i, s := range steps {
+		req.Items[i] = s.buildSendRequest()
+	}
+
 	log := getLogger(ctx)
 	log.Debug("initiate dry run send request")
-
-	sres, err := s.sender.SendDry(ctx, sr)
+	resp, err := fs.sender.SendDry(ctx, &req)
 	if err != nil {
-		log.WithError(err).Error("dry run send request failed")
-		return err
-	} else if sres == nil {
-		err := errors.New("got nil send result")
 		log.WithError(err).Error("dry run send request failed")
 		return err
 	}
 
-	s.expectedSize = sres.GetExpectedSize()
+	for i := range resp.Items {
+		steps[i].expectedSize = resp.Items[i].GetExpectedSize()
+	}
 	return nil
 }
 
-func (s *Step) buildSendRequest() (sr *pdu.SendReq) {
-	fs := s.parent.Path
-	sr = &pdu.SendReq{
-		Filesystem:        fs,
+func (s *Step) buildSendRequest() pdu.SendReq {
+	return pdu.SendReq{
+		Filesystem:        s.parent.Path,
 		From:              s.from, // may be nil
 		To:                s.to,
 		ResumeToken:       s.resumeToken,
 		ReplicationConfig: s.parent.policy.ReplicationConfig,
 	}
-	return sr
 }
 
 func (s *Step) doReplication(ctx context.Context) error {
-	fs := s.parent.Path
-
-	log := getLogger(ctx).WithField("filesystem", fs)
 	sr := s.buildSendRequest()
-
-	log.Debug("initiate send request")
-	sres, stream, err := s.sender.Send(ctx, sr)
-	if err != nil {
-		log.WithError(err).Error("send request failed")
+	if err := s.sendRecv(ctx, &sr); err != nil {
 		return err
 	}
-	if sres == nil {
+
+	log := getLogger(ctx).WithField("filesystem", s.parent.Path)
+	log.Debug("tell sender replication completed")
+	err := s.sender.SendCompleted(ctx, &pdu.SendCompletedReq{OriginalReq: &sr})
+	if err != nil {
+		log.WithError(err).Error(
+			"error telling sender that replication completed successfully")
+		return err
+	}
+	return nil
+}
+
+func (s *Step) sendRecv(ctx context.Context, sr *pdu.SendReq) error {
+	log := getLogger(ctx).WithField("filesystem", s.parent.Path)
+	log.Debug("initiate send request")
+
+	sres, stream, err := s.sender.Send(ctx, sr)
+	switch {
+	case err != nil:
+		log.WithError(err).Error("send request failed")
+		return err
+	case sres == nil:
 		err := errors.New("send request returned nil send result")
 		log.Error(err.Error())
 		return err
-	}
-	if stream == nil {
-		err := errors.New("send request did not return a stream, broken endpoint implementation")
+	case stream == nil:
+		err := errors.New(
+			"send request did not return a stream, broken endpoint implementation")
 		return err
 	}
-	defer stream.Close()
+	defer jsonclient.BodyClose(stream)
 
 	// Install a byte counter to track progress + for status report
 	byteCountingStream := bytecounter.NewReadCloser(stream)
-	s.byteCounterMtx.Lock()
-	s.byteCounter = byteCountingStream
-	s.byteCounterMtx.Unlock()
+	s.WithByteCounter(byteCountingStream)
 	defer func() {
 		defer s.byteCounterMtx.Lock().Unlock()
 		if s.parent.promBytesReplicated != nil {
@@ -658,17 +639,16 @@ func (s *Step) doReplication(ctx context.Context) error {
 		}
 	}()
 
-	rr := &pdu.ReceiveReq{
-		Filesystem:        fs,
+	rr := pdu.ReceiveReq{
+		Filesystem:        s.parent.Path,
 		To:                sr.GetTo(),
 		ClearResumeToken:  !sres.UsedResumeToken,
 		ReplicationConfig: s.parent.policy.ReplicationConfig,
 	}
+
 	log.Debug("initiate receive request")
-	err = s.receiver.Receive(ctx, rr, byteCountingStream)
-	if err != nil {
-		log.
-			WithError(err).
+	if err := s.receiver.Receive(ctx, &rr, byteCountingStream); err != nil {
+		log.WithError(err).
 			WithField("errType", fmt.Sprintf("%T", err)).
 			WithField("rr", fmt.Sprintf("%v", rr)).
 			Error("receive request failed (might also be error on sender)")
@@ -679,21 +659,23 @@ func (s *Step) doReplication(ctx context.Context) error {
 		return err
 	}
 	log.Debug("receive finished")
+	return nil
+}
 
-	log.Debug("tell sender replication completed")
-	err = s.sender.SendCompleted(ctx, &pdu.SendCompletedReq{OriginalReq: sr})
-	if err != nil {
-		log.WithError(err).Error("error telling sender that replication completed successfully")
-		return err
-	}
-
-	return err
+func (s *Step) WithByteCounter(r bytecounter.ReadCloser) *Step {
+	s.byteCounterMtx.Lock()
+	s.byteCounter = r
+	s.byteCounterMtx.Unlock()
+	return s
 }
 
 func (s *Step) String() string {
-	if s.from == nil { // FIXME: ZFS semantics are that to is nil on non-incremental send
-		return fmt.Sprintf("%s%s (full)", s.parent.Path, s.to.RelName())
+	if s.from == nil {
+		// FIXME: ZFS semantics are that to is nil on non-incremental send
+		return fmt.Sprintf("%s%s (full)",
+			s.parent.Path, s.to.RelName())
 	} else {
-		return fmt.Sprintf("%s(%s => %s)", s.parent.Path, s.from.RelName(), s.to.RelName())
+		return fmt.Sprintf("%s(%s => %s)",
+			s.parent.Path, s.from.RelName(), s.to.RelName())
 	}
 }
