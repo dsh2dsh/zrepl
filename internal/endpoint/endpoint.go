@@ -352,13 +352,7 @@ func (s *Sender) SendDry(ctx context.Context, req *pdu.SendDryReq,
 			return
 		})
 	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	} else if ctx.Err() != nil {
-		return nil, context.Cause(ctx)
-	}
-	return resp, nil
+	return resp, g.Wait()
 }
 
 func (s *Sender) makeSendArgsList(ctx context.Context, items []pdu.SendReq,
