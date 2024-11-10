@@ -791,8 +791,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	to := uncheckedSendArgsFromPDU(req.GetTo())
 	if to == nil {
 		return errors.New("`To` must not be nil")
-	}
-	if !to.IsSnapshot() {
+	} else if !to.IsSnapshot() {
 		return errors.New("`To` must be a snapshot")
 	}
 
@@ -827,37 +826,50 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 				WithField("errType", fmt.Sprintf("%T", err)).
 				Debug("get placeholder state for filesystem")
 			if err != nil {
-				visitErr = fmt.Errorf("cannot get placeholder state of %s: %w", v.Path.ToString(), err)
+				visitErr = fmt.Errorf(
+					"cannot get placeholder state of %s: %w",
+					v.Path.ToString(), err)
 				return false
 			}
 
 			if !ph.FSExists {
 				if s.conf.RootWithoutClientComponent.HasPrefix(v.Path) {
 					if v.Path.Length() == 1 {
-						visitErr = fmt.Errorf("pool %q not imported", v.Path.ToString())
+						visitErr = fmt.Errorf("pool %q not imported",
+							v.Path.ToString())
 					} else {
-						visitErr = fmt.Errorf("root_fs %q does not exist", s.conf.RootWithoutClientComponent.ToString())
+						visitErr = fmt.Errorf("root_fs %q does not exist",
+							s.conf.RootWithoutClientComponent.ToString())
 					}
-					l.WithError(visitErr).Error("placeholders are only created automatically below root_fs")
+					l.WithError(visitErr).Error(
+						"placeholders are only created automatically below root_fs")
 					return false
 				}
 
-				// compute the value lazily so that users who don't rely on
-				// placeholders can use the default value PlaceholderCreationEncryptionPropertyUnspecified
+				// compute the value lazily so that users who don't rely on placeholders
+				// can use the default value
+				// PlaceholderCreationEncryptionPropertyUnspecified
 				placeholderEncryption, err := s.receive_GetPlaceholderCreationEncryptionValue(root, v.Path)
 				if err != nil {
-					l.WithError(err).Error("cannot create placeholder filesystem") // logger already contains path
-					visitErr = fmt.Errorf("cannot create placeholder filesystem %s: %w", v.Path.ToString(), err)
+					// logger already contains path
+					l.WithError(err).Error("cannot create placeholder filesystem")
+					visitErr = fmt.Errorf(
+						"cannot create placeholder filesystem %s: %w",
+						v.Path.ToString(), err)
 					return false
 				}
 
 				l := l.WithField("encryption", placeholderEncryption)
 
 				l.Debug("creating placeholder filesystem")
-				err = zfs.ZFSCreatePlaceholderFilesystem(ctx, v.Path, v.Parent.Path, placeholderEncryption)
+				err = zfs.ZFSCreatePlaceholderFilesystem(ctx,
+					v.Path, v.Parent.Path, placeholderEncryption)
 				if err != nil {
-					l.WithError(err).Error("cannot create placeholder filesystem") // logger already contains path
-					visitErr = fmt.Errorf("cannot create placeholder filesystem %s: %w", v.Path.ToString(), err)
+					// logger already contains path
+					l.WithError(err).Error("cannot create placeholder filesystem")
+					visitErr = fmt.Errorf(
+						"cannot create placeholder filesystem %s: %w",
+						v.Path.ToString(), err)
 					return false
 				}
 				l.Info("created placeholder filesystem")
@@ -868,21 +880,26 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 			}
 		})
 	}()
+
 	getLogger(ctx).WithField("visitErr", visitErr).Debug("complete tree-walk")
 	if visitErr != nil {
 		return visitErr
 	}
 
-	log := getLogger(ctx).WithField("proto_fs", req.GetFilesystem()).WithField("local_fs", lp.ToString())
+	log := getLogger(ctx).
+		WithField("proto_fs", req.GetFilesystem()).
+		WithField("local_fs", lp.ToString())
 
-	// determine whether we need to rollback the filesystem / change its placeholder state
+	// determine whether we need to rollback the filesystem / change its
+	// placeholder state
 	var clearPlaceholderProperty bool
 	var recvOpts zfs.RecvOptions
 	ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, lp)
 	if err != nil {
 		return fmt.Errorf("cannot get placeholder state: %w", err)
 	}
-	log.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).Debug("placeholder state")
+	log.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).
+		Debug("placeholder state")
 
 	recvOpts.InheritProperties = s.conf.InheritProperties
 	recvOpts.OverrideProperties = s.conf.OverrideProperties
@@ -895,7 +912,8 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	if clearPlaceholderProperty {
 		log.Info("clearing placeholder property")
 		if err := zfs.ZFSSetPlaceholder(ctx, lp, false); err != nil {
-			return fmt.Errorf("cannot clear placeholder property for forced receive: %s", err)
+			return fmt.Errorf(
+				"cannot clear placeholder property for forced receive: %s", err)
 		}
 	}
 
@@ -908,7 +926,8 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 
 	recvOpts.SavePartialRecvState, err = zfs.ResumeRecvSupported(ctx, lp)
 	if err != nil {
-		return fmt.Errorf("cannot determine whether we can use resumable send & recv: %w", err)
+		return fmt.Errorf(
+			"cannot determine whether we can use resumable send & recv: %w", err)
 	}
 
 	// apply rate limit
@@ -925,17 +944,19 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		panic(peek.Len())
 	}
 
-	log.WithField("opts", fmt.Sprintf("%#v", recvOpts)).Debug("start receive command")
+	log.WithField("opts", fmt.Sprintf("%#v", recvOpts)).
+		Debug("start receive command")
 
 	snapFullPath := to.FullPath(lp.ToString())
-	if err := zfs.ZFSRecv(
-		ctx, lp.ToString(), to, chainedio.NewChainedReader(&peek, receive),
+	err = zfs.ZFSRecv(ctx, lp.ToString(), to,
+		chainedio.NewChainedReader(&peek, receive),
 		recvOpts, s.conf.ExecPipe...,
-	); err != nil {
-
+	)
+	if err != nil {
 		// best-effort rollback of placeholder state if the recv didn't start
 		_, resumableStatePresent := err.(*zfs.RecvFailedWithResumeTokenErr)
-		disablePlaceholderRestoration := envconst.Bool("ZREPL_ENDPOINT_DISABLE_PLACEHOLDER_RESTORATION", false)
+		disablePlaceholderRestoration := envconst.Bool(
+			"ZREPL_ENDPOINT_DISABLE_PLACEHOLDER_RESTORATION", false)
 		placeholderRestored := !ph.IsPlaceholder
 		if !disablePlaceholderRestoration && !resumableStatePresent && recvOpts.RollbackAndForceRecv && ph.FSExists && ph.IsPlaceholder && clearPlaceholderProperty {
 			log.Info("restoring placeholder property")
@@ -983,7 +1004,8 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 
 			recvOpts.RollbackAndForceRecv = false
 			recvOpts.SavePartialRecvState = true
-			rerecvErr := zfs.ZFSRecv(ctx, tempStartFullRecvFS, to, chainedio.NewChainedReader(&peekCopy), recvOpts)
+			rerecvErr := zfs.ZFSRecv(ctx, tempStartFullRecvFS, to,
+				chainedio.NewChainedReader(&peekCopy), recvOpts)
 			if _, isResumable := rerecvErr.(*zfs.RecvFailedWithResumeTokenErr); rerecvErr == nil || isResumable {
 				log.Error("completed re-receive into temporary filesystem temp_recv_fs, now shut down zrepl and use zfs rename to swap temp_recv_fs with local_fs")
 			} else {
@@ -995,11 +1017,8 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 			return err
 		}
 
-		log.
-			WithError(err).
-			WithField("opts", fmt.Sprintf("%#v", recvOpts)).
+		log.WithError(err).WithField("opts", fmt.Sprintf("%#v", recvOpts)).
 			Error("zfs receive failed")
-
 		return err
 	}
 
@@ -1008,16 +1027,20 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	if err != nil {
 		msg := "receive request's `To` version does not match what we received in the stream"
 		log.WithError(err).WithField("snap", snapFullPath).Error(msg)
-		log.Error("aborting recv request, but keeping received snapshot for inspection")
+		log.Error(
+			"aborting recv request, but keeping received snapshot for inspection")
 		return fmt.Errorf("%s: %w", msg, err)
 	}
 
-	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(req.GetReplicationConfig().Protection)
+	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(
+		req.GetReplicationConfig().Protection)
 	if err != nil {
 		return err
 	}
-	replicationGuaranteeStrategy := replicationGuaranteeOptions.Strategy(ph.FSExists)
-	liveAbs, err := replicationGuaranteeStrategy.ReceiverPostRecv(ctx, s.conf.JobID, lp.ToString(), toRecvd)
+	replicationGuaranteeStrategy := replicationGuaranteeOptions.
+		Strategy(ph.FSExists)
+	liveAbs, err := replicationGuaranteeStrategy.
+		ReceiverPostRecv(ctx, s.conf.JobID, lp.ToString(), toRecvd)
 	if err != nil {
 		return err
 	}
@@ -1036,15 +1059,17 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	check := func(obsoleteAbs []Abstraction) {
 		for _, abs := range obsoleteAbs {
 			if zfs.FilesystemVersionEqualIdentity(abs.GetFilesystemVersion(), toRecvd) {
-				panic(fmt.Sprintf("would destroy endpoint abstraction around the filesystem version we just received %s", abs))
+				panic(fmt.Sprintf(
+					"would destroy endpoint abstraction around the filesystem version we just received %s",
+					abs))
 			}
 		}
 	}
 	destroyTypes := AbstractionTypeSet{
 		AbstractionLastReceivedHold: true,
 	}
-	abstractionsCacheSingleton.TryBatchDestroy(ctx, s.conf.JobID, lp.ToString(), destroyTypes, keep, check)
-
+	abstractionsCacheSingleton.TryBatchDestroy(ctx, s.conf.JobID,
+		lp.ToString(), destroyTypes, keep, check)
 	return nil
 }
 
