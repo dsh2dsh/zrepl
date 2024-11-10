@@ -76,7 +76,10 @@ func (self *JobRender) renderPrunedDatasets(p *pruner.Report) {
 
 func (self *JobRender) renderPruningProgress(p *pruner.Report) {
 	expected, completed := p.Progress()
-	pct := float64(completed) / float64(expected)
+	var pct float64
+	if expected > 0 {
+		pct = float64(completed) / float64(expected)
+	}
 	s := &self.Styles
 	self.printLn(s.Content.Render(fmt.Sprintf(
 		"Progress: %s %d/%d", self.bar.ViewAs(pct), completed, expected)))

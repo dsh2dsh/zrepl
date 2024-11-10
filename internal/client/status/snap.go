@@ -42,10 +42,13 @@ func (self *JobRender) renderSnapHeader(r *snapper.PeriodicReport) {
 
 	expected, completed := r.CompletionProgress()
 	if !r.IsTerminal() {
-		pct := float64(completed) / float64(expected)
+		var pct float64
+		if expected > 0 {
+			pct = float64(completed) / float64(expected)
+		}
 		self.printLn(s.Content.Render(fmt.Sprintf(
 			"Progress: %s %d/%d", self.bar.ViewAs(pct), completed, expected)))
-	} else if expected > 0 {
+	} else if expected > 0 || completed > 0 {
 		self.printLn(s.Content.Render(fmt.Sprintf("Completed: %d/%d",
 			completed, expected)))
 	}

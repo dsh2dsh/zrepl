@@ -164,9 +164,12 @@ func (self *JobRender) renderReplicated(expected, replicated uint64, fsNum,
 func (self *JobRender) renderAttemptProgress(expected, replicated uint64,
 	fsNum, fsDone int,
 ) {
+	var pct float64
+	if expected > 0 {
+		pct = float64(replicated) / float64(expected)
+	}
 	s := &self.Styles
-	self.printLn(s.Content.Render("Progress:",
-		self.bar.ViewAs(float64(replicated)/float64(expected))))
+	self.printLn(s.Content.Render("Progress:", self.bar.ViewAs(pct)))
 
 	var sb strings.Builder
 	bps := self.speed.Update(replicated)
