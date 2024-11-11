@@ -7,7 +7,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -23,7 +22,6 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}
 	sendOpts := in.GetSendOptions()
-	bwlim, err := buildBandwidthLimitConfig(&sendOpts.BandwidthLimit)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build bandwidth limit config: %w", err)
 	}
@@ -41,8 +39,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		SendEmbeddedData:     sendOpts.EmbeddedData,
 		SendSaved:            sendOpts.Saved,
 
-		BandwidthLimit: bwlim,
-		ExecPipe:       sendOpts.ExecPipe,
+		ExecPipe: sendOpts.ExecPipe,
 	}
 
 	if err := sc.Validate(); err != nil {
@@ -50,16 +47,6 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 	}
 
 	return sc, nil
-}
-
-func buildBandwidthLimitConfig(in *config.BandwidthLimit) (c bandwidthlimit.Config, _ error) {
-	if in.Max.ToBytes() > 0 && int64(in.Max.ToBytes()) == 0 {
-		return c, errors.New("bandwidth limit `max` is too small, must at least specify one byte")
-	}
-	return bandwidthlimit.Config{
-		Max:            int64(in.Max.ToBytes()),
-		BucketCapacity: int64(in.BucketCapacity.ToBytes()),
-	}, nil
 }
 
 type ReceivingJobConfig interface {
@@ -80,7 +67,6 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 
 	recvOpts := in.GetRecvOptions()
 
-	bwlim, err := buildBandwidthLimitConfig(&recvOpts.BandwidthLimit)
 	if err != nil {
 		return rc, fmt.Errorf("cannot build bandwidth limit config: %w", err)
 	}
@@ -106,8 +92,6 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 
 		InheritProperties:  recvOpts.Properties.Inherit,
 		OverrideProperties: recvOpts.Properties.Override,
-
-		BandwidthLimit: bwlim,
 
 		PlaceholderEncryption: placeholderEncryption,
 		ExecPipe:              recvOpts.ExecPipe,

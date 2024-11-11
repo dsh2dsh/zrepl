@@ -9,7 +9,6 @@ import (
 	"github.com/creasty/defaults"
 	"gopkg.in/yaml.v3"
 
-	"github.com/dsh2dsh/zrepl/internal/util/datasizeunit"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 )
 
@@ -195,8 +194,7 @@ type SendOptions struct {
 	EmbeddedData     bool `yaml:"embedded_data"`
 	Saved            bool `yaml:"saved"`
 
-	BandwidthLimit BandwidthLimit `yaml:"bandwidth_limit"`
-	ExecPipe       [][]string     `yaml:"execpipe" validate:"dive,required"`
+	ExecPipe [][]string `yaml:"execpipe" validate:"dive,required"`
 }
 
 type RecvOptions struct {
@@ -205,17 +203,9 @@ type RecvOptions struct {
 	// Future:
 	// Reencrypt bool `yaml:"reencrypt"`
 
-	Properties     PropertyRecvOptions    `yaml:"properties"`
-	BandwidthLimit BandwidthLimit         `yaml:"bandwidth_limit"`
-	Placeholder    PlaceholderRecvOptions `yaml:"placeholder"`
-	ExecPipe       [][]string             `yaml:"execpipe" validate:"dive,required"`
-}
-
-var _ yaml.Unmarshaler = &datasizeunit.Bits{}
-
-type BandwidthLimit struct {
-	Max            datasizeunit.Bits `yaml:"max" default:"-1 B" validate:"required"`
-	BucketCapacity datasizeunit.Bits `yaml:"bucket_capacity" default:"128 KiB" validate:"required"`
+	Properties  PropertyRecvOptions    `yaml:"properties"`
+	Placeholder PlaceholderRecvOptions `yaml:"placeholder"`
+	ExecPipe    [][]string             `yaml:"execpipe" validate:"dive,required"`
 }
 
 type Replication struct {

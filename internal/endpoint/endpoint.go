@@ -9,13 +9,13 @@ import (
 	"path"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
-	"github.com/dsh2dsh/zrepl/internal/util/bandwidthlimit"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
-	"golang.org/x/sync/errgroup"
 )
 
 type SenderConfig struct {
@@ -31,8 +31,7 @@ type SenderConfig struct {
 	SendEmbeddedData     bool
 	SendSaved            bool
 
-	BandwidthLimit bandwidthlimit.Config
-	ExecPipe       [][]string
+	ExecPipe [][]string
 }
 
 func (c *SenderConfig) Validate() error {
@@ -43,9 +42,6 @@ func (c *SenderConfig) Validate() error {
 	if _, err := StepHoldTag(c.JobID); err != nil {
 		return fmt.Errorf("JobID cannot be used for hold tag: %s", err)
 	}
-	if err := bandwidthlimit.ValidateConfig(c.BandwidthLimit); err != nil {
-		return fmt.Errorf("`BandwidthLimit` field invalid: %w", err)
-	}
 	return nil
 }
 
@@ -54,7 +50,6 @@ type Sender struct {
 	FSFilter zfs.DatasetFilter
 	jobId    JobID
 	config   SenderConfig
-	bwLimit  bandwidthlimit.Wrapper
 }
 
 func NewSender(conf SenderConfig) *Sender {
@@ -62,13 +57,10 @@ func NewSender(conf SenderConfig) *Sender {
 		panic("invalid config" + err.Error())
 	}
 
-	ratelimiter := bandwidthlimit.WrapperFromConfig(conf.BandwidthLimit)
-
 	return &Sender{
 		FSFilter: conf.FSF,
 		jobId:    conf.JobID,
 		config:   conf,
-		bwLimit:  ratelimiter,
 	}
 }
 
@@ -308,9 +300,6 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 		return nil, nil, fmt.Errorf("zfs send failed: %w", err)
 	}
 
-	// apply rate limit
-	sendStream = s.bwLimit.WrapReadCloser(sendStream)
-
 	res := &pdu.SendRes{
 		ExpectedSize:    0,
 		UsedResumeToken: r.ResumeToken != "",
@@ -491,8 +480,6 @@ type ReceiverConfig struct {
 	InheritProperties  []zfsprop.Property
 	OverrideProperties map[zfsprop.Property]string
 
-	BandwidthLimit bandwidthlimit.Config
-
 	PlaceholderEncryption PlaceholderCreationEncryptionProperty
 
 	ExecPipe [][]string
@@ -543,10 +530,6 @@ func (c *ReceiverConfig) Validate() error {
 		return errors.New("RootWithoutClientComponent must not be an empty dataset path")
 	}
 
-	if err := bandwidthlimit.ValidateConfig(c.BandwidthLimit); err != nil {
-		return fmt.Errorf("`BandwidthLimit` field invalid: %w", err)
-	}
-
 	if !c.PlaceholderEncryption.IsAPlaceholderCreationEncryptionProperty() {
 		return errors.New("`PlaceholderEncryption` field is invalid")
 	}
@@ -562,14 +545,12 @@ func NewReceiver(config ReceiverConfig) *Receiver {
 	return &Receiver{
 		conf:                  config,
 		recvParentCreationMtx: chainlock.New(),
-		bwLimit:               bandwidthlimit.WrapperFromConfig(config.BandwidthLimit),
 	}
 }
 
 // Receiver implements replication.ReplicationEndpoint for a receiving side
 type Receiver struct {
 	conf                  ReceiverConfig // validated
-	bwLimit               bandwidthlimit.Wrapper
 	recvParentCreationMtx *chainlock.L
 	clientIdentity        string
 
@@ -926,9 +907,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		return fmt.Errorf(
 			"cannot determine whether we can use resumable send & recv: %w", err)
 	}
-
-	// apply rate limit
-	receive = s.bwLimit.WrapReadCloser(receive)
 
 	log.WithField("opts", fmt.Sprintf("%#v", recvOpts)).
 		Debug("start receive command")

@@ -158,9 +158,7 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 		state int
 		test  func(t *testing.T, jobs []Job)
 	}
-	additionalChecks := map[string]*additionalCheck{
-		"bandwidth_limit.yml": {test: testSampleConfig_BandwidthLimit},
-	}
+	additionalChecks := map[string]*additionalCheck{}
 
 	for _, p := range paths {
 
@@ -204,40 +202,6 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 		if c.state == 0 {
 			panic("univisited additional check " + basename)
 		}
-	}
-}
-
-func testSampleConfig_BandwidthLimit(t *testing.T, jobs []Job) {
-	require.Len(t, jobs, 3)
-
-	{
-		limitedSink, ok := jobs[0].(*PassiveSide)
-		require.True(t, ok, "%T", jobs[0])
-		limitedSinkMode, ok := limitedSink.mode.(*modeSink)
-		require.True(t, ok, "%T", limitedSink)
-
-		assert.Equal(t, int64(12345), limitedSinkMode.receiverConfig.BandwidthLimit.Max)
-		assert.Equal(t, int64(1<<17), limitedSinkMode.receiverConfig.BandwidthLimit.BucketCapacity)
-	}
-
-	{
-		limitedPush, ok := jobs[1].(*ActiveSide)
-		require.True(t, ok, "%T", jobs[1])
-		limitedPushMode, ok := limitedPush.mode.(*modePush)
-		require.True(t, ok, "%T", limitedPush)
-
-		assert.Equal(t, int64(54321), limitedPushMode.senderConfig.BandwidthLimit.Max)
-		assert.Equal(t, int64(1024), limitedPushMode.senderConfig.BandwidthLimit.BucketCapacity)
-	}
-
-	{
-		unlimitedSink, ok := jobs[2].(*PassiveSide)
-		require.True(t, ok, "%T", jobs[2])
-		unlimitedSinkMode, ok := unlimitedSink.mode.(*modeSink)
-		require.True(t, ok, "%T", unlimitedSink)
-
-		max := unlimitedSinkMode.receiverConfig.BandwidthLimit.Max
-		assert.Negative(t, max, max, "unlimited mode <=> negative value for .Max, see bandwidthlimit.Config")
 	}
 }
 

@@ -3,8 +3,9 @@ jobs:
     name: "limited_sink"
     root_fs: "fs0"
     recv:
-      bandwidth_limit:
-        max: 12345 B
+      execpipe:
+        # mbuffer | zfs recv
+        - [ "/usr/local/bin/mbuffer", "-q", "-R", "16K" ]
 
   - type: "push"
     name: "limited_push"
@@ -16,9 +17,9 @@ jobs:
       - pattern: "root"
         recursive: true
     send:
-      bandwidth_limit:
-        max: 54321 B
-        bucket_capacity: 1024 B
+      execpipe:
+        # zfs send | mbuffer
+        - [ "/usr/local/bin/mbuffer", "-q", "-r", "16K" ]
     snapshotting:
       type: "manual"
     pruning:
