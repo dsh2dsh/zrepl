@@ -32,7 +32,7 @@ type zabsFilterFlags struct {
 	Filesystems FilesystemsFilterFlag
 	Job         JobIDFlag
 	Types       AbstractionTypesFlag
-	Concurrency int64
+	Concurrency int
 }
 
 // produce a query from the CLI flags
@@ -59,7 +59,7 @@ func (f *zabsFilterFlags) registerZabsFilterFlags(s *pflag.FlagSet, verb string)
 	variantsJoined := strings.Join(variants, "|")
 	s.Var(&f.Types, "type", fmt.Sprintf("only %s holds of the specified type [default: all] [comma-separated list of %s]", verb, variantsJoined))
 
-	s.Int64VarP(&f.Concurrency, "concurrency", "p", 1, "number of concurrently queried filesystems")
+	s.IntVarP(&f.Concurrency, "concurrency", "p", 1, "number of concurrently queried filesystems")
 }
 
 type JobIDFlag struct{ J *endpoint.JobID }

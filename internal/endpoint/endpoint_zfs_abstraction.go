@@ -10,9 +10,10 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
-	"github.com/dsh2dsh/zrepl/internal/util/semaphore"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -300,7 +301,7 @@ type ListZFSHoldsAndBookmarksQuery struct {
 	CreateTXG CreateTXGRange
 
 	// Number of concurrently queried filesystems. Must be >= 1
-	Concurrency int64
+	Concurrency int
 }
 
 type CreateTXGRangeBound struct {
@@ -562,7 +563,8 @@ func (e ListAbstractionsErrors) Error() string {
 	return "list endpoint abstractions: multiple errors:\n" + strings.Join(msgs, "\n")
 }
 
-func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery) (out []Abstraction, outErrs []ListAbstractionsError, err error) {
+func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery,
+) (out []Abstraction, outErrs []ListAbstractionsError, err error) {
 	outChan, outErrsChan, drainDone, err := ListAbstractionsStreamed(ctx, query)
 	if err != nil {
 		return nil, nil, err
@@ -577,6 +579,7 @@ func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery) 
 			out = append(out, a)
 		}
 	}()
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -589,12 +592,18 @@ func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery) 
 }
 
 // if err != nil, the returned channels are both nil
-// if err == nil, both channels must be fully drained by the caller to avoid leaking goroutines.
+//
+// if err == nil, both channels must be fully drained by the caller to avoid
+// leaking goroutines.
+//
 // After draining is done, the caller must call the returned drainDone func.
-func ListAbstractionsStreamed(ctx context.Context, query ListZFSHoldsAndBookmarksQuery) (_ <-chan Abstraction, _ <-chan ListAbstractionsError, drainDone func(), _ error) {
-	// impl note: structure the query processing in such a way that
-	// a minimum amount of zfs shell-outs needs to be done
-
+func ListAbstractionsStreamed(ctx context.Context,
+	query ListZFSHoldsAndBookmarksQuery,
+) (_ <-chan Abstraction, _ <-chan ListAbstractionsError, drainDone func(),
+	_ error,
+) {
+	// impl note: structure the query processing in such a way that a minimum
+	// amount of zfs shell-outs needs to be done
 	if err := query.Validate(); err != nil {
 		return nil, nil, nil, fmt.Errorf("validate query: %w", err)
 	}
@@ -611,48 +620,31 @@ func ListAbstractionsStreamed(ctx context.Context, query ListZFSHoldsAndBookmark
 		outErrs <- ListAbstractionsError{Err: err, FS: fs, What: what}
 	}
 	emitAbstraction := func(a Abstraction) {
-		jobIdMatches := query.JobID == nil || a.GetJobID() == nil || *a.GetJobID() == *query.JobID
-
+		jobIdMatches := query.JobID == nil || a.GetJobID() == nil ||
+			*a.GetJobID() == *query.JobID
 		createTXGMatches := query.CreateTXG.Contains(a.GetCreateTXG())
-
 		if jobIdMatches && createTXGMatches {
 			out <- a
 		}
 	}
 
-	sem := semaphore.New(int64(query.Concurrency))
 	go func() {
 		defer close(out)
 		defer close(outErrs)
 
-		var wg sync.WaitGroup
-		add := func(f func(context.Context)) {
-			wg.Add(1)
-			go func() {
-				f(ctx)
-				wg.Done()
-			}()
-		}
-		wait := func() { wg.Wait() }
+		g := new(errgroup.Group)
+		g.SetLimit(query.Concurrency)
 
-		defer wait()
 		for _, fs := range fss {
-			add(func(ctx context.Context) {
-				g, err := sem.Acquire(ctx)
-				if err != nil {
-					errCb(err, fs, err.Error())
-					return
-				}
-				func() {
-					defer g.Release()
-					listAbstractionsImplFS(ctx, fs, &query, emitAbstraction, errCb)
-				}()
+			g.Go(func() error {
+				listAbstractionsImplFS(ctx, fs, &query, emitAbstraction, errCb)
+				return nil
 			})
 		}
+		_ = g.Wait()
 	}()
 
 	drainDone = func() {}
-
 	return out, outErrs, drainDone, nil
 }
 
