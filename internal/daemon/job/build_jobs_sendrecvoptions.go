@@ -22,9 +22,6 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}
 	sendOpts := in.GetSendOptions()
-	if err != nil {
-		return nil, fmt.Errorf("cannot build bandwidth limit config: %w", err)
-	}
 
 	sc := &endpoint.SenderConfig{
 		FSF:   fsf,
@@ -39,7 +36,8 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		SendEmbeddedData:     sendOpts.EmbeddedData,
 		SendSaved:            sendOpts.Saved,
 
-		ExecPipe: sendOpts.ExecPipe,
+		Concurrency: int64(sendOpts.Concurrency),
+		ExecPipe:    sendOpts.ExecPipe,
 	}
 
 	if err := sc.Validate(); err != nil {
@@ -67,10 +65,6 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 
 	recvOpts := in.GetRecvOptions()
 
-	if err != nil {
-		return rc, fmt.Errorf("cannot build bandwidth limit config: %w", err)
-	}
-
 	placeholderEncryption, err := endpoint.
 		PlaceholderCreationEncryptionPropertyString(
 			recvOpts.Placeholder.Encryption)
@@ -90,11 +84,12 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 		RootWithoutClientComponent: rootFs,
 		AppendClientIdentity:       in.GetAppendClientIdentity(),
 
-		InheritProperties:  recvOpts.Properties.Inherit,
-		OverrideProperties: recvOpts.Properties.Override,
-
+		InheritProperties:     recvOpts.Properties.Inherit,
+		OverrideProperties:    recvOpts.Properties.Override,
 		PlaceholderEncryption: placeholderEncryption,
-		ExecPipe:              recvOpts.ExecPipe,
+
+		Concurrency: int64(recvOpts.Concurrency),
+		ExecPipe:    recvOpts.ExecPipe,
 	}
 
 	if err = rc.Validate(); err != nil {

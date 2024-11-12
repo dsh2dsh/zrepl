@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
@@ -31,7 +32,8 @@ type SenderConfig struct {
 	SendEmbeddedData     bool
 	SendSaved            bool
 
-	ExecPipe [][]string
+	Concurrency int64
+	ExecPipe    [][]string
 }
 
 func (c *SenderConfig) Validate() error {
@@ -50,6 +52,8 @@ type Sender struct {
 	FSFilter zfs.DatasetFilter
 	jobId    JobID
 	config   SenderConfig
+
+	sem *semaphore.Weighted
 }
 
 func NewSender(conf SenderConfig) *Sender {
@@ -57,11 +61,16 @@ func NewSender(conf SenderConfig) *Sender {
 		panic("invalid config" + err.Error())
 	}
 
-	return &Sender{
+	s := &Sender{
 		FSFilter: conf.FSF,
 		jobId:    conf.JobID,
 		config:   conf,
 	}
+
+	if conf.Concurrency > 0 {
+		s.sem = semaphore.NewWeighted(conf.Concurrency)
+	}
+	return s
 }
 
 func (s *Sender) filterCheckFS(fs string) (*zfs.DatasetPath, error) {
@@ -180,27 +189,37 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 	return sendArgs, nil
 }
 
-func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.ReadCloser, error) {
+func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes,
+	io.ReadCloser, error,
+) {
 	sendArgs, err := s.sendMakeArgs(ctx, r)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// create holds or bookmarks of `From` and `To` to guarantee one of the following:
+	// create holds or bookmarks of `From` and `To` to guarantee one of the
+	// following:
+	//
 	// - that the replication step can always be resumed (`holds`),
+	//
 	// - that the replication step can be interrupted and a future replication
-	//   step with same or different `To` but same `From` is still possible (`bookmarks`)
+	//   step with same or different `To` but same `From` is still possible
+	//   (`bookmarks`)
+	//
 	// - nothing (`none`)
 	//
 	// ...
 	//
 	// ... actually create the abstractions
-	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(r.GetReplicationConfig().Protection)
+	replicationGuaranteeOptions, err := replicationGuaranteeOptionsFromPDU(
+		r.GetReplicationConfig().Protection)
 	if err != nil {
 		return nil, nil, err
 	}
-	replicationGuaranteeStrategy := replicationGuaranteeOptions.Strategy(sendArgs.From != nil)
-	liveAbs, err := replicationGuaranteeStrategy.SenderPreSend(ctx, s.jobId, &sendArgs)
+	replicationGuaranteeStrategy := replicationGuaranteeOptions.
+		Strategy(sendArgs.From != nil)
+	liveAbs, err := replicationGuaranteeStrategy.
+		SenderPreSend(ctx, s.jobId, &sendArgs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -210,36 +229,46 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 		}
 	}
 
-	// cleanup the mess that _this function_ might have created in prior failed attempts:
+	// cleanup the mess that _this function_ might have created in prior failed
+	// attempts:
 	//
-	// In summary, we delete every endpoint ZFS abstraction created on this filesystem for this job id,
-	// except for the ones we just created above.
+	// In summary, we delete every endpoint ZFS abstraction created on this
+	// filesystem for this job id, except for the ones we just created above.
 	//
-	// This is the most robust approach to avoid leaking (= forgetting to clean up) endpoint ZFS abstractions,
-	// all under the assumption that there will only ever be one send for a (jobId,fs) combination at any given time.
+	// This is the most robust approach to avoid leaking (= forgetting to clean
+	// up) endpoint ZFS abstractions, all under the assumption that there will
+	// only ever be one send for a (jobId,fs) combination at any given time.
 	//
 	// Note that the SendCompleted rpc can't be relied upon for this purpose:
-	// - it might be lost due to network errors,
-	// - or never be sent by a potentially malicious or buggy client,
-	// - or never be send because the replication step failed at some point
-	//   (potentially leaving a resumable state on the receiver, which is the case where we really do not want to blow away the step holds too soon.)
 	//
-	// Note further that a resuming send, due to the idempotent nature of func CreateReplicationCursor and HoldStep,
-	// will never lose its step holds because we just (idempotently re-)created them above, before attempting the cleanup.
+	// - it might be lost due to network errors,
+	//
+	// - or never be sent by a potentially malicious or buggy client,
+	//
+	// - or never be send because the replication step failed at some point
+	//   (potentially leaving a resumable state on the receiver, which is the case
+	//   where we really do not want to blow away the step holds too soon.)
+	//
+	// Note further that a resuming send, due to the idempotent nature of func
+	// CreateReplicationCursor and HoldStep, will never lose its step holds
+	// because we just (idempotently re-)created them above, before attempting the
+	// cleanup.
 	destroyTypes := AbstractionTypeSet{
 		AbstractionStepHold:                           true,
 		AbstractionTentativeReplicationCursorBookmark: true,
 	}
-	// The replication planner can also pick an endpoint zfs abstraction as FromVersion.
-	// Keep it, so that the replication will succeed.
+	// The replication planner can also pick an endpoint zfs abstraction as
+	// FromVersion. Keep it, so that the replication will succeed.
 	//
-	// NB: there is no abstraction for snapshots, so, we only need to check bookmarks.
+	// NB: there is no abstraction for snapshots, so, we only need to check
+	// bookmarks.
 	if sendArgs.FromVersion != nil && sendArgs.FromVersion.IsBookmark() {
 		dp, err := zfs.NewDatasetPath(sendArgs.FS)
 		if err != nil {
 			panic(err) // sendArgs is validated, this shouldn't happen
 		}
-		liveAbs = append(liveAbs, destroyTypes.ExtractBookmark(dp, sendArgs.FromVersion))
+		liveAbs = append(liveAbs,
+			destroyTypes.ExtractBookmark(dp, sendArgs.FromVersion))
 	}
 	func() {
 		keep := func(a Abstraction) (keep bool) {
@@ -250,12 +279,13 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 			return keep
 		}
 		check := func(obsoleteAbs []Abstraction) {
-			// Ensure that we don't delete `From` or `To`.
-			// Regardless of whether they are in AbstractionTypeSet or not.
-			// And produce a nice error message in case we do, to aid debugging the resulting panic.
+			// Ensure that we don't delete `From` or `To`. Regardless of whether they
+			// are in AbstractionTypeSet or not. And produce a nice error message in
+			// case we do, to aid debugging the resulting panic.
 			//
-			// This is especially important for `From`. We could break incremental replication
-			// if we deleted the last common filesystem version between sender and receiver.
+			// This is especially important for `From`. We could break incremental
+			// replication if we deleted the last common filesystem version between
+			// sender and receiver.
 			type Problem struct {
 				sendArgsWhat string
 				fullpath     string
@@ -263,9 +293,11 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 			}
 			problems := make([]Problem, 0)
 			checkFullpaths := make(map[string]string, 2)
-			checkFullpaths["ToVersion"] = sendArgs.ToVersion.FullPath(sendArgs.FS)
+			checkFullpaths["ToVersion"] = sendArgs.ToVersion.
+				FullPath(sendArgs.FS)
 			if sendArgs.FromVersion != nil {
-				checkFullpaths["FromVersion"] = sendArgs.FromVersion.FullPath(sendArgs.FS)
+				checkFullpaths["FromVersion"] = sendArgs.FromVersion.
+					FullPath(sendArgs.FS)
 			}
 			for _, a := range obsoleteAbs {
 				for what, fullpath := range checkFullpaths {
@@ -285,26 +317,39 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes, io.Rea
 			fmt.Fprintf(&msg, "cleaning up send stale would destroy send args:\n")
 			fmt.Fprintf(&msg, "  SendArgs: %#v\n", sendArgs)
 			for _, check := range problems {
-				fmt.Fprintf(&msg, "would delete %s %s because it was deemed an obsolete abstraction: %s\n",
+				fmt.Fprintf(&msg,
+					"would delete %s %s because it was deemed an obsolete abstraction: %s\n",
 					check.sendArgsWhat, check.fullpath, check.obsoleteAbs)
 			}
 			panic(msg.String())
 		}
-		abstractionsCacheSingleton.TryBatchDestroy(ctx, s.jobId, sendArgs.FS, destroyTypes, keep, check)
+		abstractionsCacheSingleton.TryBatchDestroy(ctx,
+			s.jobId, sendArgs.FS, destroyTypes, keep, check)
 	}()
 
 	var sendStream io.ReadCloser
 	sendStream, err = zfs.ZFSSend(ctx, sendArgs, s.config.ExecPipe...)
 	if err != nil {
-		// it's ok to not destroy the abstractions we just created here, a new send attempt will take care of it
+		// it's ok to not destroy the abstractions we just created here, a new send
+		// attempt will take care of it
 		return nil, nil, fmt.Errorf("zfs send failed: %w", err)
 	}
 
-	res := &pdu.SendRes{
-		ExpectedSize:    0,
-		UsedResumeToken: r.ResumeToken != "",
+	if s.sem != nil {
+		l := getLogger(ctx).WithField("proto_fs", r.GetFilesystem())
+		l.Info("waiting for concurrency semaphore")
+		if err := s.sem.Acquire(ctx, 1); err != nil {
+			return nil, nil, fmt.Errorf(
+				"failed acquire concurrency semaphore: %w", err)
+		}
+		l.Info("acquired concurrency semaphore")
+		defer func() {
+			l.Info("release concurrency semaphore")
+			s.sem.Release(1)
+		}()
 	}
 
+	res := &pdu.SendRes{UsedResumeToken: r.ResumeToken != ""}
 	return res, sendStream, nil
 }
 
@@ -482,7 +527,8 @@ type ReceiverConfig struct {
 
 	PlaceholderEncryption PlaceholderCreationEncryptionProperty
 
-	ExecPipe [][]string
+	Concurrency int64
+	ExecPipe    [][]string
 }
 
 //go:generate enumer -type=PlaceholderCreationEncryptionProperty -transform=kebab -trimprefix=PlaceholderCreationEncryptionProperty
@@ -542,10 +588,16 @@ func NewReceiver(config ReceiverConfig) *Receiver {
 	if err := config.Validate(); err != nil {
 		panic(err)
 	}
-	return &Receiver{
+
+	r := &Receiver{
 		conf:                  config,
 		recvParentCreationMtx: chainlock.New(),
 	}
+
+	if config.Concurrency > 0 {
+		r.sem = semaphore.NewWeighted(config.Concurrency)
+	}
+	return r
 }
 
 // Receiver implements replication.ReplicationEndpoint for a receiving side
@@ -553,6 +605,8 @@ type Receiver struct {
 	conf                  ReceiverConfig // validated
 	recvParentCreationMtx *chainlock.L
 	clientIdentity        string
+
+	sem *semaphore.Weighted
 
 	Test_OverrideClientIdentityFunc func() string // for use by platformtest
 }
@@ -773,6 +827,22 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		return errors.New("`To` must be a snapshot")
 	}
 
+	log := getLogger(ctx).
+		WithField("proto_fs", req.GetFilesystem()).
+		WithField("local_fs", lp.ToString())
+
+	if s.sem != nil {
+		log.Info("waiting for concurrency semaphore")
+		if err := s.sem.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("failed acquire concurrency semaphore: %w", err)
+		}
+		log.Info("acquired concurrency semaphore")
+		defer func() {
+			log.Info("release concurrency semaphore")
+			s.sem.Release(1)
+		}()
+	}
+
 	// create placeholder parent filesystems as appropriate
 	//
 	// Manipulating the ZFS dataset hierarchy must happen exclusively.
@@ -863,10 +933,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	if visitErr != nil {
 		return visitErr
 	}
-
-	log := getLogger(ctx).
-		WithField("proto_fs", req.GetFilesystem()).
-		WithField("local_fs", lp.ToString())
 
 	// determine whether we need to rollback the filesystem / change its
 	// placeholder state

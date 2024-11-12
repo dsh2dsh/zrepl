@@ -194,18 +194,23 @@ type SendOptions struct {
 	EmbeddedData     bool `yaml:"embedded_data"`
 	Saved            bool `yaml:"saved"`
 
-	ExecPipe [][]string `yaml:"execpipe" validate:"dive,required"`
+	Concurrency uint64     `yaml:"concurrency"`
+	ExecPipe    [][]string `yaml:"execpipe" validate:"dive,required"`
 }
 
 type RecvOptions struct {
-	// Note: we cannot enforce encrypted recv as the ZFS cli doesn't provide a mechanism for it
+	// Note: we cannot enforce encrypted recv as the ZFS cli doesn't provide a
+	// mechanism for it
+	//
 	// Encrypted bool `yaml:"may_encrypted"`
 	// Future:
 	// Reencrypt bool `yaml:"reencrypt"`
 
 	Properties  PropertyRecvOptions    `yaml:"properties"`
 	Placeholder PlaceholderRecvOptions `yaml:"placeholder"`
-	ExecPipe    [][]string             `yaml:"execpipe" validate:"dive,required"`
+
+	Concurrency uint64     `yaml:"concurrency"`
+	ExecPipe    [][]string `yaml:"execpipe" validate:"dive,required"`
 }
 
 type Replication struct {

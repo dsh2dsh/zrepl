@@ -48,7 +48,9 @@ func (self *LogReq) middleware(next http.Handler) http.Handler {
 		logLevel := self.requestLevel(r)
 
 		methodURL := r.Method + " " + r.URL.String()
-		log.WithField("proto", r.Proto).Log(logLevel, "\""+methodURL+"\"")
+		log.WithField("proto", r.Proto).
+			WithField("remote_addr", r.RemoteAddr).
+			Log(logLevel, "\""+methodURL+"\"")
 		log = log.WithField("req", methodURL)
 
 		if next == nil {
