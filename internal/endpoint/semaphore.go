@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"io"
+	"time"
 
 	"golang.org/x/sync/semaphore"
 
@@ -30,33 +31,33 @@ func (self *WeightedReader) Read(p []byte) (n int, err error) {
 	case err != nil:
 		self.release()
 	case n > 0 && !self.acquired:
-		err = self.acquire(n)
+		self.log().WithField("n", n).WithField("p", len(p)).
+			Info("waiting for concurrency semaphore")
+		err = self.acquire()
 	}
 	return
-}
-
-func (self *WeightedReader) acquire(n int) error {
-	log := self.log()
-	log.WithField("n", n).Info("waiting for concurrency semaphore")
-	defer func() { log.Info("acquired concurrency semaphore") }()
-
-	if err := self.sem.Acquire(self.ctx, 1); err != nil {
-		return err
-	}
-
-	self.acquired = true
-	return nil
 }
 
 func (self *WeightedReader) log() logger.Logger {
 	return logging.FromContext(self.ctx)
 }
 
+func (self *WeightedReader) acquire() error {
+	begin := time.Now()
+	if err := self.sem.Acquire(self.ctx, 1); err != nil {
+		return err
+	}
+	self.log().WithField("duration", time.Since(begin)).
+		Info("acquired concurrency semaphore")
+	self.acquired = true
+	return nil
+}
+
 func (self *WeightedReader) release() {
 	if !self.acquired {
 		return
 	}
-	self.log().Info("release concurrency semaphore")
+	self.log().Debug("release concurrency semaphore")
 	self.sem.Release(1)
 	self.acquired = false
 }
