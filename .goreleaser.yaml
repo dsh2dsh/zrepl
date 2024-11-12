@@ -34,6 +34,11 @@ archives:
       - goos: "windows"
         format: "zip"
 
+    files:
+      - "LICENSE"
+      - "README.md"
+      - "dist"
+
 changelog:
   filters:
     exclude:
