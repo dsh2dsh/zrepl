@@ -527,8 +527,7 @@ type ReceiverConfig struct {
 
 	PlaceholderEncryption PlaceholderCreationEncryptionProperty
 
-	Concurrency int64
-	ExecPipe    [][]string
+	ExecPipe [][]string
 }
 
 //go:generate enumer -type=PlaceholderCreationEncryptionProperty -transform=kebab -trimprefix=PlaceholderCreationEncryptionProperty
@@ -593,10 +592,6 @@ func NewReceiver(config ReceiverConfig) *Receiver {
 		conf:                  config,
 		recvParentCreationMtx: chainlock.New(),
 	}
-
-	if config.Concurrency > 0 {
-		r.sem = semaphore.NewWeighted(config.Concurrency)
-	}
 	return r
 }
 
@@ -605,8 +600,6 @@ type Receiver struct {
 	conf                  ReceiverConfig // validated
 	recvParentCreationMtx *chainlock.L
 	clientIdentity        string
-
-	sem *semaphore.Weighted
 
 	Test_OverrideClientIdentityFunc func() string // for use by platformtest
 }
@@ -827,22 +820,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		return errors.New("`To` must be a snapshot")
 	}
 
-	log := getLogger(ctx).
-		WithField("proto_fs", req.GetFilesystem()).
-		WithField("local_fs", lp.ToString())
-
-	if s.sem != nil {
-		log.Info("waiting for concurrency semaphore")
-		if err := s.sem.Acquire(ctx, 1); err != nil {
-			return fmt.Errorf("failed acquire concurrency semaphore: %w", err)
-		}
-		log.Info("acquired concurrency semaphore")
-		defer func() {
-			log.Info("release concurrency semaphore")
-			s.sem.Release(1)
-		}()
-	}
-
 	// create placeholder parent filesystems as appropriate
 	//
 	// Manipulating the ZFS dataset hierarchy must happen exclusively.
@@ -933,6 +910,10 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	if visitErr != nil {
 		return visitErr
 	}
+
+	log := getLogger(ctx).
+		WithField("proto_fs", req.GetFilesystem()).
+		WithField("local_fs", lp.ToString())
 
 	// determine whether we need to rollback the filesystem / change its
 	// placeholder state
