@@ -7,6 +7,7 @@ import (
 
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
@@ -68,6 +69,8 @@ func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 	m = &modeSource{}
 	if m.senderConfig, err = buildSenderConfig(in, jobID); err != nil {
 		return nil, fmt.Errorf("send options: %w", err)
+	} else if m.senderConfig.Concurrency > 0 {
+		m.sem = semaphore.NewWeighted(m.senderConfig.Concurrency)
 	}
 
 	m.snapper, err = snapper.FromConfig(g, m.senderConfig.FSF, in.Snapshotting)
@@ -80,6 +83,8 @@ func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 type modeSource struct {
 	senderConfig *endpoint.SenderConfig
 	snapper      snapper.Snapper
+
+	sem *semaphore.Weighted
 }
 
 var _ passiveMode = (*modeSource)(nil)
@@ -87,7 +92,7 @@ var _ passiveMode = (*modeSource)(nil)
 func (m *modeSource) Type() Type { return TypeSource }
 
 func (m *modeSource) Endpoint(clientIdentity string) Endpoint {
-	return endpoint.NewSender(*m.senderConfig)
+	return endpoint.NewSender(*m.senderConfig).WithSemaphore(m.sem)
 }
 
 func (m *modeSource) Periodic() bool { return m.snapper.Periodic() }

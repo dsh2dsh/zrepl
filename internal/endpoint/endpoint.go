@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
@@ -66,10 +67,11 @@ func NewSender(conf SenderConfig) *Sender {
 		jobId:    conf.JobID,
 		config:   conf,
 	}
+	return s
+}
 
-	if conf.Concurrency > 0 {
-		s.sem = semaphore.NewWeighted(conf.Concurrency)
-	}
+func (s *Sender) WithSemaphore(sem *semaphore.Weighted) *Sender {
+	s.sem = sem
 	return s
 }
 
@@ -336,17 +338,9 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes,
 	}
 
 	if s.sem != nil {
-		l := getLogger(ctx).WithField("proto_fs", r.GetFilesystem())
-		l.Info("waiting for concurrency semaphore")
-		if err := s.sem.Acquire(ctx, 1); err != nil {
-			return nil, nil, fmt.Errorf(
-				"failed acquire concurrency semaphore: %w", err)
-		}
-		l.Info("acquired concurrency semaphore")
-		defer func() {
-			l.Info("release concurrency semaphore")
-			s.sem.Release(1)
-		}()
+		ctx = logging.WithLogger(ctx,
+			getLogger(ctx).WithField("proto_fs", r.GetFilesystem()))
+		sendStream = NewWeightedReader(ctx, s.sem, sendStream)
 	}
 
 	res := &pdu.SendRes{UsedResumeToken: r.ResumeToken != ""}
