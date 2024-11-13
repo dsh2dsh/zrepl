@@ -1,8 +1,6 @@
 package zfscmd
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -12,8 +10,10 @@ var metrics struct {
 	usertime   *prometheus.HistogramVec
 }
 
-var timeLabels = []string{"jobid", "zfsbinary", "zfsverb"}
-var timeBuckets = []float64{0.01, 0.1, 0.2, 0.5, 0.75, 1, 2, 5, 10, 60}
+var (
+	timeLabels  = []string{"jobid", "zfsbinary", "zfsverb"}
+	timeBuckets = []float64{0.01, 0.1, 0.2, 0.5, 0.75, 1, 2, 5, 10, 60}
+)
 
 func init() {
 	metrics.totaltime = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -37,7 +37,6 @@ func init() {
 		Help:      "https://golang.org/pkg/os/#ProcessState.UserTime",
 		Buckets:   timeBuckets,
 	}, timeLabels)
-
 }
 
 func RegisterMetrics(r prometheus.Registerer) {
@@ -46,8 +45,7 @@ func RegisterMetrics(r prometheus.Registerer) {
 	r.MustRegister(metrics.usertime)
 }
 
-func waitPostPrometheus(c *Cmd, u usage, err error, now time.Time) {
-
+func waitPostPrometheus(c *Cmd, u usage) {
 	if len(c.cmd.Args) < 2 {
 		getLogger(c.ctx).WithField("args", c.cmd.Args).
 			Warn("prometheus: cannot turn zfs command into metric")
@@ -69,5 +67,4 @@ func waitPostPrometheus(c *Cmd, u usage, err error, now time.Time) {
 		Observe(u.system_secs)
 	metrics.usertime.WithLabelValues(labelValues...).
 		Observe(u.user_secs)
-
 }

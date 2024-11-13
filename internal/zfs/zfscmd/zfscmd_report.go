@@ -43,7 +43,7 @@ func init() {
 	active.cmds = make(map[*Cmd]bool)
 }
 
-func startPostReport(c *Cmd, err error, now time.Time) {
+func startPostReport(c *Cmd, err error) {
 	if err != nil {
 		return
 	}
@@ -57,7 +57,7 @@ func startPostReport(c *Cmd, err error, now time.Time) {
 	active.mtx.Unlock()
 }
 
-func waitPostReport(c *Cmd, _ usage, now time.Time) {
+func waitPostReport(c *Cmd) {
 	active.mtx.Lock()
 	defer active.mtx.Unlock()
 	prev := active.cmds[c]

@@ -165,7 +165,7 @@ func (c *Cmd) startPost(err error) {
 	now := time.Now()
 	c.startedAt = now
 
-	startPostReport(c, err, now)
+	startPostReport(c, err)
 	startPostLogging(c, err, now)
 }
 
@@ -229,11 +229,11 @@ func (c *Cmd) waitPost(err error) {
 		}
 	}
 
-	waitPostReport(c, c.usage, now)
+	waitPostReport(c)
 	if err == nil || c.logError {
 		c.LogError(err, false)
 	}
-	waitPostPrometheus(c, c.usage, err, now)
+	waitPostPrometheus(c, c.usage)
 }
 
 func (c *Cmd) LogError(err error, debug bool) {
@@ -310,11 +310,13 @@ func (c *Cmd) StartPipe() error {
 
 func (c *Cmd) WaitPipe() error {
 	var pipeErr error
-	for _, cmd := range c.cmds {
+	for i, cmd := range c.cmds {
 		if cmd.Process == nil {
 			break
-		} else if err := cmd.Wait(); err != nil && pipeErr == nil {
-			pipeErr = fmt.Errorf("wait %q: %w", cmd.String(), err)
+		}
+		err := cmd.Wait()
+		if err != nil && pipeErr == nil && !errors.Is(err, os.ErrClosed) {
+			pipeErr = fmt.Errorf("wait[%d] %q: %w", i, cmd.String(), err)
 		}
 	}
 
@@ -325,4 +327,11 @@ func (c *Cmd) WaitPipe() error {
 		return pipeErr
 	}
 	return nil
+}
+
+func (c *Cmd) WrapStdin(wrapper func(r io.Reader) io.Reader) *Cmd {
+	if wrapper != nil {
+		c.cmd.Stdin = wrapper(c.cmd.Stdin)
+	}
+	return c
 }

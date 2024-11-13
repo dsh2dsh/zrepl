@@ -1029,42 +1029,56 @@ func (e *ErrRecvResumeNotSupported) Error() string {
 }
 
 type RecvOptions struct {
-	// Rollback to the oldest snapshot, destroy it, then perform `recv -F`.
-	// Note that this doesn't change property values, i.e. an existing local property value will be kept.
+	// Rollback to the oldest snapshot, destroy it, then perform `recv -F`. Note
+	// that this doesn't change property values, i.e. an existing local property
+	// value will be kept.
 	RollbackAndForceRecv bool
 	// Set -s flag used for resumable send & recv
 	SavePartialRecvState bool
 
 	InheritProperties  []zfsprop.Property
 	OverrideProperties map[zfsprop.Property]string
+
+	stdinWrapper func(r io.Reader) io.Reader
 }
 
-func (opts RecvOptions) buildRecvFlags() []string {
-	args := make([]string, 0)
-	if opts.RollbackAndForceRecv {
+func (self *RecvOptions) buildRecvFlags() []string {
+	args := make([]string, 0,
+		2+len(self.InheritProperties)*2+len(self.OverrideProperties)*2)
+
+	if self.RollbackAndForceRecv {
 		args = append(args, "-F")
 	}
-	if opts.SavePartialRecvState {
+
+	if self.SavePartialRecvState {
 		args = append(args, "-s")
 	}
-	if opts.InheritProperties != nil {
-		for _, prop := range opts.InheritProperties {
+
+	if len(self.InheritProperties) != 0 {
+		for _, prop := range self.InheritProperties {
 			args = append(args, "-x", string(prop))
 		}
 	}
-	if opts.OverrideProperties != nil {
-		for prop, value := range opts.OverrideProperties {
-			args = append(args, "-o", fmt.Sprintf("%s=%s", prop, value))
+
+	if len(self.OverrideProperties) != 0 {
+		for prop, value := range self.OverrideProperties {
+			args = append(args, "-o", string(prop)+"="+value)
 		}
 	}
-
 	return args
+}
+
+func (self *RecvOptions) WithStdinWrapper(wrapper func(r io.Reader) io.Reader,
+) *RecvOptions {
+	self.stdinWrapper = wrapper
+	return self
 }
 
 func ZFSRecv(
 	ctx context.Context, fs string, v *ZFSSendArgVersion, stream io.ReadCloser,
 	opts RecvOptions, pipeCmds ...[]string,
 ) error {
+	defer stream.Close()
 	if err := v.ValidateInMemory(fs); err != nil {
 		return fmt.Errorf("invalid version: %w", err)
 	} else if !v.IsSnapshot() {
@@ -1077,9 +1091,9 @@ func ZFSRecv(
 	}
 
 	if opts.RollbackAndForceRecv {
-		// Destroy all snapshots before `recv -F` because `recv -F`. Does not
-		// perform a rollback unless `send -R` was used (which we assume hasn't been
-		// the case).
+		// Destroy all snapshots before `recv -F` because `recv -F` does not perform
+		// a rollback unless `send -R` was used (which we assume hasn't been the
+		// case).
 		if err := zfsRollbackForceRecv(ctx, fsdp); err != nil {
 			return nil
 		}
@@ -1096,26 +1110,28 @@ func ZFSRecv(
 	args = append(args, "recv")
 	args = append(args, recvFlags...)
 	args = append(args, fs)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).WithCommand(ZfsBin, args)
+	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).
+		WithCommand(ZfsBin, args)
 
 	// TODO report bug upstream Setup an unused stdout buffer. Otherwise, ZoL
 	// v0.6.5.9-1 3.16.0-4-amd64 writes the following error to stderr and exits
 	// with code 1
 	//
 	//  cannot receive new filesystem stream: invalid backup stream
-	var stdout, stderr bytes.Buffer
+	var stderr bytes.Buffer
 
-	if err := cmd.PipeFrom(pipeCmds, stream, &stdout, &stderr); err != nil {
+	if err := cmd.PipeFrom(pipeCmds, stream, &stderr, &stderr); err != nil {
 		return err
-	} else if err = cmd.Start(); err != nil {
+	} else if opts.stdinWrapper != nil {
+		cmd.WrapStdin(opts.stdinWrapper)
+	}
+
+	if err := cmd.Start(); err != nil {
 		return err
 	}
 
 	pid := cmd.Process().Pid
-	debug := func(format string, args ...interface{}) {
+	debug := func(format string, args ...any) {
 		debug("recv: pid=%v: %s", pid, fmt.Sprintf(format, args...))
 	}
 	debug("started")
@@ -1186,8 +1202,10 @@ type RecvFailedWithResumeTokenErr struct {
 
 var recvErrorResumeTokenRE = regexp.MustCompile(`A resuming stream can be generated on the sending system by running:\s+zfs send -t\s(\S+)`)
 
-func tryRecvErrorWithResumeToken(ctx context.Context, stderr string) *RecvFailedWithResumeTokenErr {
-	if match := recvErrorResumeTokenRE.FindStringSubmatch(stderr); match != nil {
+func tryRecvErrorWithResumeToken(ctx context.Context, stderr string,
+) *RecvFailedWithResumeTokenErr {
+	match := recvErrorResumeTokenRE.FindStringSubmatch(stderr)
+	if match != nil {
 		parsed, err := ParseResumeToken(ctx, match[1])
 		if err != nil {
 			return nil
@@ -1202,7 +1220,9 @@ func tryRecvErrorWithResumeToken(ctx context.Context, stderr string) *RecvFailed
 }
 
 func (e *RecvFailedWithResumeTokenErr) Error() string {
-	return fmt.Sprintf("receive failed, resume token available: %s\n%#v", e.ResumeTokenRaw, e.ResumeTokenParsed)
+	return fmt.Sprintf(
+		"receive failed, resume token available: %s\n%#v",
+		e.ResumeTokenRaw, e.ResumeTokenParsed)
 }
 
 type RecvDestroyOrOverwriteEncryptedErr struct {
@@ -1215,7 +1235,8 @@ func (e *RecvDestroyOrOverwriteEncryptedErr) Error() string {
 
 var recvDestroyOrOverwriteEncryptedErrRe = regexp.MustCompile(`^(cannot receive new filesystem stream: zfs receive -F cannot be used to destroy an encrypted filesystem or overwrite an unencrypted one with an encrypted one)`)
 
-func tryRecvDestroyOrOverwriteEncryptedErr(stderr []byte) *RecvDestroyOrOverwriteEncryptedErr {
+func tryRecvDestroyOrOverwriteEncryptedErr(stderr []byte,
+) *RecvDestroyOrOverwriteEncryptedErr {
 	debug("tryRecvDestroyOrOverwriteEncryptedErr: %v", stderr)
 	m := recvDestroyOrOverwriteEncryptedErrRe.FindSubmatch(stderr)
 	if m == nil {
@@ -1232,9 +1253,11 @@ func (e *RecvCannotReadFromStreamErr) Error() string {
 	return e.Msg
 }
 
-var reRecvCannotReadFromStreamErr = regexp.MustCompile(`^(cannot receive: failed to read from stream)$`)
+var reRecvCannotReadFromStreamErr = regexp.MustCompile(
+	`^(cannot receive: failed to read from stream)$`)
 
-func tryRecvCannotReadFromStreamErr(stderr []byte) *RecvCannotReadFromStreamErr {
+func tryRecvCannotReadFromStreamErr(stderr []byte,
+) *RecvCannotReadFromStreamErr {
 	m := reRecvCannotReadFromStreamErr.FindSubmatch(stderr)
 	if m == nil {
 		return nil

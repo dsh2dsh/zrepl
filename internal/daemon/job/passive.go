@@ -38,11 +38,16 @@ func modeSinkFromConfig(in *config.SinkJob, jobID endpoint.JobID,
 		return nil, err
 	}
 	m := &modeSink{receiverConfig: c}
+	if c.Concurrency > 0 {
+		m.sem = semaphore.NewWeighted(c.Concurrency)
+	}
 	return m, nil
 }
 
 type modeSink struct {
 	receiverConfig endpoint.ReceiverConfig
+
+	sem *semaphore.Weighted
 }
 
 var _ passiveMode = (*modeSink)(nil)
@@ -59,7 +64,7 @@ func (m *modeSink) Shutdown() {}
 
 func (m *modeSink) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewReceiver(m.receiverConfig).
-		WithClientIdentity(clientIdentity)
+		WithClientIdentity(clientIdentity).WithSemaphore(m.sem)
 }
 
 func modeSourceFromConfig(g *config.Global, in *config.SourceJob,

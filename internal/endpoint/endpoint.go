@@ -521,7 +521,8 @@ type ReceiverConfig struct {
 
 	PlaceholderEncryption PlaceholderCreationEncryptionProperty
 
-	ExecPipe [][]string
+	Concurrency int64
+	ExecPipe    [][]string
 }
 
 //go:generate enumer -type=PlaceholderCreationEncryptionProperty -transform=kebab -trimprefix=PlaceholderCreationEncryptionProperty
@@ -595,11 +596,18 @@ type Receiver struct {
 	recvParentCreationMtx *chainlock.L
 	clientIdentity        string
 
+	sem *semaphore.Weighted
+
 	Test_OverrideClientIdentityFunc func() string // for use by platformtest
 }
 
 func (s *Receiver) WithClientIdentity(identity string) *Receiver {
 	s.clientIdentity = identity
+	return s
+}
+
+func (s *Receiver) WithSemaphore(sem *semaphore.Weighted) *Receiver {
+	s.sem = sem
 	return s
 }
 
@@ -798,8 +806,8 @@ func (s *Receiver) receive_GetPlaceholderCreationEncryptionValue(client_root, pa
 func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	receive io.ReadCloser,
 ) error {
-	getLogger(ctx).Debug("incoming Receive")
 	defer receive.Close()
+	getLogger(ctx).Debug("incoming Receive")
 
 	root := s.clientRootFromCtx(ctx)
 	lp, err := subroot{root}.MapToLocal(req.Filesystem)
@@ -911,8 +919,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 
 	// determine whether we need to rollback the filesystem / change its
 	// placeholder state
-	var clearPlaceholderProperty bool
-	var recvOpts zfs.RecvOptions
 	ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, lp)
 	if err != nil {
 		return fmt.Errorf("cannot get placeholder state: %w", err)
@@ -920,9 +926,12 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	log.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).
 		Debug("placeholder state")
 
-	recvOpts.InheritProperties = s.conf.InheritProperties
-	recvOpts.OverrideProperties = s.conf.OverrideProperties
+	recvOpts := zfs.RecvOptions{
+		InheritProperties:  s.conf.InheritProperties,
+		OverrideProperties: s.conf.OverrideProperties,
+	}
 
+	var clearPlaceholderProperty bool
 	if ph.FSExists && ph.IsPlaceholder {
 		recvOpts.RollbackAndForceRecv = true
 		clearPlaceholderProperty = true
@@ -947,6 +956,13 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	if err != nil {
 		return fmt.Errorf(
 			"cannot determine whether we can use resumable send & recv: %w", err)
+	}
+
+	if s.sem != nil {
+		ctx := logging.WithLogger(ctx, log)
+		recvOpts.WithStdinWrapper(func(r io.Reader) io.Reader {
+			return NewWeightedReader(ctx, s.sem, io.NopCloser(r))
+		})
 	}
 
 	log.WithField("opts", fmt.Sprintf("%#v", recvOpts)).

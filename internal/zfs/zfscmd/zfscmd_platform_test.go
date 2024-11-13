@@ -110,7 +110,7 @@ func TestSigpipe(t *testing.T) {
 	// => we should expect a broken pipe error from the copier's perspective
 	t.Logf("copy err = %T: %s", err, err)
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "broken pipe"))
+	require.Contains(t, err.Error(), "broken pipe")
 
 	err = cmd.Wait()
 	require.ErrorContains(t, err, "exit status 23")

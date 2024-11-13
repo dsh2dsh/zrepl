@@ -209,7 +209,8 @@ type RecvOptions struct {
 	Properties  PropertyRecvOptions    `yaml:"properties"`
 	Placeholder PlaceholderRecvOptions `yaml:"placeholder"`
 
-	ExecPipe [][]string `yaml:"execpipe" validate:"dive,required"`
+	Concurrency uint64     `yaml:"concurrency"`
+	ExecPipe    [][]string `yaml:"execpipe" validate:"dive,required"`
 }
 
 type Replication struct {

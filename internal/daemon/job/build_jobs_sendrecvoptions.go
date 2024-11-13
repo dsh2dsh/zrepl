@@ -88,7 +88,8 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 		OverrideProperties:    recvOpts.Properties.Override,
 		PlaceholderEncryption: placeholderEncryption,
 
-		ExecPipe: recvOpts.ExecPipe,
+		Concurrency: int64(recvOpts.Concurrency),
+		ExecPipe:    recvOpts.ExecPipe,
 	}
 
 	if err = rc.Validate(); err != nil {

@@ -260,6 +260,8 @@ type modePull struct {
 	sender         Endpoint
 	plannerPolicy  *logic.PlannerPolicy
 	cronSpec       string
+
+	sem *semaphore.Weighted
 }
 
 func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
@@ -274,7 +276,7 @@ func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
 		WithField("from", cn.Name()).
 		Info("connect to sender")
 
-	m.receiver = endpoint.NewReceiver(m.receiverConfig)
+	m.receiver = endpoint.NewReceiver(m.receiverConfig).WithSemaphore(m.sem)
 	m.sender = cn.Endpoint()
 }
 
@@ -357,6 +359,8 @@ func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 	m.receiverConfig, err = buildReceiverConfig(in, jobID)
 	if err != nil {
 		return nil, err
+	} else if m.receiverConfig.Concurrency > 0 {
+		m.sem = semaphore.NewWeighted(m.receiverConfig.Concurrency)
 	}
 	return m, nil
 }
