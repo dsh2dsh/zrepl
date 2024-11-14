@@ -1038,8 +1038,6 @@ type RecvOptions struct {
 
 	InheritProperties  []zfsprop.Property
 	OverrideProperties map[zfsprop.Property]string
-
-	stdinWrapper func(r io.Reader) io.Reader
 }
 
 func (self *RecvOptions) buildRecvFlags() []string {
@@ -1066,12 +1064,6 @@ func (self *RecvOptions) buildRecvFlags() []string {
 		}
 	}
 	return args
-}
-
-func (self *RecvOptions) WithStdinWrapper(wrapper func(r io.Reader) io.Reader,
-) *RecvOptions {
-	self.stdinWrapper = wrapper
-	return self
 }
 
 func ZFSRecv(
@@ -1122,8 +1114,6 @@ func ZFSRecv(
 
 	if err := cmd.PipeFrom(pipeCmds, stream, &stderr, &stderr); err != nil {
 		return err
-	} else if opts.stdinWrapper != nil {
-		cmd.WrapStdin(opts.stdinWrapper)
 	}
 
 	if err := cmd.Start(); err != nil {

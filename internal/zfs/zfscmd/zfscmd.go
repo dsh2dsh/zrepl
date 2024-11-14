@@ -313,9 +313,7 @@ func (c *Cmd) WaitPipe() error {
 	for i, cmd := range c.cmds {
 		if cmd.Process == nil {
 			break
-		}
-		err := cmd.Wait()
-		if err != nil && pipeErr == nil && !errors.Is(err, os.ErrClosed) {
+		} else if err := cmd.Wait(); err != nil && pipeErr == nil {
 			pipeErr = fmt.Errorf("wait[%d] %q: %w", i, cmd.String(), err)
 		}
 	}
@@ -327,11 +325,4 @@ func (c *Cmd) WaitPipe() error {
 		return pipeErr
 	}
 	return nil
-}
-
-func (c *Cmd) WrapStdin(wrapper func(r io.Reader) io.Reader) *Cmd {
-	if wrapper != nil {
-		c.cmd.Stdin = wrapper(c.cmd.Stdin)
-	}
-	return c
 }

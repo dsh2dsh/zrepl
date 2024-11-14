@@ -2,12 +2,14 @@
 package endpoint
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -959,9 +961,29 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	}
 
 	if s.sem != nil {
-		ctx := logging.WithLogger(ctx, log)
-		recvOpts.WithStdinWrapper(func(r io.Reader) io.Reader {
-			return NewWeightedReader(ctx, s.sem, io.NopCloser(r))
+		b := new(bytes.Buffer)
+		b.Grow(1024 << 10) // 1M
+		n, err := io.CopyN(b, receive, int64(b.Available()))
+		if err != nil && !errors.Is(err, io.EOF) {
+			log.WithField("n", n).WithError(err).
+				Error("error copying from receive")
+			return err
+		}
+		log.WithField("n", n).Info("waiting for concurrency semaphore")
+		begin := time.Now()
+		if err := s.sem.Acquire(ctx, 1); err != nil {
+			log.WithError(err).Error("failed waiting for semaphore")
+			return err
+		}
+		defer func() {
+			log.Debug("release concurrency semaphore")
+			s.sem.Release(1)
+		}()
+		log.WithField("duration", time.Since(begin)).
+			Info("acquired concurrency semaphore")
+		r := receive
+		receive = NewCloser(io.MultiReader(b, receive), func() error {
+			return r.Close()
 		})
 	}
 
@@ -976,6 +998,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 			Error("zfs receive failed")
 		return err
 	}
+	receive.Close()
 
 	// validate that we actually received what the sender claimed
 	toRecvd, err := to.ValidateExistsAndGetVersion(ctx, lp.ToString())

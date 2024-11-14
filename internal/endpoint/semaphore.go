@@ -66,3 +66,15 @@ func (self *WeightedReader) Close() error {
 	self.release()
 	return self.r.Close()
 }
+
+func NewCloser(r io.Reader, closer func() error) *Closer {
+	return &Closer{Reader: r, closer: closer}
+}
+
+type Closer struct {
+	io.Reader
+
+	closer func() error
+}
+
+func (self *Closer) Close() error { return self.closer() }
