@@ -211,11 +211,13 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 		return nil, ResumeTokenDecodingNotSupported
 	}
 
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, "send", "-nvt", token)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, "send", "-nvt", token).
+		WithLogError(false)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		var exitError *exec.ExitError
 		if !errors.As(err, &exitError) || !exitError.Exited() {
+			cmd.LogError(err, false)
 			return nil, err
 		}
 		// we abuse zfs send for decoding, the exit error may be due to

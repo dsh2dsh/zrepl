@@ -1136,7 +1136,8 @@ func ZFSRecv(
 	}
 	debug("started")
 
-	if err := cmd.Wait(); err != nil {
+	if err := cmd.WithLogError(false).Wait(); err != nil {
+		cmd.WithStderrOutput(stderr.Bytes()).LogError(err, false)
 		err = parseZfsRecvErr(ctx, err, stderr.Bytes())
 		debug("wait err: %T %s", err, err)
 		// almost always more interesting info. NOTE: do not wrap!
@@ -1194,35 +1195,36 @@ func parseZfsRecvErr(ctx context.Context, err error, stderr []byte) error {
 	return NewZfsError(err, stderr)
 }
 
+var recvErrorResumeTokenRE = regexp.MustCompile(`A resuming stream can be generated on the sending system by running:\s+zfs send -t\s(\S+)`)
+
+func tryRecvErrorWithResumeToken(ctx context.Context, stderr string,
+) *RecvFailedWithResumeTokenErr {
+	match := recvErrorResumeTokenRE.FindStringSubmatch(stderr)
+	if len(match) == 0 {
+		return nil
+	}
+
+	parsed, err := ParseResumeToken(ctx, match[1])
+	if err != nil {
+		return nil
+	}
+	return &RecvFailedWithResumeTokenErr{
+		Msg:               stderr,
+		ResumeTokenRaw:    match[1],
+		ResumeTokenParsed: parsed,
+	}
+}
+
 type RecvFailedWithResumeTokenErr struct {
 	Msg               string
 	ResumeTokenRaw    string
 	ResumeTokenParsed *ResumeToken
 }
 
-var recvErrorResumeTokenRE = regexp.MustCompile(`A resuming stream can be generated on the sending system by running:\s+zfs send -t\s(\S+)`)
-
-func tryRecvErrorWithResumeToken(ctx context.Context, stderr string,
-) *RecvFailedWithResumeTokenErr {
-	match := recvErrorResumeTokenRE.FindStringSubmatch(stderr)
-	if match != nil {
-		parsed, err := ParseResumeToken(ctx, match[1])
-		if err != nil {
-			return nil
-		}
-		return &RecvFailedWithResumeTokenErr{
-			Msg:               stderr,
-			ResumeTokenRaw:    match[1],
-			ResumeTokenParsed: parsed,
-		}
-	}
-	return nil
-}
-
-func (e *RecvFailedWithResumeTokenErr) Error() string {
+func (self *RecvFailedWithResumeTokenErr) Error() string {
 	return fmt.Sprintf(
 		"receive failed, resume token available: %s\n%#v",
-		e.ResumeTokenRaw, e.ResumeTokenParsed)
+		self.ResumeTokenRaw, self.ResumeTokenParsed)
 }
 
 type RecvDestroyOrOverwriteEncryptedErr struct {
