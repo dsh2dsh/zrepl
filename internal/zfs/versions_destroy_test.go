@@ -18,16 +18,11 @@ import (
 )
 
 type mockBatchDestroy struct {
-	mtx              chainlock.L
-	calls            []string
-	commaUnsupported bool
-	undestroyable    *regexp.Regexp
-	randomerror      string
-	e2biglen         int
-}
-
-func (m *mockBatchDestroy) DestroySnapshotsCommaSyntaxSupported(_ context.Context) (bool, error) {
-	return !m.commaUnsupported, nil
+	mtx           chainlock.L
+	calls         []string
+	undestroyable *regexp.Regexp
+	randomerror   string
+	e2biglen      int
 }
 
 func (m *mockBatchDestroy) Destroy(ctx context.Context, args []string) error {
@@ -41,15 +36,7 @@ func (m *mockBatchDestroy) Destroy(ctx context.Context, args []string) error {
 	}
 	m.calls = append(m.calls, a)
 
-	var snapnames []string
-	if m.commaUnsupported {
-		snapnames = append(snapnames, a)
-		if strings.Contains(a, ",") {
-			return errors.New("unsupported syntax mock error")
-		}
-	} else {
-		snapnames = append(snapnames, strings.Split(a, ",")...)
-	}
+	snapnames := strings.Split(a, ",")
 	fs, vt, firstsnapname, err := DecomposeVersionString(snapnames[0])
 	if err != nil {
 		panic(err)
@@ -103,9 +90,8 @@ func TestBatchDestroySnaps(t *testing.T) {
 	t.Run("single_undestroyable_dataset", func(t *testing.T) {
 		nilErrs()
 		mock := &mockBatchDestroy{
-			commaUnsupported: false,
-			undestroyable:    regexp.MustCompile(`undestroyable`),
-			randomerror:      "randomerror",
+			undestroyable: regexp.MustCompile(`undestroyable`),
+			randomerror:   "randomerror",
 		}
 
 		doDestroy(context.TODO(), opsTemplate, mock)
@@ -147,8 +133,7 @@ func TestBatchDestroySnaps(t *testing.T) {
 		}
 
 		mock := &mockBatchDestroy{
-			commaUnsupported: false,
-			undestroyable:    regexp.MustCompile(`.*`),
+			undestroyable: regexp.MustCompile(`.*`),
 		}
 
 		doDestroy(context.TODO(), opsTemplate, mock)
@@ -160,47 +145,6 @@ func TestBatchDestroySnaps(t *testing.T) {
 				"zroot/a@bar,foo", // reordered snaps in lexicographical order
 				"zroot/a@bar",
 				"zroot/a@foo",
-			},
-			mock.calls,
-		)
-	})
-
-	t.Run("comma_syntax_unsupported", func(t *testing.T) {
-		nilErrs()
-		mock := &mockBatchDestroy{
-			commaUnsupported: true,
-			undestroyable:    regexp.MustCompile(`undestroyable`),
-			randomerror:      "randomerror",
-		}
-
-		doDestroy(context.TODO(), opsTemplate, mock)
-
-		assert.NoError(t, errs[0])
-		assert.NoError(t, errs[1])
-		assert.NoError(t, errs[2])
-		assert.NoError(t, errs[3])
-		assert.NoError(t, errs[4])
-		require.Error(t, errs[5], "undestroyable")
-		require.NoError(t, errs[6])
-		require.Error(t, errs[7], "randomerror")
-		assert.NoError(t, errs[8])
-		assert.NoError(t, errs[9])
-
-		defer mock.mtx.Lock().Unlock()
-		assert.Equal(
-			t,
-			[]string{
-				// expect exactly argument order
-				"zroot/z@foo",
-				"zroot/a@foo",
-				"zroot/a@bar",
-				"zroot/b@bar",
-				"zroot/b@zab",
-				"zroot/b@undestroyable",
-				"zroot/c@baz",
-				"zroot/c@randomerror",
-				"zroot/c@bar",
-				"zroot/d@blup",
 			},
 			mock.calls,
 		)

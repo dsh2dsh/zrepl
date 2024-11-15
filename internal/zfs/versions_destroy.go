@@ -1,19 +1,15 @@
 package zfs
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
-	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
 func ZFSDestroyFilesystemVersion(ctx context.Context, filesystem *DatasetPath, version *FilesystemVersion) (err error) {
@@ -51,7 +47,6 @@ func setDestroySnapOpErr(b []*DestroySnapOp, err error) {
 
 type destroyer interface {
 	Destroy(ctx context.Context, args []string) error
-	DestroySnapshotsCommaSyntaxSupported(context.Context) (bool, error)
 }
 
 func doDestroy(ctx context.Context, reqs []*DestroySnapOp, e destroyer) {
@@ -69,19 +64,7 @@ func doDestroy(ctx context.Context, reqs []*DestroySnapOp, e destroyer) {
 		}
 	}
 	reqs = validated
-
-	commaSupported, err := e.DestroySnapshotsCommaSyntaxSupported(ctx)
-	if err != nil {
-		debug("destroy: comma syntax support detection failed: %s", err)
-		setDestroySnapOpErr(reqs, err)
-		return
-	}
-
-	if !commaSupported {
-		doDestroySeq(ctx, reqs, e)
-	} else {
-		doDestroyBatched(ctx, reqs, e)
-	}
+	doDestroyBatched(ctx, reqs, e)
 }
 
 func doDestroySeq(ctx context.Context, reqs []*DestroySnapOp, e destroyer) {
@@ -214,36 +197,4 @@ func (d destroyerImpl) Destroy(ctx context.Context, args []string) error {
 		panic(fmt.Sprintf("sanity check: expecting '@' in call to Destroy, got %q", args[0]))
 	}
 	return ZFSDestroy(ctx, args[0])
-}
-
-var batchDestroyFeatureCheck struct {
-	once   sync.Once
-	enable bool
-	err    error
-}
-
-func (d destroyerImpl) DestroySnapshotsCommaSyntaxSupported(ctx context.Context,
-) (bool, error) {
-	batchDestroyFeatureCheck.once.Do(func() {
-		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, ZfsBin, "destroy").
-			WithLogError(false)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			var exitError *exec.ExitError
-			if !errors.As(err, &exitError) {
-				debug("destroy feature check failed: %T %s", err, err)
-				batchDestroyFeatureCheck.err = err
-			}
-		}
-		def := bytes.Contains(output,
-			[]byte("<filesystem|volume>@<snap>[%<snap>][,...]"))
-		if err != nil {
-			cmd.LogError(err, def)
-		}
-		batchDestroyFeatureCheck.enable = envconst.Bool(
-			"ZREPL_EXPERIMENTAL_ZFS_COMMA_SYNTAX_SUPPORTED", def)
-		debug("destroy feature check complete %#v", &batchDestroyFeatureCheck)
-	})
-	return batchDestroyFeatureCheck.enable, batchDestroyFeatureCheck.err
 }
