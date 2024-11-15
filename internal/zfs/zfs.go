@@ -570,12 +570,17 @@ func ZFSSendArgsSkipValidation(ctx context.Context) context.Context {
 }
 
 // - Recursively call Validate on each field.
-// - Make sure that if ResumeToken != "", it reflects the same operation as the other parameters would.
 //
-// This function is not pure because GUIDs are checked against the local host's datasets.
-func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsValidated, _ error) {
+// - Make sure that if ResumeToken != "", it reflects the same operation as the
+// other parameters would.
+//
+// This function is not pure because GUIDs are checked against the local host's
+// datasets.
+func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
+) (v ZFSSendArgsValidated, _ error) {
 	if dp, err := NewDatasetPath(a.FS); err != nil || dp.Length() == 0 {
-		return v, newGenericValidationError(a, errors.New("`FS` must be a valid non-zero dataset path"))
+		return v, newGenericValidationError(a,
+			errors.New("`FS` must be a valid non-zero dataset path"))
 	}
 
 	if a.To == nil {
@@ -590,7 +595,8 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsVali
 	if a.From != nil {
 		fromV, err := a.From.ValidateExistsAndGetVersion(ctx, a.FS)
 		if err != nil {
-			return v, newGenericValidationError(a, fmt.Errorf("`From` invalid: %w", err))
+			return v, newGenericValidationError(a,
+				fmt.Errorf("`From` invalid: %w", err))
 		}
 		fromVersion = &fromV
 		// fallthrough
@@ -601,7 +607,6 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsVali
 		FromVersion:            fromVersion,
 		ToVersion:              toVersion,
 	}
-
 	if ctx.Value(zfsSendArgsSkipValidationKey) != nil {
 		return validated, nil
 	}
@@ -611,27 +616,32 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context) (v ZFSSendArgsVali
 	}
 
 	valCtx := &zfsSendArgsValidationContext{}
-	fsEncrypted, err := ZFSGetEncryptionEnabled(ctx, a.FS)
-	if err != nil {
-		return v, newValidationError(a, ZFSSendArgsFSEncryptionCheckFail,
-			fmt.Errorf("cannot check whether filesystem %q is encrypted: %w", a.FS, err))
+	var fsEncrypted bool
+	if a.Encrypted.B {
+		fsEncrypted, err = ZFSGetEncryptionEnabled(ctx, a.FS)
+		if err != nil {
+			return v, newValidationError(a, ZFSSendArgsFSEncryptionCheckFail,
+				fmt.Errorf("cannot check whether filesystem %q is encrypted: %w", a.FS, err))
+		} else if !fsEncrypted {
+			return v, newValidationError(a,
+				ZFSSendArgsEncryptedSendRequestedButFSUnencrypted,
+				fmt.Errorf(
+					"encrypted send mandated by policy, but filesystem %q is not encrypted",
+					a.FS))
+		}
+	} else if a.Raw && fsEncrypted {
+		return v, newValidationError(a,
+			ZFSSendArgsGenericValidationError,
+			fmt.Errorf(
+				"policy mandates raw+unencrypted sends, but filesystem %q is encrypted",
+				a.FS))
 	}
 	valCtx.encEnabled = &nodefault.Bool{B: fsEncrypted}
 
-	if a.Encrypted.B && !fsEncrypted {
-		return v, newValidationError(a, ZFSSendArgsEncryptedSendRequestedButFSUnencrypted,
-			fmt.Errorf("encrypted send mandated by policy, but filesystem %q is not encrypted", a.FS))
-	}
-
-	if a.Raw && fsEncrypted && !a.Encrypted.B {
-		return v, newValidationError(a, ZFSSendArgsGenericValidationError,
-			fmt.Errorf("policy mandates raw+unencrypted sends, but filesystem %q is encrypted", a.FS))
-	}
-
-	if err := a.validateEncryptionFlagsCorrespondToResumeToken(ctx, valCtx); err != nil {
+	err = a.validateEncryptionFlagsCorrespondToResumeToken(ctx, valCtx)
+	if err != nil {
 		return v, newValidationError(a, ZFSSendArgsResumeTokenMismatch, err)
 	}
-
 	return validated, nil
 }
 
@@ -829,9 +839,6 @@ func (a ZFSSendArgsUnvalidated) validateEncryptionFlagsCorrespondToResumeToken(c
 	}
 }
 
-var ErrEncryptedSendNotSupported = errors.New(
-	"raw sends which are required for encrypted zfs send are not supported")
-
 // if token != "", then send -t token is used
 // otherwise send [-i from] to is used
 // (if from is "" a full ZFS send is done)
@@ -841,17 +848,6 @@ var ErrEncryptedSendNotSupported = errors.New(
 func ZFSSend(
 	ctx context.Context, sendArgs ZFSSendArgsValidated, pipeCmds ...[]string,
 ) (*SendStream, error) {
-	// Pre-validation of sendArgs for plain ErrEncryptedSendNotSupported error. We
-	// tie BackupProperties (send -b) and SendRaw (-w, same as with Encrypted) to
-	// this since these were released together.
-	if sendArgs.Encrypted.B {
-		if encryptionSupported, err := EncryptionCLISupported(ctx); err != nil {
-			return nil, fmt.Errorf("cannot determine CLI native encryption support: %w", err)
-		} else if !encryptionSupported {
-			return nil, ErrEncryptedSendNotSupported
-		}
-	}
-
 	sargs, err := sendArgs.buildSendCommandLine()
 	if err != nil {
 		return nil, err
