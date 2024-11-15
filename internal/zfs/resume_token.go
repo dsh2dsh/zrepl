@@ -41,35 +41,6 @@ var (
 	ResumeTokenParsingError         = errors.New("zrepl cannot parse resume token values")
 )
 
-var resumeSendSupportedCheck struct {
-	once      sync.Once
-	supported bool
-	err       error
-}
-
-func ResumeSendSupported(ctx context.Context) (bool, error) {
-	resumeSendSupportedCheck.once.Do(func() {
-		// "feature discovery"
-		cmd := zfscmd.CommandContext(ctx, ZfsBin, "send").WithLogError(false)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			var exitError *exec.ExitError
-			if !errors.As(err, &exitError) || !exitError.Exited() {
-				resumeSendSupportedCheck.err = fmt.Errorf(
-					"resumable send cli support feature check failed: %w", err)
-			}
-		}
-		def := bytes.Contains(output, []byte("receive_resume_token"))
-		if err != nil {
-			cmd.LogError(err, def)
-		}
-		resumeSendSupportedCheck.supported = envconst.Bool(
-			"ZREPL_EXPERIMENTAL_ZFS_SEND_RESUME_SUPPORTED", def)
-		debug("resume send feature check complete %#v", &resumeSendSupportedCheck)
-	})
-	return resumeSendSupportedCheck.supported, resumeSendSupportedCheck.err
-}
-
 var resumeRecvPoolSupportRecheckTimeout = envconst.Duration("ZREPL_ZFS_RESUME_RECV_POOL_SUPPORT_RECHECK_TIMEOUT", 30*time.Second)
 
 type resumeRecvPoolSupportedResult struct {
@@ -205,12 +176,6 @@ func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
 //
 // cannot resume send: 'pool1/test@b' used in the initial send no longer exists
 func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
-	if supported, err := ResumeSendSupported(ctx); err != nil {
-		return nil, err
-	} else if !supported {
-		return nil, ResumeTokenDecodingNotSupported
-	}
-
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "send", "-nvt", token).
 		WithLogError(false)
 	output, err := cmd.CombinedOutput()
