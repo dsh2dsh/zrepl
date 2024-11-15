@@ -929,8 +929,9 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		Debug("placeholder state")
 
 	recvOpts := zfs.RecvOptions{
-		InheritProperties:  s.conf.InheritProperties,
-		OverrideProperties: s.conf.OverrideProperties,
+		SavePartialRecvState: true,
+		InheritProperties:    s.conf.InheritProperties,
+		OverrideProperties:   s.conf.OverrideProperties,
 	}
 
 	var clearPlaceholderProperty bool
@@ -952,12 +953,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		if err := zfs.ZFSRecvClearResumeToken(ctx, lp.ToString()); err != nil {
 			return fmt.Errorf("cannot clear resume token: %w", err)
 		}
-	}
-
-	recvOpts.SavePartialRecvState, err = zfs.ResumeRecvSupported(ctx, lp)
-	if err != nil {
-		return fmt.Errorf(
-			"cannot determine whether we can use resumable send & recv: %w", err)
 	}
 
 	if s.sem != nil {

@@ -1008,22 +1008,6 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 	return si, nil
 }
 
-type ErrRecvResumeNotSupported struct {
-	FS       string
-	CheckErr error
-}
-
-func (e *ErrRecvResumeNotSupported) Error() string {
-	var buf strings.Builder
-	fmt.Fprintf(&buf, "zfs resumable recv into %q: ", e.FS)
-	if e.CheckErr != nil {
-		fmt.Fprint(&buf, e.CheckErr.Error())
-	} else {
-		fmt.Fprintf(&buf, "not supported by ZFS or pool")
-	}
-	return buf.String()
-}
-
 type RecvOptions struct {
 	// Rollback to the oldest snapshot, destroy it, then perform `recv -F`. Note
 	// that this doesn't change property values, i.e. an existing local property
@@ -1084,12 +1068,6 @@ func ZFSRecv(
 		// case).
 		if err := zfsRollbackForceRecv(ctx, fsdp); err != nil {
 			return nil
-		}
-	}
-
-	if opts.SavePartialRecvState {
-		if supported, err := ResumeRecvSupported(ctx, fsdp); err != nil || !supported {
-			return &ErrRecvResumeNotSupported{FS: fs, CheckErr: err}
 		}
 	}
 

@@ -1,7 +1,6 @@
 package zfs
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,10 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
@@ -40,113 +36,6 @@ var (
 	ResumeTokenDecodingNotSupported = errors.New("zfs binary does not allow decoding resume token or zrepl cannot scrape zfs output")
 	ResumeTokenParsingError         = errors.New("zrepl cannot parse resume token values")
 )
-
-var resumeRecvPoolSupportRecheckTimeout = envconst.Duration("ZREPL_ZFS_RESUME_RECV_POOL_SUPPORT_RECHECK_TIMEOUT", 30*time.Second)
-
-type resumeRecvPoolSupportedResult struct {
-	lastCheck time.Time
-	supported bool
-	err       error
-}
-
-var resumeRecvSupportedCheck struct {
-	mtx         sync.RWMutex
-	flagSupport struct {
-		checked   bool
-		supported bool
-		err       error
-	}
-	poolSupported map[string]resumeRecvPoolSupportedResult
-}
-
-// fs == nil only checks for CLI support
-func ResumeRecvSupported(ctx context.Context, fs *DatasetPath) (bool, error) {
-	sup := &resumeRecvSupportedCheck
-	sup.mtx.RLock()
-	defer sup.mtx.RUnlock()
-	upgradeWhile := func(cb func()) {
-		sup.mtx.RUnlock()
-		defer sup.mtx.RLock()
-		sup.mtx.Lock()
-		defer sup.mtx.Unlock()
-		cb()
-	}
-
-	if !sup.flagSupport.checked {
-		cmd := zfscmd.CommandContext(ctx, ZfsBin, "receive").
-			WithLogError(false)
-		output, err := cmd.CombinedOutput()
-		upgradeWhile(func() {
-			sup.flagSupport.checked = true
-			if err != nil {
-				var exitError *exec.ExitError
-				if !errors.As(err, &exitError) || !exitError.Exited() {
-					sup.flagSupport.err = err
-				} else {
-					sup.flagSupport.supported = bytes.Contains(output,
-						[]byte("-A <filesystem|volume>"))
-				}
-				cmd.LogError(err, sup.flagSupport.supported)
-			} else {
-				sup.flagSupport.supported = bytes.Contains(output,
-					[]byte("-A <filesystem|volume>"))
-			}
-			debug("resume recv cli flag feature check result: %#v", sup.flagSupport)
-		})
-		// fallthrough
-	}
-
-	if sup.flagSupport.err != nil {
-		return false, fmt.Errorf(
-			"zfs recv feature check for resumable send & recv failed: %w",
-			sup.flagSupport.err)
-	} else if !sup.flagSupport.supported || fs == nil {
-		return sup.flagSupport.supported, nil
-	}
-
-	// Flag is supported and pool-support is request
-	// Now check for pool support
-	pool, err := fs.Pool()
-	if err != nil {
-		return false, fmt.Errorf(
-			"resume recv check requires pool of dataset: %w", err)
-	}
-
-	if sup.poolSupported == nil {
-		upgradeWhile(func() {
-			sup.poolSupported = make(map[string]resumeRecvPoolSupportedResult)
-		})
-	}
-
-	poolSup, ok := sup.poolSupported[pool]
-	if !ok || (!poolSup.supported &&
-		time.Since(poolSup.lastCheck) > resumeRecvPoolSupportRecheckTimeout) {
-
-		cmd := zfscmd.CommandContext(ctx, "zpool", "get", "-H", "-p",
-			"-o", "value", "feature@extensible_dataset", pool)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			debug("resume recv pool support check result: %#v", sup.flagSupport)
-			poolSup.supported, poolSup.err = false, err
-		} else {
-			poolSup.err = nil
-			o := strings.TrimSpace(string(output))
-			poolSup.supported = o == "active" || o == "enabled"
-		}
-		poolSup.lastCheck = time.Now()
-		// we take the lock late, so two updaters might check simultaneously, but
-		// that shouldn't hurt
-		upgradeWhile(func() { sup.poolSupported[pool] = poolSup })
-		// fallthrough
-	}
-
-	if poolSup.err != nil {
-		return false, fmt.Errorf(
-			"pool %q check for feature@extensible_dataset feature failed: %w",
-			pool, poolSup.err)
-	}
-	return poolSup.supported, nil
-}
 
 // Abuse 'zfs send' to decode the resume token
 //
@@ -262,11 +151,6 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 
 // if string is empty and err == nil, the feature is not supported
 func ZFSGetReceiveResumeTokenOrEmptyStringIfNotSupported(ctx context.Context, fs *DatasetPath) (string, error) {
-	if supported, err := ResumeRecvSupported(ctx, fs); err != nil {
-		return "", fmt.Errorf("cannot determine zfs recv resume support: %w", err)
-	} else if !supported {
-		return "", nil
-	}
 	const prop_receive_resume_token = "receive_resume_token"
 	props, err := ZFSGet(ctx, fs, []string{prop_receive_resume_token})
 	if err != nil {
