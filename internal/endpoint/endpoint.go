@@ -107,32 +107,13 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 		return nil, err
 	}
 
-	rfss := make([]*pdu.Filesystem, 0, len(fss))
-	for _, a := range fss {
-		// TODO: dedup code with Receiver.ListFilesystems
-		l := getLogger(ctx).WithField("fs", a)
-		ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, a)
-		if err != nil {
-			l.WithError(err).Error("error getting placeholder state")
-			return nil, fmt.Errorf(
-				"cannot get placeholder state for fs %q: %w", a, err)
+	rfss := make([]*pdu.Filesystem, len(fss))
+	for i, p := range fss {
+		rfss[i] = &pdu.Filesystem{
+			Path: p.ToString(),
+			// ResumeToken does not make sense from Sender. And IsPlaceholder too,
+			// because after FSFilter we got non plaseholder datasets only.
 		}
-		l.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).
-			Debug("placeholder state")
-
-		if !ph.FSExists {
-			l.Error("inconsistent placeholder state: filesystem must exists")
-			err := fmt.Errorf(
-				"inconsistent placeholder state: filesystem %q must exist in this context",
-				a.ToString())
-			return nil, err
-		}
-
-		rfss = append(rfss, &pdu.Filesystem{
-			Path: a.ToString(),
-			// ResumeToken does not make sense from Sender
-			IsPlaceholder: ph.IsPlaceholder,
-		})
 	}
 
 	res := &pdu.ListFilesystemRes{Filesystems: rfss}
