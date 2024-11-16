@@ -1,13 +1,17 @@
-// Package endpoint implements replication endpoints for use with package replication.
+// Package endpoint implements replication endpoints for use with package
+// replication.
 package endpoint
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -95,11 +99,14 @@ func (s *Sender) filterCheckFS(fs string) (*zfs.DatasetPath, error) {
 	return dp, nil
 }
 
-func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error) {
+func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
+	error,
+) {
 	fss, err := zfs.ZFSListMapping(ctx, s.FSFilter)
 	if err != nil {
 		return nil, err
 	}
+
 	rfss := make([]*pdu.Filesystem, 0, len(fss))
 	for _, a := range fss {
 		// TODO: dedup code with Receiver.ListFilesystems
@@ -107,22 +114,27 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, e
 		ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, a)
 		if err != nil {
 			l.WithError(err).Error("error getting placeholder state")
-			return nil, fmt.Errorf("cannot get placeholder state for fs %q: %w", a, err)
+			return nil, fmt.Errorf(
+				"cannot get placeholder state for fs %q: %w", a, err)
 		}
-		l.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).Debug("placeholder state")
+		l.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).
+			Debug("placeholder state")
+
 		if !ph.FSExists {
 			l.Error("inconsistent placeholder state: filesystem must exists")
-			err := fmt.Errorf("inconsistent placeholder state: filesystem %q must exist in this context", a.ToString())
+			err := fmt.Errorf(
+				"inconsistent placeholder state: filesystem %q must exist in this context",
+				a.ToString())
 			return nil, err
 		}
 
-		fs := &pdu.Filesystem{
+		rfss = append(rfss, &pdu.Filesystem{
 			Path: a.ToString(),
 			// ResumeToken does not make sense from Sender
 			IsPlaceholder: ph.IsPlaceholder,
-		}
-		rfss = append(rfss, fs)
+		})
 	}
+
 	res := &pdu.ListFilesystemRes{Filesystems: rfss}
 	return res, nil
 }
@@ -688,59 +700,100 @@ func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
 	return c, nil
 }
 
-func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error) {
+const receiveResumeToken = "receive_resume_token"
+
+func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
+	error,
+) {
 	// first make sure that root_fs is imported
-	if rphs, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, s.conf.RootWithoutClientComponent); err != nil {
-		return nil, fmt.Errorf("cannot determine whether root_fs exists: %w", err)
-	} else if !rphs.FSExists {
-		getLogger(ctx).WithField("root_fs", s.conf.RootWithoutClientComponent).Error("root_fs does not exist")
-		return nil, errors.New("root_fs does not exist")
+	if err := s.checkRootExists(ctx); err != nil {
+		return nil, err
 	}
 
 	root := s.clientRootFromCtx(ctx)
-	filtered, err := zfs.ZFSListMapping(ctx, subroot{root})
+	fsProps, err := zfs.ZFSGetRecursive(ctx, root.ToString(), -1,
+		[]string{"filesystem"},
+		[]string{zfs.PlaceholderPropertyName, receiveResumeToken},
+		zfs.SourceAny)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed get properties of fs %q: %w", root.ToString(), err)
+	}
+
+	sortedProps := slices.SortedFunc(maps.Values(fsProps),
+		func(a, b *zfs.ZFSProperties) int {
+			return cmp.Compare(a.Order(), b.Order())
+		})
+
+	fss, err := makeFilesystems(ctx, root, sortedProps)
 	if err != nil {
 		return nil, err
-	}
-	// present filesystem without the root_fs prefix
-	fss := make([]*pdu.Filesystem, 0, len(filtered))
-	for _, a := range filtered {
-		l := getLogger(ctx).WithField("fs", a)
-		ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, a)
-		if err != nil {
-			l.WithError(err).Error("error getting placeholder state")
-			return nil, fmt.Errorf("cannot get placeholder state for fs %q: %w", a, err)
-		}
-		l.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).Debug("placeholder state")
-		if !ph.FSExists {
-			l.Error("inconsistent placeholder state: filesystem must exists")
-			err := fmt.Errorf("inconsistent placeholder state: filesystem %q must exist in this context", a.ToString())
-			return nil, err
-		}
-		token, err := zfs.ZFSGetReceiveResumeTokenOrEmptyStringIfNotSupported(ctx, a)
-		if err != nil {
-			l.WithError(err).Error("cannot get receive resume token")
-			return nil, err
-		}
-		l.WithField("receive_resume_token", token).Debug("receive resume token")
-
-		a.TrimPrefix(root)
-
-		fs := &pdu.Filesystem{
-			Path:          a.ToString(),
-			IsPlaceholder: ph.IsPlaceholder,
-			ResumeToken:   token,
-		}
-		fss = append(fss, fs)
-	}
-	if len(fss) == 0 {
+	} else if len(fss) == 0 {
 		getLogger(ctx).Debug("no filesystems found")
 		return &pdu.ListFilesystemRes{}, nil
 	}
 	return &pdu.ListFilesystemRes{Filesystems: fss}, nil
 }
 
-func (s *Receiver) ListFilesystemVersions(ctx context.Context, req *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error) {
+func (s *Receiver) checkRootExists(ctx context.Context) error {
+	rphs, err := zfs.ZFSGetFilesystemPlaceholderState(ctx,
+		s.conf.RootWithoutClientComponent)
+	if err != nil {
+		return fmt.Errorf(
+			"cannot determine whether root_fs exists: %w", err)
+	} else if !rphs.FSExists {
+		getLogger(ctx).
+			WithField("root_fs", s.conf.RootWithoutClientComponent).
+			Error("root_fs does not exist")
+		return errors.New("root_fs does not exist")
+	}
+	return nil
+}
+
+func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,
+	items []*zfs.ZFSProperties,
+) ([]*pdu.Filesystem, error) {
+	// present filesystem without the root_fs prefix
+	fss := make([]*pdu.Filesystem, 0, len(items))
+	for _, props := range items {
+		l := getLogger(ctx).WithField("fs", props.Fs())
+		p, err := props.DatasetPath()
+		if err != nil {
+			l.WithError(err).Error("error getting placeholder state")
+			return nil, fmt.Errorf(
+				"cannot get placeholder state for fs %q: %w", props.Fs(), err)
+		}
+
+		state := zfs.NewPlaceholderState(p, props)
+		l.WithField("placeholder_state", fmt.Sprintf("%#v", state)).
+			Debug("placeholder state")
+		if !state.FSExists {
+			l.Error("inconsistent placeholder state: filesystem must exists")
+			return nil, fmt.Errorf(
+				"inconsistent placeholder state: filesystem %q must exist in this context",
+				p.ToString())
+		}
+
+		tokenProp := props.GetDetails(receiveResumeToken)
+		token := tokenProp.Value
+		if tokenProp.Source != zfs.SourceLocal {
+			token = ""
+		}
+		l.WithField("receive_resume_token", token).Debug("receive resume token")
+
+		p.TrimPrefix(root)
+		fss = append(fss, &pdu.Filesystem{
+			Path:          p.ToString(),
+			IsPlaceholder: state.IsPlaceholder,
+			ResumeToken:   token,
+		})
+	}
+	return fss, nil
+}
+
+func (s *Receiver) ListFilesystemVersions(ctx context.Context,
+	req *pdu.ListFilesystemVersionsReq,
+) (*pdu.ListFilesystemVersionsRes, error) {
 	root := s.clientRootFromCtx(ctx)
 	lp, err := subroot{root}.MapToLocal(req.GetFilesystem())
 	if err != nil {
@@ -757,7 +810,6 @@ func (s *Receiver) ListFilesystemVersions(ctx context.Context, req *pdu.ListFile
 	for i := range fsvs {
 		rfsvs[i] = pdu.FilesystemVersionFromZFS(&fsvs[i])
 	}
-
 	return &pdu.ListFilesystemVersionsRes{Versions: rfsvs}, nil
 }
 

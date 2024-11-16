@@ -1270,11 +1270,17 @@ type PropertyValue struct {
 }
 
 type ZFSProperties struct {
-	m map[string]PropertyValue
+	fs    string
+	order int
+	m     map[string]PropertyValue
 }
 
-func NewZFSProperties() *ZFSProperties {
-	return &ZFSProperties{make(map[string]PropertyValue, 4)}
+func NewZFSProperties(fs string, order int) *ZFSProperties {
+	return &ZFSProperties{
+		fs:    fs,
+		order: order,
+		m:     make(map[string]PropertyValue, 4),
+	}
 }
 
 func (p *ZFSProperties) Valid(props []string) bool {
@@ -1295,6 +1301,14 @@ func (p *ZFSProperties) Add(propName string, propValue PropertyValue) bool {
 	}
 	p.m[propName] = propValue
 	return true
+}
+
+func (p *ZFSProperties) Fs() string { return p.fs }
+
+func (p *ZFSProperties) Order() int { return p.order }
+
+func (p *ZFSProperties) DatasetPath() (*DatasetPath, error) {
+	return NewDatasetPath(p.fs)
 }
 
 func zfsSet(ctx context.Context, path string, props map[string]string) error {
@@ -1375,7 +1389,8 @@ func ZFSGetMountpoint(ctx context.Context, fs string) (*GetMountpointOutput, err
 	return o, nil
 }
 
-func ZFSGetRawAnySource(ctx context.Context, path string, props []string) (*ZFSProperties, error) {
+func ZFSGetRawAnySource(ctx context.Context, path string, props []string,
+) (*ZFSProperties, error) {
 	return zfsGet(ctx, path, props, SourceAny)
 }
 
@@ -1387,7 +1402,11 @@ type DatasetDoesNotExist struct {
 	Path string
 }
 
-func (d *DatasetDoesNotExist) Error() string { return fmt.Sprintf("dataset %q does not exist", d.Path) }
+var _ error = (*DatasetDoesNotExist)(nil)
+
+func (d *DatasetDoesNotExist) Error() string {
+	return fmt.Sprintf("dataset %q does not exist", d.Path)
+}
 
 func tryDatasetDoesNotExist(expectPath string, stderr []byte,
 ) *DatasetDoesNotExist {
@@ -1476,11 +1495,14 @@ func ZFSGetRecursive(ctx context.Context, path string, depth int,
 	propsByFS := map[string]*ZFSProperties{}
 	allowedPrefixes := allowedSources.zfsGetSourceFieldPrefixes()
 
+	var i int
 	err = scanCmdOutput(cmd, stdout, &stderrBuf,
 		func(s string) (error, bool) {
-			if err := parsePropsByFs(s, propsByFS, allowedPrefixes); err != nil {
+			err := parsePropsByFs(i, s, propsByFS, allowedPrefixes)
+			if err != nil {
 				return err, false
 			}
+			i++
 			return nil, true
 		})
 	if err != nil {
@@ -1510,7 +1532,7 @@ func zfsGetArgs(path string, depth int, dstypes []string,
 	return append(args, strings.Join(props, ","), path)
 }
 
-func parsePropsByFs(s string, propsByFs map[string]*ZFSProperties,
+func parsePropsByFs(order int, s string, propsByFs map[string]*ZFSProperties,
 	prefixes []string,
 ) error {
 	fields := strings.SplitN(s, "\t", 5)
@@ -1520,25 +1542,26 @@ func parsePropsByFs(s string, propsByFs map[string]*ZFSProperties,
 	}
 	fs, prop, value, srcStr := fields[0], fields[1], fields[2], fields[3]
 
-	for _, p := range prefixes {
-		// prefix-match so that SourceAny (= "") works
-		if !strings.HasPrefix(srcStr, p) {
-			continue
-		}
-		source, err := parsePropertySource(srcStr)
-		if err != nil {
-			return fmt.Errorf("parse property source %q: %w", srcStr, err)
-		}
-		fsProps, ok := propsByFs[fs]
-		if !ok {
-			fsProps = NewZFSProperties()
-			propsByFs[fs] = fsProps
-		}
-		if !fsProps.Add(prop, NewPropertyValue(value, source)) {
-			return fmt.Errorf(
-				"duplicate property %q for dataset %q", prop, fs)
-		}
-		break
+	if i := slices.IndexFunc(prefixes, func(p string) bool {
+		return strings.HasPrefix(srcStr, p)
+	}); i < 0 {
+		return nil
+	}
+
+	source, err := parsePropertySource(srcStr)
+	if err != nil {
+		return fmt.Errorf("parse property source %q: %w", srcStr, err)
+	}
+
+	fsProps, ok := propsByFs[fs]
+	if !ok {
+		fsProps = NewZFSProperties(fs, order)
+		propsByFs[fs] = fsProps
+	}
+
+	if !fsProps.Add(prop, NewPropertyValue(value, source)) {
+		return fmt.Errorf(
+			"duplicate property %q for dataset %q", prop, fs)
 	}
 	return nil
 }
@@ -1565,7 +1588,7 @@ func zfsGet(ctx context.Context, path string, props []string,
 		// XXX callers expect to always get a result here. They will observe
 		// props.Get("propname") == "". We should change .Get to return a tuple, or
 		// an error, or whatever.
-		return NewZFSProperties(), nil
+		return NewZFSProperties(path, 0), nil
 	case len(propMap) != 1:
 		return nil, errors.New(
 			"zfs get unexpectedly returned properties for multiple datasets")

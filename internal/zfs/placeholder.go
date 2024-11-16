@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
@@ -39,7 +40,9 @@ func computeLegacyHashBasedPlaceholderPropertyValue(p *DatasetPath) string {
 }
 
 // the caller asserts that placeholderPropertyValue is sourceLocal
-func isLocalPlaceholderPropertyValuePlaceholder(p *DatasetPath, placeholderPropertyValue string) (isPlaceholder bool) {
+func isLocalPlaceholderPropertyValuePlaceholder(p *DatasetPath,
+	placeholderPropertyValue string,
+) (isPlaceholder bool) {
 	legacy := computeLegacyHashBasedPlaceholderPropertyValue(p)
 	switch placeholderPropertyValue {
 	case legacy:
@@ -48,6 +51,22 @@ func isLocalPlaceholderPropertyValuePlaceholder(p *DatasetPath, placeholderPrope
 		return true
 	default:
 		return false
+	}
+}
+
+func NewPlaceholderState(p *DatasetPath, props *ZFSProperties,
+) *FilesystemPlaceholderState {
+	details := props.GetDetails(PlaceholderPropertyName)
+	rawValue := details.Value
+	if details.Source != SourceLocal {
+		rawValue = "-"
+	}
+	return &FilesystemPlaceholderState{
+		FS:                    p.ToString(),
+		FSExists:              true,
+		RawLocalPropertyValue: rawValue,
+		IsPlaceholder: isLocalPlaceholderPropertyValuePlaceholder(
+			p, rawValue),
 	}
 }
 
@@ -65,22 +84,15 @@ type FilesystemPlaceholderState struct {
 // For nonexistent FS, err == nil and state.FSExists == false
 func ZFSGetFilesystemPlaceholderState(ctx context.Context, p *DatasetPath,
 ) (*FilesystemPlaceholderState, error) {
-	state := &FilesystemPlaceholderState{FS: p.ToString()}
-	props, err := zfsGet(ctx, state.FS,
+	props, err := zfsGet(ctx, p.ToString(),
 		[]string{PlaceholderPropertyName}, SourceLocal)
-
-	var _ error = (*DatasetDoesNotExist)(nil) // weak assertion on zfsGet's interface
-	if _, ok := err.(*DatasetDoesNotExist); ok {
-		return state, nil
+	var errNotExist *DatasetDoesNotExist
+	if errors.As(err, &errNotExist) {
+		return &FilesystemPlaceholderState{FS: p.ToString()}, nil
 	} else if err != nil {
-		return state, err
+		return nil, err
 	}
-
-	state.FSExists = true
-	state.RawLocalPropertyValue = props.Get(PlaceholderPropertyName)
-	state.IsPlaceholder = isLocalPlaceholderPropertyValuePlaceholder(
-		p, state.RawLocalPropertyValue)
-	return state, nil
+	return NewPlaceholderState(p, props), nil
 }
 
 //go:generate enumer -type=FilesystemPlaceholderCreateEncryptionValue -trimprefix=FilesystemPlaceholderCreateEncryption
@@ -162,34 +174,4 @@ func ZFSMigrateHashBasedPlaceholderToCurrent(ctx context.Context, fs *DatasetPat
 		return nil, fmt.Errorf("error re-writing placeholder property: %s", err)
 	}
 	return &report, nil
-}
-
-func ZFSListPlaceholderFilesystemsWithAdditionalProps(ctx context.Context, root string, additionalProps []string) (map[string]*ZFSProperties, error) {
-	props := []string{PlaceholderPropertyName}
-	if len(additionalProps) > 0 {
-		props = append(props, additionalProps...)
-	}
-
-	propsByFS, err := ZFSGetRecursive(ctx, root, -1, []string{"filesystem", "volume"}, props, SourceAny)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get placeholder filesystems under %q: %w", root, err)
-	}
-
-	filtered := make(map[string]*ZFSProperties)
-	for fs, props := range propsByFS {
-		details := props.GetDetails(PlaceholderPropertyName)
-		if details.Source != SourceLocal {
-			continue
-		}
-		fsp, err := NewDatasetPath(fs)
-		if err != nil {
-			return nil, fmt.Errorf("zfs get returned invalid dataset path %q: %w", fs, err)
-		}
-		if !isLocalPlaceholderPropertyValuePlaceholder(fsp, details.Value) {
-			continue
-		}
-		filtered[fs] = props
-	}
-
-	return filtered, nil
 }

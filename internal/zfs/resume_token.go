@@ -149,22 +149,6 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	return rt, nil
 }
 
-// if string is empty and err == nil, the feature is not supported
-func ZFSGetReceiveResumeTokenOrEmptyStringIfNotSupported(ctx context.Context, fs *DatasetPath) (string, error) {
-	const prop_receive_resume_token = "receive_resume_token"
-	props, err := ZFSGet(ctx, fs, []string{prop_receive_resume_token})
-	if err != nil {
-		return "", err
-	}
-	res := props.Get(prop_receive_resume_token)
-	debug("%q receive_resume_token=%q", fs.ToString(), res)
-	if res == "-" {
-		return "", nil
-	} else {
-		return res, nil
-	}
-}
-
 func (t *ResumeToken) ToNameSplit() (fs *DatasetPath, snapName string, err error) {
 	comps := strings.SplitN(t.ToName, "@", 2)
 	if len(comps) != 2 {
