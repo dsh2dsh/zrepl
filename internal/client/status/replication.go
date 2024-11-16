@@ -137,9 +137,11 @@ func (self *JobRender) renderAttemptContent(a *report.AttemptReport) {
 	fsNum, fsDone := a.FilesystemsProgress()
 	expected, replicated, invalidEstimates := a.BytesSum()
 	if a.State.IsTerminal() {
-		self.renderReplicated(expected, replicated, fsNum, fsDone)
+		d := a.FinishAt.Sub(a.StartAt)
+		self.renderReplicated(expected, replicated, fsNum, fsDone, d)
 	} else {
-		self.renderAttemptProgress(expected, replicated, fsNum, fsDone)
+		d := time.Since(a.StartAt)
+		self.renderAttemptProgress(expected, replicated, fsNum, fsDone, d)
 	}
 
 	if invalidEstimates {
@@ -149,20 +151,21 @@ func (self *JobRender) renderAttemptContent(a *report.AttemptReport) {
 }
 
 func (self *JobRender) renderReplicated(expected, replicated uint64, fsNum,
-	fsDone int,
+	fsDone int, d time.Duration,
 ) {
 	self.printLn(self.Styles.Content.Render(fmt.Sprintf(
-		"Replicated: %d/%d, %s / %s",
+		"Replicated: %d/%d, %s / %s, %s",
 		fsDone, fsNum,
 		humanizeFormat(replicated, true, "%s %sB"),
-		humanizeFormat(expected, true, "%s %sB"))))
+		humanizeFormat(expected, true, "%s %sB"),
+		d.Round(time.Second))))
 	if self.speed.Valid() {
 		self.speed.Reset()
 	}
 }
 
 func (self *JobRender) renderAttemptProgress(expected, replicated uint64,
-	fsNum, fsDone int,
+	fsNum, fsDone int, d time.Duration,
 ) {
 	var pct float64
 	if expected > 0 {
@@ -171,19 +174,19 @@ func (self *JobRender) renderAttemptProgress(expected, replicated uint64,
 	s := &self.Styles
 	self.printLn(s.Content.Render("Progress:", self.bar.ViewAs(pct)))
 
-	var sb strings.Builder
-	bps := self.speed.Update(replicated)
-	fmt.Fprintf(&sb, "%d/%d, %s / %s @ %s",
+	speed := self.speed.Update(replicated)
+	str := fmt.Sprintf("%d/%d, %s / %s @ %s",
 		fsDone, fsNum,
 		humanizeFormat(replicated, true, "%s %sB"),
 		humanizeFormat(expected, true, "%s %sB"),
-		humanizeFormat(uint64(bps), true, "%s %sB/s"))
-	if bps > 0 && replicated < expected {
-		eta := time.Duration(
-			(float64(expected)-float64(replicated))/float64(bps)) * time.Second
-		fmt.Fprintf(&sb, " (%s remaining)", humanizeDuration(eta))
+		humanizeFormat(uint64(speed), true, "%s %sB/s"))
+	if replicated < expected && d > 5*time.Second {
+		bps := float64(replicated) / d.Seconds()
+		bytesLeft := expected - replicated
+		eta := time.Duration(float64(bytesLeft)/bps) * time.Second
+		str += fmt.Sprintf(" (%s remaining)", humanizeDuration(eta))
 	}
-	self.printLn(s.Content.Render(s.Indent.Render(sb.String())))
+	self.printLn(s.Content.Render(s.Indent.Render(str)))
 }
 
 func (self *JobRender) filterFilesystems(items []*report.FilesystemReport,
