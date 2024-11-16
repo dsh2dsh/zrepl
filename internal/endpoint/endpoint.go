@@ -711,14 +711,16 @@ func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	}
 
 	root := s.clientRootFromCtx(ctx)
-	fsProps, err := zfs.ZFSGetRecursive(ctx, root.ToString(), -1,
+	rootStr := root.ToString()
+	fsProps, err := zfs.ZFSGetRecursive(ctx, rootStr, -1,
 		[]string{"filesystem"},
 		[]string{zfs.PlaceholderPropertyName, receiveResumeToken},
 		zfs.SourceAny)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed get properties of fs %q: %w", root.ToString(), err)
+			"failed get properties of fs %q: %w", rootStr, err)
 	}
+	delete(fsProps, rootStr)
 
 	sortedProps := slices.SortedFunc(maps.Values(fsProps),
 		func(a, b *zfs.ZFSProperties) int {
