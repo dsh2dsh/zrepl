@@ -255,9 +255,10 @@ func (j *SnapJob) doPrune(ctx context.Context) {
 		Encrypt: &nodefault.Bool{B: true},
 	})
 
+	localSender := NewLocalSender(ctx, sender)
+	pruner := j.prunerFactory.BuildLocalPruner(ctx, localSender, localSender)
 	j.prunerMtx.Lock()
-	j.pruner = j.prunerFactory.BuildLocalPruner(ctx, sender,
-		NewLocalSender(sender))
+	j.pruner = pruner
 	j.prunerMtx.Unlock()
 
 	log := GetLogger(ctx)
@@ -278,19 +279,33 @@ func (j *SnapJob) doPrune(ctx context.Context) {
 // But the pruner.Pruner gives up on an FS if no replication
 // cursor is present, which is why this pruner returns the
 // most recent filesystem version.
-func NewLocalSender(target pruner.Target) *LocalSender {
-	return &LocalSender{Target: target}
+func NewLocalSender(ctx context.Context, target pruner.Target) *LocalSender {
+	return &LocalSender{
+		Target: target,
+
+		listFilesystemsOnce: sync.OnceValues(
+			func() (*pdu.ListFilesystemRes, error) {
+				return target.ListFilesystems(ctx)
+			}),
+	}
 }
 
 type LocalSender struct {
 	// the Target passed as Target to BuildLocalPruner
 	pruner.Target
+
+	listFilesystemsOnce func() (*pdu.ListFilesystemRes, error)
 }
 
 var (
 	_ pruner.Sender = (*LocalSender)(nil)
 	_ pruner.Target = (*LocalSender)(nil)
 )
+
+func (self *LocalSender) ListFilesystems(ctx context.Context,
+) (*pdu.ListFilesystemRes, error) {
+	return self.listFilesystemsOnce()
+}
 
 func (self *LocalSender) ReplicationCursor(ctx context.Context,
 	req *pdu.ReplicationCursorReq,
