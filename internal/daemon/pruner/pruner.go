@@ -11,36 +11,36 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/pruning"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 )
 
-// The sender in the replication setup.
-// The pruner uses the Sender to determine which of the Target's filesystems need to be pruned.
-// Also, it asks the Sender about the replication cursor of each filesystem
-// to enable the 'not_replicated' pruning rule.
+// The sender in the replication setup. The pruner uses the Sender to determine
+// which of the Target's filesystems need to be pruned. Also, it asks the Sender
+// about the replication cursor of each filesystem to enable the
+// 'not_replicated' pruning rule.
 //
-// Try to keep it compatible with github.com/dsh2dsh/zrepl/endpoint.Endpoint
+// Try to keep it compatible with endpoint.Endpoint.
 type Sender interface {
-	ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error)
+	ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq,
+	) (*pdu.ReplicationCursorRes, error)
 	ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error)
 }
 
 // The pruning target, i.e., on which snapshots are destroyed.
 // This can be a replication sender or receiver.
 //
-// Try to keep it compatible with github.com/dsh2dsh/zrepl/endpoint.Endpoint
+// Try to keep it compatible with endpoint.Endpoint.
 type Target interface {
 	ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error)
-	ListFilesystemVersions(ctx context.Context, req *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error)
-	DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error)
+	ListFilesystemVersions(ctx context.Context,
+		req *pdu.ListFilesystemVersionsReq,
+	) (*pdu.ListFilesystemVersionsRes, error)
+	DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq,
+	) (*pdu.DestroySnapshotsRes, error)
 }
-
-type Logger = logger.Logger
 
 type contextKey int
 
@@ -48,9 +48,10 @@ const (
 	contextKeyPruneSide contextKey = 1 + iota
 )
 
-func GetLogger(ctx context.Context) Logger {
+func GetLogger(ctx context.Context) logger.Logger {
 	pruneSide := ctx.Value(contextKeyPruneSide).(string)
-	return logging.GetLogger(ctx, logging.SubsysPruning).WithField("prune_side", pruneSide)
+	return logging.GetLogger(ctx, logging.SubsysPruning).
+		WithField("prune_side", pruneSide)
 }
 
 type args struct {
@@ -78,141 +79,6 @@ type Pruner struct {
 	execQueue *execQueue
 }
 
-type PrunerFactory struct {
-	senderRules                    []pruning.KeepRule
-	receiverRules                  []pruning.KeepRule
-	retryWait                      time.Duration
-	considerSnapAtCursorReplicated bool
-	promPruneSecs                  *prometheus.HistogramVec
-}
-
-type LocalPrunerFactory struct {
-	keepRules     []pruning.KeepRule
-	retryWait     time.Duration
-	promPruneSecs *prometheus.HistogramVec
-}
-
-func NewLocalPrunerFactory(in config.PruningLocal, promPruneSecs *prometheus.HistogramVec) (*LocalPrunerFactory, error) {
-	rules, err := pruning.RulesFromConfig(in.Keep)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build pruning rules: %w", err)
-	}
-	for _, r := range in.Keep {
-		if _, ok := r.Ret.(*config.PruneKeepNotReplicated); ok {
-			// rule NotReplicated  for a local pruner doesn't make sense
-			// because no replication happens with that job type
-			return nil, errors.New("single-site pruner cannot support `not_replicated` keep rule")
-		}
-	}
-	f := &LocalPrunerFactory{
-		keepRules:     rules,
-		retryWait:     envconst.Duration("ZREPL_PRUNER_RETRY_INTERVAL", 10*time.Second),
-		promPruneSecs: promPruneSecs,
-	}
-	return f, nil
-}
-
-func NewPrunerFactory(in config.PruningSenderReceiver, promPruneSecs *prometheus.HistogramVec) (*PrunerFactory, error) {
-	keepRulesReceiver, err := pruning.RulesFromConfig(in.KeepReceiver)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build receiver pruning rules: %w", err)
-	}
-
-	keepRulesSender, err := pruning.RulesFromConfig(in.KeepSender)
-	if err != nil {
-		return nil, fmt.Errorf("cannot build sender pruning rules: %w", err)
-	}
-
-	considerSnapAtCursorReplicated := false
-	for _, r := range in.KeepSender {
-		knr, ok := r.Ret.(*config.PruneKeepNotReplicated)
-		if !ok {
-			continue
-		}
-		considerSnapAtCursorReplicated = considerSnapAtCursorReplicated || !knr.KeepSnapshotAtCursor
-	}
-	f := &PrunerFactory{
-		senderRules:                    keepRulesSender,
-		receiverRules:                  keepRulesReceiver,
-		retryWait:                      envconst.Duration("ZREPL_PRUNER_RETRY_INTERVAL", 10*time.Second),
-		considerSnapAtCursorReplicated: considerSnapAtCursorReplicated,
-		promPruneSecs:                  promPruneSecs,
-	}
-	return f, nil
-}
-
-func (f *PrunerFactory) BuildSenderPruner(ctx context.Context, target Target, sender Sender) *Pruner {
-	p := &Pruner{
-		args: args{
-			context.WithValue(ctx, contextKeyPruneSide, "sender"),
-			target,
-			sender,
-			f.senderRules,
-			f.retryWait,
-			f.considerSnapAtCursorReplicated,
-			f.promPruneSecs.WithLabelValues("sender"),
-		},
-		state:     Plan,
-		startedAt: time.Now(),
-	}
-	return p
-}
-
-func (f *PrunerFactory) BuildReceiverPruner(ctx context.Context, target Target, sender Sender) *Pruner {
-	p := &Pruner{
-		args: args{
-			context.WithValue(ctx, contextKeyPruneSide, "receiver"),
-			target,
-			sender,
-			f.receiverRules,
-			f.retryWait,
-			false, // senseless here anyways
-			f.promPruneSecs.WithLabelValues("receiver"),
-		},
-		state:     Plan,
-		startedAt: time.Now(),
-	}
-	return p
-}
-
-func (f *LocalPrunerFactory) BuildLocalPruner(ctx context.Context, target Target, history Sender) *Pruner {
-	p := &Pruner{
-		args: args{
-			context.WithValue(ctx, contextKeyPruneSide, "local"),
-			target,
-			history,
-			f.keepRules,
-			f.retryWait,
-			false, // considerSnapAtCursorReplicated is not relevant for local pruning
-			f.promPruneSecs.WithLabelValues("local"),
-		},
-		state:     Plan,
-		startedAt: time.Now(),
-	}
-	return p
-}
-
-//go:generate enumer -type=State
-type State int
-
-const (
-	Plan State = 1 << iota
-	PlanErr
-	Exec
-	ExecErr
-	Done
-)
-
-// Returns true in case the State is a terminal state(PlanErr, ExecErr, Done)
-func (s State) IsTerminal() bool {
-	switch s {
-	case PlanErr, ExecErr, Done:
-		return true
-	default:
-		return false
-	}
-}
-
 type updater func(func(*Pruner))
 
 func (p *Pruner) Prune() {
@@ -232,63 +98,13 @@ func (p *Pruner) prune(args args) {
 		f(p)
 	}
 	// TODO support automatic retries
+	//
 	// It is advisable to merge this code with package replication/driver before
-	// That will likely require re-modelling struct fs like replication/driver.attempt,
-	// including figuring out how to resume a plan after being interrupted by network errors
-	// The non-retrying code in this package should move straight to replication/logic.
+	// That will likely require re-modelling struct fs like
+	// replication/driver.attempt, including figuring out how to resume a plan
+	// after being interrupted by network errors The non-retrying code in this
+	// package should move straight to replication/logic.
 	doOneAttempt(&args, u)
-}
-
-type Report struct {
-	State              string
-	StartedAt          time.Time
-	Error              string
-	Pending, Completed []FSReport
-}
-
-type FSReport struct {
-	Filesystem                string
-	SnapshotList, DestroyList []SnapshotReport
-	SkipReason                FSSkipReason
-	LastError                 string
-}
-
-type SnapshotReport struct {
-	Name       string
-	Replicated bool
-	Date       time.Time
-}
-
-func (self *Report) StateString() (State, error) {
-	return StateString(self.State)
-}
-
-func (self *Report) IsTerminal() bool {
-	switch self.State {
-	case "Plan", "Exec":
-		return false
-	}
-	return true
-}
-
-func (self *Report) Running() (d time.Duration, ok bool) {
-	if !self.StartedAt.IsZero() {
-		d = time.Since(self.StartedAt)
-	}
-	return d, !self.IsTerminal()
-}
-
-func (self *Report) Progress() (expected, completed uint64) {
-	for i := range self.Pending {
-		fs := &self.Pending[i]
-		expected += uint64(len(fs.DestroyList))
-	}
-	for i := range self.Completed {
-		fs := &self.Completed[i]
-		expected += uint64(len(fs.DestroyList))
-		completed += uint64(len(fs.DestroyList))
-	}
-	return
 }
 
 func (p *Pruner) Report() *Report {
@@ -314,98 +130,10 @@ func (p *Pruner) State() State {
 	return p.state
 }
 
-type fs struct {
-	path string
-
-	// permanent error during planning
-	planErr        error
-	planErrContext string
-
-	// if != "", the fs was skipped for planning and the field
-	// contains the reason
-	skipReason FSSkipReason
-
-	// snapshots presented by target
-	// (type snapshot)
-	snaps []pruning.Snapshot
-	// destroy list returned by pruning.PruneSnapshots(snaps)
-	// (type snapshot)
-	destroyList []pruning.Snapshot
-
-	mtx sync.RWMutex
-
-	// only during Exec state, also used by execQueue
-	execErrLast error
-}
-
-type FSSkipReason string
-
-const (
-	NotSkipped                   = ""
-	SkipPlaceholder              = "filesystem is placeholder"
-	SkipNoCorrespondenceOnSender = "filesystem has no correspondence on sender"
-)
-
-func (r FSSkipReason) NotSkipped() bool {
-	return r == NotSkipped
-}
-
-func (f *fs) Report() FSReport {
-	f.mtx.Lock()
-	defer f.mtx.Unlock()
-
-	r := FSReport{}
-	r.Filesystem = f.path
-	r.SkipReason = f.skipReason
-	if !r.SkipReason.NotSkipped() {
-		return r
-	}
-
-	if f.planErr != nil {
-		r.LastError = f.planErr.Error()
-	} else if f.execErrLast != nil {
-		r.LastError = f.execErrLast.Error()
-	}
-
-	r.SnapshotList = make([]SnapshotReport, len(f.snaps))
-	for i, snap := range f.snaps {
-		r.SnapshotList[i] = snap.(snapshot).Report()
-	}
-
-	r.DestroyList = make([]SnapshotReport, len(f.destroyList))
-	for i, snap := range f.destroyList {
-		r.DestroyList[i] = snap.(snapshot).Report()
-	}
-
-	return r
-}
-
-type snapshot struct {
-	replicated bool
-	date       time.Time
-	fsv        *pdu.FilesystemVersion
-}
-
-func (s snapshot) Report() SnapshotReport {
-	return SnapshotReport{
-		Name:       s.Name(),
-		Replicated: s.Replicated(),
-		Date:       s.Date(),
-	}
-}
-
-var _ pruning.Snapshot = snapshot{}
-
-func (s snapshot) Name() string { return s.fsv.Name }
-
-func (s snapshot) Replicated() bool { return s.replicated }
-
-func (s snapshot) Date() time.Time { return s.date }
-
 func doOneAttempt(a *args, u updater) {
 	ctx, target, sender := a.ctx, a.target, a.sender
 
-	sfssres, err := sender.ListFilesystems(ctx)
+	sfss, tfss, err := listFilesystems(ctx, sender, target)
 	if err != nil {
 		u(func(p *Pruner) {
 			p.state = PlanErr
@@ -413,31 +141,14 @@ func doOneAttempt(a *args, u updater) {
 		})
 		return
 	}
-	sfss := make(map[string]*pdu.Filesystem)
-	for _, sfs := range sfssres.GetFilesystems() {
-		sfss[sfs.GetPath()] = sfs
-	}
-
-	tfssres, err := target.ListFilesystems(ctx)
-	if err != nil {
-		u(func(p *Pruner) {
-			p.state = PlanErr
-			p.err = err
-		})
-		return
-	}
-	tfss := tfssres.GetFilesystems()
 
 	pfss := make([]*fs, len(tfss))
 tfss_loop:
 	for i, tfs := range tfss {
-
 		l := GetLogger(ctx).WithField("fs", tfs.Path)
 		l.Debug("plan filesystem")
 
-		pfs := &fs{
-			path: tfs.Path,
-		}
+		pfs := &fs{path: tfs.Path}
 		pfss[i] = pfs
 
 		if tfs.GetIsPlaceholder() {
@@ -446,7 +157,8 @@ tfss_loop:
 			continue
 		} else if sfs := sfss[tfs.GetPath()]; sfs == nil {
 			pfs.skipReason = SkipNoCorrespondenceOnSender
-			l.WithField("skip_reason", pfs.skipReason).WithField("sfs", sfs.GetPath()).Debug("skipping filesystem")
+			l.WithField("skip_reason", pfs.skipReason).
+				WithField("sfs", sfs.GetPath()).Debug("skipping filesystem")
 			continue
 		}
 
@@ -454,34 +166,36 @@ tfss_loop:
 			t := fmt.Sprintf("%T", err)
 			pfs.planErr = err
 			pfs.planErrContext = message
-			l.WithField("orig_err_type", t).WithError(err).Error(message + ": plan error, skipping filesystem")
+			l.WithField("orig_err_type", t).WithError(err).
+				Error(message + ": plan error, skipping filesystem")
 		}
 
-		tfsvsres, err := target.ListFilesystemVersions(ctx, &pdu.ListFilesystemVersionsReq{Filesystem: tfs.Path})
+		tfsvsres, err := target.ListFilesystemVersions(ctx,
+			&pdu.ListFilesystemVersionsReq{Filesystem: tfs.Path})
 		if err != nil {
 			pfsPlanErrAndLog(err, "cannot list filesystem versions")
 			continue tfss_loop
 		}
 		tfsvs := tfsvsres.GetVersions()
-		// no progress here since we could run in a live-lock (must have used target AND receiver before progress)
+		// no progress here since we could run in a live-lock (must have used target
+		// AND receiver before progress)
 
 		pfs.snaps = make([]pruning.Snapshot, 0, len(tfsvs))
 
-		rcReq := &pdu.ReplicationCursorReq{
-			Filesystem: tfs.Path,
-		}
-		rc, err := sender.ReplicationCursor(ctx, rcReq)
+		rc, err := sender.ReplicationCursor(ctx,
+			&pdu.ReplicationCursorReq{Filesystem: tfs.Path})
 		if err != nil {
 			pfsPlanErrAndLog(err, "cannot get replication cursor bookmark")
 			continue tfss_loop
-		}
-		if rc.GetNotexist() {
-			err := errors.New("replication cursor bookmark does not exist (one successful replication is required before pruning works)")
+		} else if rc.GetNotexist() {
+			err := errors.New(
+				"replication cursor bookmark does not exist (one successful replication is required before pruning works)")
 			pfsPlanErrAndLog(err, "")
 			continue tfss_loop
 		}
 
-		// scan from older to newer, all snapshots older than cursor are interpreted as replicated
+		// scan from older to newer, all snapshots older than cursor are interpreted
+		// as replicated
 		sort.Slice(tfsvs, func(i, j int) bool {
 			return tfsvs[i].CreateTXG < tfsvs[j].CreateTXG
 		})
@@ -495,6 +209,7 @@ tfss_loop:
 				haveCursorSnapshot = true
 			}
 		}
+
 		preCursor := haveCursorSnapshot
 		for _, tfsv := range tfsvs {
 			if tfsv.Type != pdu.FilesystemVersion_Snapshot {
@@ -506,17 +221,20 @@ tfss_loop:
 				pfsPlanErrAndLog(err, "fs version with invalid creation date")
 				continue tfss_loop
 			}
-			// note that we cannot use CreateTXG because target and receiver could be on different pools
+			// note that we cannot use CreateTXG because target and receiver could be
+			// on different pools
 			atCursor := tfsv.Guid == rc.GetGuid()
 			preCursor = preCursor && !atCursor
-			pfs.snaps = append(pfs.snaps, snapshot{
-				replicated: preCursor || (a.considerSnapAtCursorReplicated && atCursor),
-				date:       creation,
-				fsv:        tfsv,
+			pfs.snaps = append(pfs.snaps, &snapshot{
+				replicated: preCursor ||
+					(a.considerSnapAtCursorReplicated && atCursor),
+				date: creation,
+				fsv:  tfsv,
 			})
 		}
 		if preCursor {
-			pfsPlanErrAndLog(errors.New("prune target has no snapshot that corresponds to sender replication cursor bookmark"), "")
+			pfsPlanErrAndLog(errors.New(
+				"prune target has no snapshot that corresponds to sender replication cursor bookmark"), "")
 			continue tfss_loop
 		}
 
@@ -552,6 +270,7 @@ tfss_loop:
 		})
 		rep = pruner.Report()
 	}
+
 	u(func(p *Pruner) {
 		if len(rep.Pending) > 0 {
 			panic("queue should not have pending items at this point")
@@ -568,16 +287,36 @@ tfss_loop:
 	})
 }
 
+func listFilesystems(ctx context.Context, sender Sender, target Target,
+) (map[string]*pdu.Filesystem, []*pdu.Filesystem, error) {
+	sfssres, err := sender.ListFilesystems(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sfss := make(map[string]*pdu.Filesystem, len(sfssres.Filesystems))
+	for _, sfs := range sfssres.Filesystems {
+		sfss[sfs.GetPath()] = sfs
+	}
+
+	tfssres, err := target.ListFilesystems(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sfss, tfssres.Filesystems, nil
+}
+
 // attempts to exec pfs, puts it back into the queue with the result
 func doOneAttemptExec(a *args, u updater, pfs *fs) {
 	destroyList := make([]*pdu.FilesystemVersion, len(pfs.destroyList))
 	for i := range destroyList {
-		destroyList[i] = pfs.destroyList[i].(snapshot).fsv
+		destroyList[i] = pfs.destroyList[i].(*snapshot).fsv
 		GetLogger(a.ctx).
 			WithField("fs", pfs.path).
 			WithField("destroy_snap", destroyList[i].Name).
 			Debug("policy destroys snapshot")
 	}
+
 	req := pdu.DestroySnapshotsReq{
 		Filesystem: pfs.path,
 		Snapshots:  destroyList,
@@ -590,11 +329,13 @@ func doOneAttemptExec(a *args, u updater, pfs *fs) {
 		})
 		return
 	}
+
 	// check if all snapshots were destroyed
 	destroyResults := make(map[string]*pdu.DestroySnapshotRes)
 	for _, fsres := range res.Results {
 		destroyResults[fsres.Snapshot.Name] = fsres
 	}
+
 	err = nil
 	destroyFails := make([]*pdu.DestroySnapshotRes, 0)
 	for _, reqDestroy := range destroyList {
@@ -606,6 +347,7 @@ func doOneAttemptExec(a *args, u updater, pfs *fs) {
 			destroyFails = append(destroyFails, res)
 		}
 	}
+
 	if err == nil && len(destroyFails) > 0 {
 		names := make([]string, len(destroyFails))
 		pairs := make([]string, len(destroyFails))
@@ -624,11 +366,10 @@ func doOneAttemptExec(a *args, u updater, pfs *fs) {
 			err = fmt.Errorf("destroys failed: %s", strings.Join(pairs, ", "))
 		}
 	}
-	u(func(pruner *Pruner) {
-		pruner.execQueue.Put(pfs, err, err == nil)
-	})
+
+	u(func(pruner *Pruner) { pruner.execQueue.Put(pfs, err, err == nil) })
 	if err != nil {
-		GetLogger(a.ctx).WithError(err).Error("target could not destroy snapshots")
-		return
+		GetLogger(a.ctx).WithError(err).
+			Error("target could not destroy snapshots")
 	}
 }
