@@ -686,11 +686,6 @@ const receiveResumeToken = "receive_resume_token"
 func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	error,
 ) {
-	// first make sure that root_fs is imported
-	if err := s.checkRootExists(ctx); err != nil {
-		return nil, err
-	}
-
 	root := s.clientRootFromCtx(ctx)
 	rootStr := root.ToString()
 	fsProps, err := zfs.ZFSGetRecursive(ctx, rootStr, -1,
@@ -698,6 +693,13 @@ func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 		[]string{zfs.PlaceholderPropertyName, receiveResumeToken},
 		zfs.SourceAny)
 	if err != nil {
+		var errNotExist *zfs.DatasetDoesNotExist
+		if errors.As(err, &errNotExist) {
+			msg := "root_fs does not exist"
+			err = fmt.Errorf("%s: %w", msg, err)
+			getLogger(ctx).WithError(err).WithField("root_fs", rootStr).Error(msg)
+			return nil, err
+		}
 		return nil, fmt.Errorf(
 			"failed get properties of fs %q: %w", rootStr, err)
 	}
@@ -716,21 +718,6 @@ func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 		return &pdu.ListFilesystemRes{}, nil
 	}
 	return &pdu.ListFilesystemRes{Filesystems: fss}, nil
-}
-
-func (s *Receiver) checkRootExists(ctx context.Context) error {
-	rphs, err := zfs.ZFSGetFilesystemPlaceholderState(ctx,
-		s.conf.RootWithoutClientComponent)
-	if err != nil {
-		return fmt.Errorf(
-			"cannot determine whether root_fs exists: %w", err)
-	} else if !rphs.FSExists {
-		getLogger(ctx).
-			WithField("root_fs", s.conf.RootWithoutClientComponent).
-			Error("root_fs does not exist")
-		return errors.New("root_fs does not exist")
-	}
-	return nil
 }
 
 func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,

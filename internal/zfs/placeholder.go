@@ -86,10 +86,11 @@ func ZFSGetFilesystemPlaceholderState(ctx context.Context, p *DatasetPath,
 ) (*FilesystemPlaceholderState, error) {
 	props, err := zfsGet(ctx, p.ToString(),
 		[]string{PlaceholderPropertyName}, SourceLocal)
-	var errNotExist *DatasetDoesNotExist
-	if errors.As(err, &errNotExist) {
-		return &FilesystemPlaceholderState{FS: p.ToString()}, nil
-	} else if err != nil {
+	if err != nil {
+		var errNotExist *DatasetDoesNotExist
+		if errors.As(err, &errNotExist) {
+			return &FilesystemPlaceholderState{FS: p.ToString()}, nil
+		}
 		return nil, err
 	}
 	return NewPlaceholderState(p, props), nil
