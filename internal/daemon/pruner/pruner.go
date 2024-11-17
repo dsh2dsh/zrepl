@@ -1,10 +1,11 @@
 package pruner
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -143,7 +144,9 @@ func doOneAttempt(a *args, u updater) {
 	}
 
 	pfss := make([]*fs, len(tfss))
-tfss_loop:
+	needsReplicated := containsNotReplicated(a.rules)
+
+tfssLoop:
 	for i, tfs := range tfss {
 		l := GetLogger(ctx).WithField("fs", tfs.Path)
 		l.Debug("plan filesystem")
@@ -174,68 +177,63 @@ tfss_loop:
 			&pdu.ListFilesystemVersionsReq{Filesystem: tfs.Path})
 		if err != nil {
 			pfsPlanErrAndLog(err, "cannot list filesystem versions")
-			continue tfss_loop
+			continue
 		}
 		tfsvs := tfsvsres.GetVersions()
 		// no progress here since we could run in a live-lock (must have used target
 		// AND receiver before progress)
 
-		pfs.snaps = make([]pruning.Snapshot, 0, len(tfsvs))
-
-		rc, err := sender.ReplicationCursor(ctx,
-			&pdu.ReplicationCursorReq{Filesystem: tfs.Path})
-		if err != nil {
-			pfsPlanErrAndLog(err, "cannot get replication cursor bookmark")
-			continue tfss_loop
-		} else if rc.GetNotexist() {
-			err := errors.New(
-				"replication cursor bookmark does not exist (one successful replication is required before pruning works)")
-			pfsPlanErrAndLog(err, "")
-			continue tfss_loop
-		}
-
 		// scan from older to newer, all snapshots older than cursor are interpreted
 		// as replicated
-		sort.Slice(tfsvs, func(i, j int) bool {
-			return tfsvs[i].CreateTXG < tfsvs[j].CreateTXG
+		slices.SortFunc(tfsvs, func(a, b *pdu.FilesystemVersion) int {
+			return cmp.Compare(a.CreateTXG, b.CreateTXG)
 		})
+		pfs.snaps = make([]pruning.Snapshot, 0, len(tfsvs))
 
-		haveCursorSnapshot := false
-		for _, tfsv := range tfsvs {
-			if tfsv.Type != pdu.FilesystemVersion_Snapshot {
+		var cursorGuid uint64
+		var beforeCursor bool
+		if needsReplicated {
+			req := pdu.ReplicationCursorReq{Filesystem: tfs.Path}
+			resp, err := sender.ReplicationCursor(ctx, &req)
+			if err != nil {
+				pfsPlanErrAndLog(err, "cannot get replication cursor bookmark")
+				continue
+			} else if resp.GetNotexist() {
+				err := errors.New(
+					"replication cursor bookmark does not exist (one successful replication is required before pruning works)")
+				pfsPlanErrAndLog(err, "")
 				continue
 			}
-			if tfsv.Guid == rc.GetGuid() {
-				haveCursorSnapshot = true
-			}
+			cursorGuid = resp.GetGuid()
+			beforeCursor = containsGuid(tfsvs, cursorGuid)
 		}
 
-		preCursor := haveCursorSnapshot
 		for _, tfsv := range tfsvs {
 			if tfsv.Type != pdu.FilesystemVersion_Snapshot {
 				continue
 			}
 			creation, err := tfsv.CreationAsTime()
 			if err != nil {
-				err := fmt.Errorf("%s: %s", tfsv.RelName(), err)
+				err := fmt.Errorf("%s: %w", tfsv.RelName(), err)
 				pfsPlanErrAndLog(err, "fs version with invalid creation date")
-				continue tfss_loop
+				continue tfssLoop
 			}
+			s := &snapshot{date: creation, fsv: tfsv}
 			// note that we cannot use CreateTXG because target and receiver could be
 			// on different pools
-			atCursor := tfsv.Guid == rc.GetGuid()
-			preCursor = preCursor && !atCursor
-			pfs.snaps = append(pfs.snaps, &snapshot{
-				replicated: preCursor ||
-					(a.considerSnapAtCursorReplicated && atCursor),
-				date: creation,
-				fsv:  tfsv,
-			})
+			if needsReplicated {
+				atCursor := tfsv.Guid == cursorGuid
+				beforeCursor = beforeCursor && !atCursor
+				s.replicated = beforeCursor ||
+					(a.considerSnapAtCursorReplicated && atCursor)
+			}
+			pfs.snaps = append(pfs.snaps, s)
 		}
-		if preCursor {
-			pfsPlanErrAndLog(errors.New(
-				"prune target has no snapshot that corresponds to sender replication cursor bookmark"), "")
-			continue tfss_loop
+
+		if needsReplicated && beforeCursor {
+			err := errors.New("prune target has no snapshot that corresponds to sender replication cursor bookmark")
+			pfsPlanErrAndLog(err, "")
+			continue
 		}
 
 		// Apply prune rules
@@ -304,6 +302,22 @@ func listFilesystems(ctx context.Context, sender Sender, target Target,
 		return nil, nil, err
 	}
 	return sfss, tfssres.Filesystems, nil
+}
+
+func containsNotReplicated(rules []pruning.KeepRule) bool {
+	i := slices.IndexFunc(rules, func(r pruning.KeepRule) bool {
+		_, ok := r.(*pruning.KeepNotReplicated)
+		return ok
+	})
+	return i >= 0
+}
+
+func containsGuid(snapshots []*pdu.FilesystemVersion, guid uint64) bool {
+	i := slices.IndexFunc(snapshots,
+		func(s *pdu.FilesystemVersion) bool {
+			return s.Type == pdu.FilesystemVersion_Snapshot && s.Guid == guid
+		})
+	return i >= 0
 }
 
 // attempts to exec pfs, puts it back into the queue with the result
