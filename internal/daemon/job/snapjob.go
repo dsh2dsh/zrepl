@@ -262,7 +262,8 @@ func (j *SnapJob) doPrune(ctx context.Context) {
 	j.prunerMtx.Unlock()
 
 	log := GetLogger(ctx)
-	log.Info("start pruning")
+	log.WithField("concurrency", j.prunerFactory.Concurrency()).
+		Info("start pruning")
 	j.pruner.Prune()
 	log.Info("finished pruning")
 }

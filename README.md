@@ -542,6 +542,18 @@ pkg install zrepl-dsh2dsh
     The `post` hook sets `ZREPL_JOB_ERR` to the last error. It's empty if the
     job finished without errors.
 
+  * The pruning now prunes filesystems concurrently.
+
+    By default it uses the number of CPUs as concurrency limit and it can be
+    changed in config:
+
+    ```yaml
+    jobs:
+      - name: "zroot-to-zdisk"
+        pruning:
+          concurrency: 1
+    ```
+
 ## Upstream user documentation
 
 **User Documentation** can be found at

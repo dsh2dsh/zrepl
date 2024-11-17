@@ -344,12 +344,14 @@ type SnapshottingManual struct {
 }
 
 type PruningSenderReceiver struct {
+	Concurrency  uint          `yaml:"concurrency"`
 	KeepSender   []PruningEnum `yaml:"keep_sender"`
 	KeepReceiver []PruningEnum `yaml:"keep_receiver"`
 }
 
 type PruningLocal struct {
-	Keep []PruningEnum `yaml:"keep"`
+	Concurrency uint          `yaml:"concurrency"`
+	Keep        []PruningEnum `yaml:"keep"`
 }
 
 type LoggingOutletEnumList []LoggingOutletEnum

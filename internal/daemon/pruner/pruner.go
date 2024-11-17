@@ -1,9 +1,7 @@
 package pruner
 
 import (
-	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
@@ -56,6 +55,7 @@ func GetLogger(ctx context.Context) logger.Logger {
 }
 
 type args struct {
+	concurrency                    int
 	ctx                            context.Context
 	target                         Target
 	sender                         Sender
@@ -145,9 +145,13 @@ func doOneAttempt(a *args, u updater) {
 
 	pfss := make([]*fs, len(tfss))
 	needsReplicated := containsNotReplicated(a.rules)
+	g := new(errgroup.Group)
+	g.SetLimit(a.concurrency)
 
-tfssLoop:
 	for i, tfs := range tfss {
+		if ctx.Err() != nil {
+			break
+		}
 		l := GetLogger(ctx).WithField("fs", tfs.Path)
 		l.Debug("plan filesystem")
 
@@ -165,79 +169,24 @@ tfssLoop:
 			continue
 		}
 
-		pfsPlanErrAndLog := func(err error, message string) {
-			t := fmt.Sprintf("%T", err)
-			pfs.planErr = err
-			pfs.planErrContext = message
-			l.WithField("orig_err_type", t).WithError(err).
-				Error(message + ": plan error, skipping filesystem")
-		}
-
-		tfsvsres, err := target.ListFilesystemVersions(ctx,
-			&pdu.ListFilesystemVersionsReq{Filesystem: tfs.Path})
-		if err != nil {
-			pfsPlanErrAndLog(err, "cannot list filesystem versions")
-			continue
-		}
-		tfsvs := tfsvsres.GetVersions()
-		// no progress here since we could run in a live-lock (must have used target
-		// AND receiver before progress)
-
-		// scan from older to newer, all snapshots older than cursor are interpreted
-		// as replicated
-		slices.SortFunc(tfsvs, func(a, b *pdu.FilesystemVersion) int {
-			return cmp.Compare(a.CreateTXG, b.CreateTXG)
+		g.Go(func() error {
+			pfs.Build(a, tfs, target, sender, needsReplicated)
+			return nil
 		})
-		pfs.snaps = make([]pruning.Snapshot, 0, len(tfsvs))
+	}
 
-		var cursorGuid uint64
-		var beforeCursor bool
-		if needsReplicated {
-			req := pdu.ReplicationCursorReq{Filesystem: tfs.Path}
-			resp, err := sender.ReplicationCursor(ctx, &req)
-			if err != nil {
-				pfsPlanErrAndLog(err, "cannot get replication cursor bookmark")
-				continue
-			} else if resp.GetNotexist() {
-				err := errors.New(
-					"replication cursor bookmark does not exist (one successful replication is required before pruning works)")
-				pfsPlanErrAndLog(err, "")
-				continue
-			}
-			cursorGuid = resp.GetGuid()
-			beforeCursor = containsGuid(tfsvs, cursorGuid)
-		}
-
-		for _, tfsv := range tfsvs {
-			if tfsv.Type != pdu.FilesystemVersion_Snapshot {
-				continue
-			}
-			creation, err := tfsv.CreationAsTime()
-			if err != nil {
-				err := fmt.Errorf("%s: %w", tfsv.RelName(), err)
-				pfsPlanErrAndLog(err, "fs version with invalid creation date")
-				continue tfssLoop
-			}
-			s := &snapshot{date: creation, fsv: tfsv}
-			// note that we cannot use CreateTXG because target and receiver could be
-			// on different pools
-			if needsReplicated {
-				atCursor := tfsv.Guid == cursorGuid
-				beforeCursor = beforeCursor && !atCursor
-				s.replicated = beforeCursor ||
-					(a.considerSnapAtCursorReplicated && atCursor)
-			}
-			pfs.snaps = append(pfs.snaps, s)
-		}
-
-		if needsReplicated && beforeCursor {
-			err := errors.New("prune target has no snapshot that corresponds to sender replication cursor bookmark")
-			pfsPlanErrAndLog(err, "")
-			continue
-		}
-
-		// Apply prune rules
-		pfs.destroyList = pruning.PruneSnapshots(pfs.snaps, a.rules)
+	if err := g.Wait(); err != nil {
+		u(func(p *Pruner) {
+			p.state = PlanErr
+			p.err = err
+		})
+		return
+	} else if ctx.Err() != nil {
+		u(func(p *Pruner) {
+			p.state = PlanErr
+			p.err = context.Cause(ctx)
+		})
+		return
 	}
 
 	u(func(pruner *Pruner) {
@@ -286,22 +235,33 @@ tfssLoop:
 }
 
 func listFilesystems(ctx context.Context, sender Sender, target Target,
-) (map[string]*pdu.Filesystem, []*pdu.Filesystem, error) {
-	sfssres, err := sender.ListFilesystems(ctx)
-	if err != nil {
+) (sfss map[string]*pdu.Filesystem, tfss []*pdu.Filesystem, _ error) {
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		sfssres, err := sender.ListFilesystems(ctx)
+		if err != nil {
+			return err
+		}
+		sfss = make(map[string]*pdu.Filesystem, len(sfssres.Filesystems))
+		for _, sfs := range sfssres.Filesystems {
+			sfss[sfs.GetPath()] = sfs
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		tfssres, err := target.ListFilesystems(ctx)
+		if err != nil {
+			return err
+		}
+		tfss = tfssres.Filesystems
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, nil, err
 	}
-
-	sfss := make(map[string]*pdu.Filesystem, len(sfssres.Filesystems))
-	for _, sfs := range sfssres.Filesystems {
-		sfss[sfs.GetPath()] = sfs
-	}
-
-	tfssres, err := target.ListFilesystems(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	return sfss, tfssres.Filesystems, nil
+	return sfss, tfss, nil
 }
 
 func containsNotReplicated(rules []pruning.KeepRule) bool {

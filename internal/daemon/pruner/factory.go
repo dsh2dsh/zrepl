@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,6 +15,7 @@ import (
 )
 
 type PrunerFactory struct {
+	concurrency                    int
 	senderRules                    []pruning.KeepRule
 	receiverRules                  []pruning.KeepRule
 	retryWait                      time.Duration
@@ -22,6 +24,7 @@ type PrunerFactory struct {
 }
 
 type LocalPrunerFactory struct {
+	concurrency   int
 	keepRules     []pruning.KeepRule
 	retryWait     time.Duration
 	promPruneSecs *prometheus.HistogramVec
@@ -34,6 +37,7 @@ func NewLocalPrunerFactory(in config.PruningLocal,
 	if err != nil {
 		return nil, fmt.Errorf("cannot build pruning rules: %w", err)
 	}
+
 	for _, r := range in.Keep {
 		if _, ok := r.Ret.(*config.PruneKeepNotReplicated); ok {
 			// rule NotReplicated  for a local pruner doesn't make sense
@@ -42,7 +46,14 @@ func NewLocalPrunerFactory(in config.PruningLocal,
 				"single-site pruner cannot support `not_replicated` keep rule")
 		}
 	}
+
+	concurrency := int(in.Concurrency)
+	if concurrency == 0 {
+		concurrency = runtime.GOMAXPROCS(0)
+	}
+
 	f := &LocalPrunerFactory{
+		concurrency:   concurrency,
 		keepRules:     rules,
 		promPruneSecs: promPruneSecs,
 
@@ -65,16 +76,21 @@ func NewPrunerFactory(in config.PruningSenderReceiver,
 		return nil, fmt.Errorf("cannot build sender pruning rules: %w", err)
 	}
 
-	considerSnapAtCursorReplicated := false
+	var considerSnapAtCursorReplicated bool
 	for _, r := range in.KeepSender {
-		knr, ok := r.Ret.(*config.PruneKeepNotReplicated)
-		if !ok {
-			continue
+		if knr, ok := r.Ret.(*config.PruneKeepNotReplicated); ok {
+			considerSnapAtCursorReplicated = considerSnapAtCursorReplicated ||
+				!knr.KeepSnapshotAtCursor
 		}
-		considerSnapAtCursorReplicated = considerSnapAtCursorReplicated ||
-			!knr.KeepSnapshotAtCursor
 	}
+
+	concurrency := int(in.Concurrency)
+	if concurrency == 0 {
+		concurrency = runtime.GOMAXPROCS(0)
+	}
+
 	f := &PrunerFactory{
+		concurrency:   concurrency,
 		senderRules:   keepRulesSender,
 		receiverRules: keepRulesReceiver,
 		promPruneSecs: promPruneSecs,
@@ -92,13 +108,16 @@ func (f *PrunerFactory) BuildSenderPruner(ctx context.Context, target Target,
 ) *Pruner {
 	return &Pruner{
 		args: args{
-			context.WithValue(ctx, contextKeyPruneSide, "sender"),
-			target,
-			sender,
-			f.senderRules,
-			f.retryWait,
-			f.considerSnapAtCursorReplicated,
-			f.promPruneSecs.WithLabelValues("sender"),
+			concurrency: f.concurrency,
+			ctx:         context.WithValue(ctx, contextKeyPruneSide, "sender"),
+			target:      target,
+			sender:      sender,
+			rules:       f.senderRules,
+			retryWait:   f.retryWait,
+
+			considerSnapAtCursorReplicated: f.considerSnapAtCursorReplicated,
+
+			promPruneSecs: f.promPruneSecs.WithLabelValues("sender"),
 		},
 		state:     Plan,
 		startedAt: time.Now(),
@@ -110,34 +129,44 @@ func (f *PrunerFactory) BuildReceiverPruner(ctx context.Context, target Target,
 ) *Pruner {
 	return &Pruner{
 		args: args{
-			context.WithValue(ctx, contextKeyPruneSide, "receiver"),
-			target,
-			sender,
-			f.receiverRules,
-			f.retryWait,
-			false, // senseless here anyways
-			f.promPruneSecs.WithLabelValues("receiver"),
+			concurrency: f.concurrency,
+			ctx:         context.WithValue(ctx, contextKeyPruneSide, "receiver"),
+			target:      target,
+			sender:      sender,
+			rules:       f.receiverRules,
+			retryWait:   f.retryWait,
+
+			considerSnapAtCursorReplicated: false, // senseless here anyways
+
+			promPruneSecs: f.promPruneSecs.WithLabelValues("receiver"),
 		},
 		state:     Plan,
 		startedAt: time.Now(),
 	}
 }
 
+func (f *PrunerFactory) Concurrency() int { return f.concurrency }
+
 func (f *LocalPrunerFactory) BuildLocalPruner(ctx context.Context,
 	target Target, history Sender,
 ) *Pruner {
 	return &Pruner{
 		args: args{
-			context.WithValue(ctx, contextKeyPruneSide, "local"),
-			target,
-			history,
-			f.keepRules,
-			f.retryWait,
+			concurrency: f.concurrency,
+			ctx:         context.WithValue(ctx, contextKeyPruneSide, "local"),
+			target:      target,
+			sender:      history,
+			rules:       f.keepRules,
+			retryWait:   f.retryWait,
+
 			// considerSnapAtCursorReplicated is not relevant for local pruning
-			false,
-			f.promPruneSecs.WithLabelValues("local"),
+			considerSnapAtCursorReplicated: false,
+
+			promPruneSecs: f.promPruneSecs.WithLabelValues("local"),
 		},
 		state:     Plan,
 		startedAt: time.Now(),
 	}
 }
+
+func (f *LocalPrunerFactory) Concurrency() int { return f.concurrency }
