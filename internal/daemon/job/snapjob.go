@@ -1,10 +1,11 @@
 package job
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -244,6 +245,27 @@ func (j *SnapJob) Shutdown() {
 	j.shutdown(errors.New("shutdown received"))
 }
 
+func (j *SnapJob) doPrune(ctx context.Context) {
+	sender := endpoint.NewSender(endpoint.SenderConfig{
+		JobID: j.name,
+		FSF:   j.fsfilter,
+		// FIXME the following config fields are irrelevant for SnapJob
+		// because the endpoint is only used as pruner.Target.
+		// However, the implementation requires them to be set.
+		Encrypt: &nodefault.Bool{B: true},
+	})
+
+	j.prunerMtx.Lock()
+	j.pruner = j.prunerFactory.BuildLocalPruner(ctx, sender,
+		NewLocalSender(sender))
+	j.prunerMtx.Unlock()
+
+	log := GetLogger(ctx)
+	log.Info("start pruning")
+	j.pruner.Prune()
+	log.Info("finished pruning")
+}
+
 // Adaptor that implements pruner.History around a pruner.Target.
 // The ReplicationCursor method is Get-op only and always returns
 // the filesystem's most recent version's GUID.
@@ -256,51 +278,42 @@ func (j *SnapJob) Shutdown() {
 // But the pruner.Pruner gives up on an FS if no replication
 // cursor is present, which is why this pruner returns the
 // most recent filesystem version.
-type alwaysUpToDateReplicationCursorHistory struct {
-	// the Target passed as Target to BuildLocalPruner
-	target pruner.Target
+func NewLocalSender(target pruner.Target) *LocalSender {
+	return &LocalSender{Target: target}
 }
 
-var _ pruner.Sender = (*alwaysUpToDateReplicationCursorHistory)(nil)
+type LocalSender struct {
+	// the Target passed as Target to BuildLocalPruner
+	pruner.Target
+}
 
-func (h alwaysUpToDateReplicationCursorHistory) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error) {
-	fsvReq := &pdu.ListFilesystemVersionsReq{
-		Filesystem: req.GetFilesystem(),
-	}
-	res, err := h.target.ListFilesystemVersions(ctx, fsvReq)
+var (
+	_ pruner.Sender = (*LocalSender)(nil)
+	_ pruner.Target = (*LocalSender)(nil)
+)
+
+func (self *LocalSender) ReplicationCursor(ctx context.Context,
+	req *pdu.ReplicationCursorReq,
+) (*pdu.ReplicationCursorRes, error) {
+	fsvReq := &pdu.ListFilesystemVersionsReq{Filesystem: req.Filesystem}
+	res, err := self.ListFilesystemVersions(ctx, fsvReq)
 	if err != nil {
 		return nil, err
 	}
-	fsvs := res.GetVersions()
-	if len(fsvs) <= 0 {
-		return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Notexist: true}}, nil
+
+	fsvs := res.Versions
+	if len(fsvs) == 0 {
+		return &pdu.ReplicationCursorRes{
+			Result: &pdu.ReplicationCursorRes_Result{Notexist: true},
+		}, nil
 	}
+
 	// always return must recent version
-	sort.Slice(fsvs, func(i, j int) bool {
-		return fsvs[i].CreateTXG < fsvs[j].CreateTXG
-	})
-	mostRecent := fsvs[len(fsvs)-1]
-	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Guid: mostRecent.GetGuid()}}, nil
-}
-
-func (h alwaysUpToDateReplicationCursorHistory) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes, error) {
-	return h.target.ListFilesystems(ctx)
-}
-
-func (j *SnapJob) doPrune(ctx context.Context) {
-	log := GetLogger(ctx)
-	sender := endpoint.NewSender(endpoint.SenderConfig{
-		JobID: j.name,
-		FSF:   j.fsfilter,
-		// FIXME the following config fields are irrelevant for SnapJob
-		// because the endpoint is only used as pruner.Target.
-		// However, the implementation requires them to be set.
-		Encrypt: &nodefault.Bool{B: true},
-	})
-	j.prunerMtx.Lock()
-	j.pruner = j.prunerFactory.BuildLocalPruner(ctx, sender, alwaysUpToDateReplicationCursorHistory{sender})
-	j.prunerMtx.Unlock()
-	log.Info("start pruning")
-	j.pruner.Prune()
-	log.Info("finished pruning")
+	mostRecent := slices.MaxFunc(fsvs,
+		func(a, b *pdu.FilesystemVersion) int {
+			return cmp.Compare(a.CreateTXG, b.CreateTXG)
+		})
+	return &pdu.ReplicationCursorRes{
+		Result: &pdu.ReplicationCursorRes_Result{Guid: mostRecent.GetGuid()},
+	}, nil
 }
