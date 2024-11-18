@@ -718,11 +718,12 @@ func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 		}
 	}
 
-	if fromV == "" { // Initial
+	switch {
+	case fromV == "": // Initial
 		flags = append(flags, toV)
-	} else if a.From.RelName[0] == '@' { // snapshot
+	case a.From.RelName[0] == '@': // snapshot
 		flags = append(flags, "-I", fromV, toV)
-	} else {
+	default:
 		flags = append(flags, "-i", fromV, toV)
 	}
 	return flags, nil
@@ -787,17 +788,21 @@ func (a ZFSSendArgsUnvalidated) validateEncryptionFlagsCorrespondToResumeToken(c
 	}
 
 	// If From is set, it must match.
-	if (a.From != nil) != t.HasFromGUID { // existence must be same
+	switch {
+	case (a.From != nil) != t.HasFromGUID: // existence must be same
 		if t.HasFromGUID {
-			return gen.fmt("resume token not expected to be incremental, but `fromguid` = %v", t.FromGUID)
+			return gen.fmt("resume token not expected to be incremental, but `fromguid` = %v",
+				t.FromGUID)
 		} else {
 			return gen.fmt("resume token expected to be incremental, but `fromguid` not present")
 		}
-	} else if t.HasFromGUID { // if exists (which is same, we checked above), they must match
+	case t.HasFromGUID:
+		// if exists (which is same, we checked above), they must match
 		if t.FromGUID != a.From.GUID {
-			return gen.fmt("resume token `fromguid` != expected: %v != %v", t.FromGUID, a.From.GUID)
+			return gen.fmt("resume token `fromguid` != expected: %v != %v",
+				t.FromGUID, a.From.GUID)
 		}
-	} else {
+	default:
 		_ = struct{}{} // both empty, ok
 	}
 

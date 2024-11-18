@@ -860,7 +860,8 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 	for k := range by {
 		l := by[k]
 
-		if k.Type == AbstractionStepHold {
+		switch {
+		case k.Type == AbstractionStepHold:
 			// all step holds older than the most recent cursor are stale, others are always live
 
 			// if we don't have a replication cursor yet, use untilBound = nil
@@ -868,25 +869,26 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 			var untilBound *CreateTXGRangeBound
 			{
 				sfnsc := stepFirstNotStaleCandidates[k.fsAndJobId]
-
-				// If there's a replication cursor, use it as a cutoff between live and stale
-				// for both cursors and holds.
-				// If there's no cursor, we are in initial replication and only need to keep
-				// the most recent step hold live, which hold the .To of the initial send step.
-				if sfnsc.cursor != nil {
+				// If there's a replication cursor, use it as a cutoff between live and
+				// stale for both cursors and holds. If there's no cursor, we are in
+				// initial replication and only need to keep the most recent step hold
+				// live, which hold the .To of the initial send step.
+				switch {
+				case sfnsc.cursor != nil:
 					untilBound = &CreateTXGRangeBound{
 						CreateTXG: (*sfnsc.cursor).GetCreateTXG(),
 						// if we have a cursor, can throw away step hold on both From and To
 						Inclusive: &nodefault.Bool{B: true},
 					}
-				} else if sfnsc.step != nil {
+				case sfnsc.step != nil:
 					untilBound = &CreateTXGRangeBound{
 						CreateTXG: (*sfnsc.step).GetCreateTXG(),
 						// if we don't have a cursor, the step most recent step hold is our
-						// initial replication cursor and it's possibly still live (interrupted initial replication)
+						// initial replication cursor and it's possibly still live
+						// (interrupted initial replication)
 						Inclusive: &nodefault.Bool{B: false},
 					}
-				} else {
+				default:
 					untilBound = nil // consider everything stale
 				}
 			}
@@ -903,11 +905,14 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 					ret.Live = append(ret.Live, a)
 				}
 			}
-
-		} else if k.Type == AbstractionReplicationCursorBookmarkV2 || k.Type == AbstractionLastReceivedHold {
-			// all cursors but the most recent cursor are stale by definition (we always _move_ them)
-			// NOTE: must not use firstNotStale in this branch, not computed for these types
-
+		case k.Type == AbstractionReplicationCursorBookmarkV2 ||
+			k.Type == AbstractionLastReceivedHold:
+			// all cursors but the most recent cursor are stale by definition (we
+			// always _move_ them)
+			//
+			// NOTE: must not use firstNotStale in this branch, not computed for these
+			// types
+			//
 			// sort descending (highest createtxg first), then cut off
 			sort.Slice(l, func(i, j int) bool {
 				return l[i].GetCreateTXG() > l[j].GetCreateTXG()
@@ -916,7 +921,7 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 				ret.Live = append(ret.Live, l[0])
 				ret.Stale = append(ret.Stale, l[1:]...)
 			}
-		} else {
+		default:
 			ret.Live = append(ret.Live, l...)
 		}
 	}

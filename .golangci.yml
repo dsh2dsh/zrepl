@@ -4,7 +4,7 @@ linters:
     - "bidichk"
     - "copyloopvar"
     # - "errorlint"
-    # - "gocritic"
+    - "gocritic"
     - "gofumpt"
     - "goimports"
     - "makezero"

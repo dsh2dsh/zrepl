@@ -11,7 +11,7 @@ func NewDatasetPathForest() *DatasetPathForest {
 }
 
 func (f *DatasetPathForest) Add(p *DatasetPath) {
-	if len(p.comps) <= 0 {
+	if len(p.comps) == 0 {
 		panic("dataset path too short. must have length > 0")
 	}
 

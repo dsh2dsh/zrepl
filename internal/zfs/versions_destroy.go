@@ -52,14 +52,15 @@ type destroyer interface {
 func doDestroy(ctx context.Context, reqs []*DestroySnapOp, e destroyer) {
 	var validated []*DestroySnapOp
 	for _, req := range reqs {
-		// Filesystem and Snapshot should not be empty
-		// ZFS will generally fail because those are invalid destroy arguments,
-		// but we'd rather apply defensive programming here (doing destroy after all)
-		if req.Filesystem == "" {
+		// Filesystem and Snapshot should not be empty. ZFS will generally fail
+		// because those are invalid destroy arguments, but we'd rather apply
+		// defensive programming here (doing destroy after all).
+		switch {
+		case req.Filesystem == "":
 			*req.ErrOut = errors.New("Filesystem must not be an empty string")
-		} else if req.Name == "" {
+		case req.Name == "":
 			*req.ErrOut = errors.New("Name must not be an empty string")
-		} else {
+		default:
 			validated = append(validated, req)
 		}
 	}

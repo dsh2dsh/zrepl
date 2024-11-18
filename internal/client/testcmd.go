@@ -99,13 +99,14 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 		var res string
 		var errStr string
 		pass, err := f.Filter(in)
-		if err != nil {
+		switch {
+		case err != nil:
 			res = "ERROR"
 			errStr = err.Error()
 			hadFilterErr = true
-		} else if pass {
+		case pass:
 			res = "ACCEPT"
-		} else {
+		default:
 			res = "REJECT"
 		}
 		fmt.Printf("%s\t%s\t%s\n", res, in.ToString(), errStr)

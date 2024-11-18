@@ -208,11 +208,12 @@ func (self *JobRender) renderFilesystemsBar(totalItems, visibleItems int) {
 	sb.WriteString(fmt.Sprintf("%s “%s” ",
 		eyes, strings.TrimSpace(self.filterValue)))
 	s := &self.Styles
-	if visibleItems == 0 {
+	switch {
+	case visibleItems == 0:
 		sb.WriteString(s.StatusEmpty.Render("Nothing matched"))
-	} else if visibleItems == 1 {
+	case visibleItems == 1:
 		sb.WriteString(fmt.Sprintf("%d filesystem", visibleItems))
-	} else {
+	default:
 		sb.WriteString(fmt.Sprintf("%d filesystems", visibleItems))
 	}
 

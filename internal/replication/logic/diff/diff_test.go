@@ -28,7 +28,8 @@ func fsvlist(fsv ...string) (r []*FilesystemVersion) {
 		creation := func(id int) string {
 			return FilesystemVersionCreation(time.Unix(0, 0).Add(time.Duration(id) * time.Second))
 		}
-		if strings.HasPrefix(f, "#") {
+		switch {
+		case strings.HasPrefix(f, "#"):
 			r[i] = &FilesystemVersion{
 				Name:      strings.TrimPrefix(f, "#"),
 				Type:      FilesystemVersion_Bookmark,
@@ -36,7 +37,7 @@ func fsvlist(fsv ...string) (r []*FilesystemVersion) {
 				CreateTXG: uint64(id),
 				Creation:  creation(id),
 			}
-		} else if strings.HasPrefix(f, "@") {
+		case strings.HasPrefix(f, "@"):
 			r[i] = &FilesystemVersion{
 				Name:      strings.TrimPrefix(f, "@"),
 				Type:      FilesystemVersion_Snapshot,
@@ -44,7 +45,7 @@ func fsvlist(fsv ...string) (r []*FilesystemVersion) {
 				CreateTXG: uint64(id),
 				Creation:  creation(id),
 			}
-		} else {
+		default:
 			panic("invalid character")
 		}
 	}

@@ -308,7 +308,8 @@ jobs:
 			require.NoError(t, err)
 
 			jobs, _, err := JobsFromConfig(c)
-			if ts.expectOk != nil {
+			switch {
+			case ts.expectOk != nil:
 				require.NoError(t, err)
 				require.NotNil(t, c)
 				require.NoError(t, err)
@@ -316,9 +317,9 @@ jobs:
 				a := jobs[0].(*ActiveSide)
 				m := a.mode.(*modePush)
 				ts.expectOk(t, a, m)
-			} else if ts.expectError {
+			case ts.expectError:
 				require.Error(t, err)
-			} else {
+			default:
 				t.Fatalf("test must define expectOk or expectError")
 			}
 		})

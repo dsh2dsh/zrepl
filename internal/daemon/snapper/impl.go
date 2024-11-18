@@ -122,7 +122,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 			}
 			// account for running hooks
 			for _, h := range filteredHooks {
-				hookMatchCount[h] = hookMatchCount[h] + 1
+				hookMatchCount[h]++
 			}
 
 			var planErr error

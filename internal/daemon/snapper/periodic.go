@@ -353,17 +353,18 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 		ctx := logging.WithField(ctx, "fs", d.ToString())
 		syncPoint, err := findSyncPointFSNextOptimalSnapshotTime(
 			ctx, now, interval, prefix, d)
-		if err == findSyncPointFSNoFilesystemVersionsErr {
+		switch {
+		case err == findSyncPointFSNoFilesystemVersionsErr:
 			snaptimes = append(snaptimes, snapTime{
 				ds:   d,
 				prio: prioNoVersions,
 				time: now,
 			})
-		} else if err != nil {
+		case err != nil:
 			hardErrs++
 			getLogger(ctx).WithError(err).Error(
 				"cannot determine optimal sync point for this filesystem")
-		} else {
+		default:
 			getLogger(ctx).WithField("syncPoint", syncPoint).Debug(
 				"found optimal sync point for this filesystem")
 			snaptimes = append(snaptimes, snapTime{
@@ -418,7 +419,7 @@ func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time,
 		})
 	if err != nil {
 		return time.Time{}, fmt.Errorf("list filesystem versions: %w", err)
-	} else if len(fsvs) <= 0 {
+	} else if len(fsvs) == 0 {
 		return time.Time{}, findSyncPointFSNoFilesystemVersionsErr
 	}
 

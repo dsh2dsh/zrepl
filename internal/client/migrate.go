@@ -96,11 +96,12 @@ func doMigratePlaceholder0_1(ctx context.Context, sc *cli.Subcommand, args []str
 		for _, fs := range wi.fss {
 			fmt.Printf("\t%q ... ", fs.ToString())
 			r, err := zfs.ZFSMigrateHashBasedPlaceholderToCurrent(ctx, fs, migratePlaceholder0_1Args.dryRun)
-			if err != nil {
+			switch {
+			case err != nil:
 				fmt.Printf("error: %s\n", err)
-			} else if !r.NeedsModification {
+			case !r.NeedsModification:
 				fmt.Printf("unchanged (placeholder=%v)\n", r.OriginalState.IsPlaceholder)
-			} else {
+			default:
 				fmt.Printf("migrate (placeholder=%v) (old value = %q)\n",
 					r.OriginalState.IsPlaceholder, r.OriginalState.RawLocalPropertyValue)
 			}
@@ -164,12 +165,13 @@ func doMigrateReplicationCursor(ctx context.Context, sc *cli.Subcommand, args []
 		bold.Printf("INSPECT FILESYSTEM %q\n", fs.ToString())
 
 		err := doMigrateReplicationCursorFS(ctx, v1cursorJobs, fs)
-		if err == migrateReplicationCursorSkipSentinel {
+		switch {
+		case err == migrateReplicationCursorSkipSentinel:
 			bold.Printf("FILESYSTEM SKIPPED\n")
-		} else if err != nil {
+		case err != nil:
 			hadError = true
 			fail.Printf("MIGRATION FAILED: %s\n", err)
-		} else {
+		default:
 			succ.Printf("FILESYSTEM %q COMPLETE\n", fs.ToString())
 		}
 	}

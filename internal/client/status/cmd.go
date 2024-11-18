@@ -77,9 +77,7 @@ var rawCmd = &cli.Subcommand{
 
 	Run: func(ctx context.Context, subcommand *cli.Subcommand, args []string,
 	) error {
-		return withStatusClient(subcommand, func(c *Client) error {
-			return raw(c)
-		})
+		return withStatusClient(subcommand, raw)
 	},
 }
 

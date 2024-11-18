@@ -89,15 +89,19 @@ func (p *Planner) WaitForConnectivity(ctx context.Context) error {
 	go doPing(p.sender, &senderErr)
 	go doPing(p.receiver, &receiverErr)
 	wg.Wait()
-	if senderErr == nil && receiverErr == nil {
+	switch {
+	case senderErr == nil && receiverErr == nil:
 		return nil
-	} else if senderErr != nil && receiverErr != nil {
+	case senderErr != nil && receiverErr != nil:
 		if senderErr.Error() == receiverErr.Error() {
-			return fmt.Errorf("sender and receiver are not reachable: %s", senderErr.Error())
+			return fmt.Errorf("sender and receiver are not reachable: %s",
+				senderErr.Error())
 		} else {
-			return fmt.Errorf("sender and receiver are not reachable:\n  sender: %s\n  receiver: %s", senderErr, receiverErr)
+			return fmt.Errorf(
+				"sender and receiver are not reachable:\n  sender: %s\n  receiver: %s",
+				senderErr, receiverErr)
 		}
-	} else {
+	default:
 		var side string
 		var err *error
 		if senderErr != nil {

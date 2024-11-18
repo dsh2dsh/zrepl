@@ -769,11 +769,12 @@ func (a *attempt) report() *report.AttemptReport {
 	}
 
 	var state report.AttemptState
-	if a.planErr == nil && a.fss == nil {
+	switch {
+	case a.planErr == nil && a.fss == nil:
 		state = report.AttemptPlanning
-	} else if a.planErr != nil && a.fss == nil {
+	case a.planErr != nil && a.fss == nil:
 		state = report.AttemptPlanningError
-	} else if a.planErr == nil && a.fss != nil {
+	case a.planErr == nil && a.fss != nil:
 		if a.finishedAt.IsZero() {
 			state = report.AttemptFanOutFSs
 		} else {
@@ -786,8 +787,10 @@ func (a *attempt) report() *report.AttemptReport {
 				state = report.AttemptFanOutError
 			}
 		}
-	} else {
-		panic(fmt.Sprintf("attempt.planErr and attempt.fss must not both be != nil:\n%#v\n%#v", a.planErr, a.fss))
+	default:
+		panic(fmt.Sprintf(
+			"attempt.planErr and attempt.fss must not both be != nil:\n%#v\n%#v",
+			a.planErr, a.fss))
 	}
 	r.State = state
 
@@ -799,11 +802,12 @@ func (f *fs) report() *report.FilesystemReport {
 	state := report.FilesystemPlanningErrored
 	if f.planning.err == nil {
 		if f.planning.done {
-			if f.planned.stepErr != nil {
+			switch {
+			case f.planned.stepErr != nil:
 				state = report.FilesystemSteppingErrored
-			} else if f.planned.step < len(f.planned.steps) {
+			case f.planned.step < len(f.planned.steps):
 				state = report.FilesystemStepping
-			} else {
+			default:
 				state = report.FilesystemDone
 			}
 		} else {
