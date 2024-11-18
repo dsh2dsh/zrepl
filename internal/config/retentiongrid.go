@@ -112,7 +112,7 @@ func ParseRetentionIntervalSpec(s string) (intervals []RetentionInterval, err er
 	for intervalIdx, e := range ges {
 		parsed, err := parseRetentionGridIntervalString(e)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse interval %d of %d: %s: %s", intervalIdx+1, len(ges), err, strings.TrimSpace(e))
+			return nil, fmt.Errorf("cannot parse interval %d of %d: %s: %s", intervalIdx+1, len(ges), err.Error(), strings.TrimSpace(e))
 		}
 		intervals = append(intervals, parsed...)
 	}

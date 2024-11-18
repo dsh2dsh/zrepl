@@ -354,7 +354,7 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 		syncPoint, err := findSyncPointFSNextOptimalSnapshotTime(
 			ctx, now, interval, prefix, d)
 		switch {
-		case err == findSyncPointFSNoFilesystemVersionsErr:
+		case errors.Is(err, findSyncPointFSNoFilesystemVersionsErr):
 			snaptimes = append(snaptimes, snapTime{
 				ds:   d,
 				prio: prioNoVersions,

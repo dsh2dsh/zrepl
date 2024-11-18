@@ -125,7 +125,7 @@ func (flag *FilesystemsFilterFlag) Set(s string) error {
 		}
 		err := f.Add(lhsrhs[0], lhsrhs[1])
 		if err != nil {
-			return fmt.Errorf("%s: %s", thisMappingErr, err)
+			return fmt.Errorf("%s: %w", thisMappingErr.Error(), err)
 		}
 	}
 	f.CompatSort()

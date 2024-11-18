@@ -99,7 +99,7 @@ func (p *Planner) WaitForConnectivity(ctx context.Context) error {
 		} else {
 			return fmt.Errorf(
 				"sender and receiver are not reachable:\n  sender: %s\n  receiver: %s",
-				senderErr, receiverErr)
+				senderErr.Error(), receiverErr.Error())
 		}
 	default:
 		var side string
@@ -111,7 +111,7 @@ func (p *Planner) WaitForConnectivity(ctx context.Context) error {
 			side = "receiver"
 			err = &receiverErr
 		}
-		return fmt.Errorf("%s is not reachable: %s", side, *err)
+		return fmt.Errorf("%s is not reachable: %w", side, *err)
 	}
 }
 
@@ -225,12 +225,14 @@ func NewPlanner(secsPerState *prometheus.HistogramVec, bytesReplicated *promethe
 }
 
 func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*pdu.FilesystemVersion, reason error) {
-	if _, ok := conflict.(*ConflictMostRecentSnapshotAlreadyPresent); ok {
+	var errMostRecent *ConflictMostRecentSnapshotAlreadyPresent
+	if errors.As(conflict, &errMostRecent) {
 		// replicatoin is a no-op
 		return nil, nil
 	}
 
-	if noCommonAncestor, ok := conflict.(*ConflictNoCommonAncestor); ok {
+	var noCommonAncestor *ConflictNoCommonAncestor
+	if errors.As(conflict, &noCommonAncestor) {
 		if len(noCommonAncestor.SortedReceiverVersions) == 0 {
 
 			if len(noCommonAncestor.SortedSenderVersions) == 0 {

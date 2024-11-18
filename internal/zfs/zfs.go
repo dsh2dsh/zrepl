@@ -965,7 +965,7 @@ func (s *DrySendInfo) unmarshalInfoLine(l string) error {
 		if s.Filesystem == "" {
 			toFS, _, _, err := DecomposeVersionString(to)
 			if err != nil {
-				return fmt.Errorf("'to' is not a valid filesystem version: %s", err)
+				return fmt.Errorf("'to' is not a valid filesystem version: %w", err)
 			}
 			s.Filesystem = toFS
 		}
@@ -980,7 +980,7 @@ func (s *DrySendInfo) unmarshalInfoLine(l string) error {
 	}
 
 	if sizeEstimate, err := strconv.ParseUint(size, 10, 64); err != nil {
-		return fmt.Errorf("cannot not parse size %q: %s", size, err)
+		return fmt.Errorf("cannot not parse size %q: %w", size, err)
 	} else if snapType == "size" {
 		s.SizeEstimate = max(sizeEstimate, s.SizeEstimate)
 	} else {
@@ -1008,7 +1008,7 @@ func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 
 	si := new(DrySendInfo)
 	if err := si.unmarshalZFSOutput(output); err != nil {
-		return nil, fmt.Errorf("could not parse zfs send -n output: %s", err)
+		return nil, fmt.Errorf("could not parse zfs send -n output: %w", err)
 	}
 	return si, nil
 }
@@ -1118,12 +1118,14 @@ func ZFSRecv(
 func zfsRollbackForceRecv(ctx context.Context, fsdp *DatasetPath) error {
 	snaps, err := ZFSListFilesystemVersions(ctx, fsdp,
 		ListFilesystemVersionsOptions{Types: Snapshots})
-	if _, ok := err.(*DatasetDoesNotExist); ok {
+	var errNotExist *DatasetDoesNotExist
+	switch {
+	case errors.As(err, &errNotExist):
 		snaps = []FilesystemVersion{}
-	} else if err != nil {
+	case err != nil:
 		return fmt.Errorf(
-			"cannot list versions for rollback for forced receive: %s", err)
-	} else if len(snaps) == 0 {
+			"cannot list versions for rollback for forced receive: %w", err)
+	case len(snaps) == 0:
 		return nil
 	}
 
@@ -1140,14 +1142,14 @@ func zfsRollbackForceRecv(ctx context.Context, fsdp *DatasetPath) error {
 	debug("recv: rollback to %q", rollbackTargetAbs)
 	if err := ZFSRollback(ctx, fsdp, rollbackTarget, "-r"); err != nil {
 		return fmt.Errorf(
-			"cannot rollback %s to %s for forced receive: %s",
+			"cannot rollback %s to %s for forced receive: %w",
 			fsdp.ToString(), rollbackTarget, err)
 	}
 
 	debug("recv: destroy %q", rollbackTargetAbs)
 	if err := ZFSDestroy(ctx, rollbackTargetAbs); err != nil {
 		return fmt.Errorf(
-			"cannot destroy %s for forced receive: %s",
+			"cannot destroy %s for forced receive: %w",
 			rollbackTargetAbs, err)
 	}
 	return nil
@@ -1349,7 +1351,7 @@ func ZFSGet(ctx context.Context, fs *DatasetPath, props []string) (*ZFSPropertie
 func ZFSGetGUID(ctx context.Context, fs string, version string) (g uint64, err error) {
 	defer func(e *error) {
 		if *e != nil {
-			*e = fmt.Errorf("zfs get guid fs=%q version=%q: %s", fs, version, *e)
+			*e = fmt.Errorf("zfs get guid fs=%q version=%q: %w", fs, version, *e)
 		}
 	}(&err)
 	if err := validateZFSFilesystem(fs); err != nil {
@@ -1707,7 +1709,8 @@ func ZFSDestroy(ctx context.Context, arg string) error {
 
 func ZFSDestroyIdempotent(ctx context.Context, path string) error {
 	err := ZFSDestroy(ctx, path)
-	if _, ok := err.(*DatasetDoesNotExist); ok {
+	var errNotExist *DatasetDoesNotExist
+	if errors.As(err, &errNotExist) {
 		return nil
 	}
 	return err

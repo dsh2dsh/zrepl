@@ -16,7 +16,7 @@ func SleepUntil(t time.Time) error {
 	for {
 		err := clockNanosleep(unix.CLOCK_REALTIME, unix.TIMER_ABSTIME, &rqtp, nil)
 		if err != nil {
-			if err == unix.EINTR {
+			if err == unix.EINTR { //nolint:errorlint // never wrapped
 				continue
 			}
 			return err

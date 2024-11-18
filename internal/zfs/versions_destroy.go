@@ -139,26 +139,28 @@ func doDestroyBatchedRec(ctx context.Context, fsbatch []*DestroySnapOp, d destro
 	if err == nil {
 		setDestroySnapOpErr(fsbatch, nil)
 		return
-	}
-
-	if pe, ok := err.(*os.PathError); ok && pe.Err == syscall.E2BIG {
-		// see TestExcessiveArgumentsResultInE2BIG
-		// try halving batch size, assuming snapshots names are roughly the same length
-		debug("batch destroy: E2BIG encountered: %s", err)
-		doDestroyBatchedRec(ctx, fsbatch[0:len(fsbatch)/2], d)
-		doDestroyBatchedRec(ctx, fsbatch[len(fsbatch)/2:], d)
-		return
+	} else {
+		var pe *os.PathError
+		if errors.As(err, &pe) && errors.Is(pe.Err, syscall.E2BIG) {
+			// see TestExcessiveArgumentsResultInE2BIG
+			// try halving batch size, assuming snapshots names are roughly the same length
+			debug("batch destroy: E2BIG encountered: %s", err)
+			doDestroyBatchedRec(ctx, fsbatch[0:len(fsbatch)/2], d)
+			doDestroyBatchedRec(ctx, fsbatch[len(fsbatch)/2:], d)
+			return
+		}
 	}
 
 	singleRun := fsbatch // the destroys that will be tried sequentially after "smart" error handling below
 
-	if err, ok := err.(*DestroySnapshotsError); ok {
+	var errDestroy *DestroySnapshotsError
+	if errors.As(err, &errDestroy) {
 		// eliminate undestroyable datasets from batch and try it once again
 		strippedBatch, remaining := make([]*DestroySnapOp, 0, len(fsbatch)), make([]*DestroySnapOp, 0, len(fsbatch))
 
 		for _, b := range fsbatch {
 			isUndestroyable := false
-			for _, undestroyable := range err.Undestroyable {
+			for _, undestroyable := range errDestroy.Undestroyable {
 				if undestroyable == b.Name {
 					isUndestroyable = true
 					break

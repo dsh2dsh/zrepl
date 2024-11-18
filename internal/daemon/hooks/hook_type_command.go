@@ -33,7 +33,7 @@ func NewCommandHook(in *config.HookCommand) (*CommandHook, error) {
 
 	filter, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse filesystem filter: %s", err)
+		return nil, fmt.Errorf("cannot parse filesystem filter: %w", err)
 	}
 	r.filter = filter
 	return r, nil

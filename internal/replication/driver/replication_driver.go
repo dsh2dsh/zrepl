@@ -874,7 +874,8 @@ func (a *attempt) errorReport() *errorReport {
 			r.byClass[class] = errs
 		}
 		for _, err := range r.flattened {
-			if neterr, ok := err.Err.(net.Error); ok && neterr.Timeout() {
+			var neterr net.Error
+			if errors.As(err.Err, &neterr) && neterr.Timeout() {
 				putClass(err, errorClassTemporaryConnectivityRelated)
 				continue
 			}

@@ -48,13 +48,13 @@ func runVersionCmd() error {
 
 	if args.Show == "daemon" || args.Show == "" {
 		if args.ConfigErr != nil {
-			return fmt.Errorf("config parsing error: %s", args.ConfigErr)
+			return fmt.Errorf("config parsing error: %w", args.ConfigErr)
 		}
 
 		err := jsonRequestResponse(args.Config.Global.Control.SockPath,
 			daemon.ControlJobEndpointVersion, nil, &daemonVersion)
 		if err != nil {
-			return fmt.Errorf("server: error: %s\n", err)
+			return fmt.Errorf("server: error: %w\n", err)
 		}
 		fmt.Printf("server: %s\n", daemonVersion.String())
 	}

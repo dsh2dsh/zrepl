@@ -166,7 +166,7 @@ func doMigrateReplicationCursor(ctx context.Context, sc *cli.Subcommand, args []
 
 		err := doMigrateReplicationCursorFS(ctx, v1cursorJobs, fs)
 		switch {
-		case err == migrateReplicationCursorSkipSentinel:
+		case errors.Is(err, migrateReplicationCursorSkipSentinel):
 			bold.Printf("FILESYSTEM SKIPPED\n")
 		case err != nil:
 			hadError = true
@@ -218,7 +218,7 @@ func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, f
 	var oldCursor *zfs.FilesystemVersion
 	for i, fsv := range bookmarks {
 		_, _, err := endpoint.ParseReplicationCursorBookmarkName(fsv.ToAbsPath(fs))
-		if err != endpoint.ErrV1ReplicationCursor {
+		if !errors.Is(err, endpoint.ErrV1ReplicationCursor) {
 			continue
 		}
 

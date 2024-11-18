@@ -155,7 +155,7 @@ type MigrateHashBasedPlaceholderReport struct {
 func ZFSMigrateHashBasedPlaceholderToCurrent(ctx context.Context, fs *DatasetPath, dryRun bool) (*MigrateHashBasedPlaceholderReport, error) {
 	st, err := ZFSGetFilesystemPlaceholderState(ctx, fs)
 	if err != nil {
-		return nil, fmt.Errorf("error getting placeholder state: %s", err)
+		return nil, fmt.Errorf("error getting placeholder state: %w", err)
 	}
 	if !st.FSExists {
 		panic("inconsistent placeholder state returned: fs must exist")
@@ -172,7 +172,7 @@ func ZFSMigrateHashBasedPlaceholderToCurrent(ctx context.Context, fs *DatasetPat
 
 	err = ZFSSetPlaceholder(ctx, fs, st.IsPlaceholder)
 	if err != nil {
-		return nil, fmt.Errorf("error re-writing placeholder property: %s", err)
+		return nil, fmt.Errorf("error re-writing placeholder property: %w", err)
 	}
 	return &report, nil
 }

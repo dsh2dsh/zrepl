@@ -44,7 +44,7 @@ func (c *SenderConfig) Validate() error {
 		return fmt.Errorf("`Encrypt` field invalid: %w", err)
 	}
 	if _, err := StepHoldTag(c.JobID); err != nil {
-		return fmt.Errorf("JobID cannot be used for hold tag: %s", err)
+		return fmt.Errorf("JobID cannot be used for hold tag: %w", err)
 	}
 	return nil
 }
@@ -603,7 +603,7 @@ func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
 		clientIdentity)
 	if err != nil {
 		err = fmt.Errorf(
-			"ClientIdentityContextKey must have been validated before invoking Receiver: %s",
+			"ClientIdentityContextKey must have been validated before invoking Receiver: %w",
 			err)
 		panic(err)
 	}
@@ -940,7 +940,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		log.Info("clearing placeholder property")
 		if err := zfs.ZFSSetPlaceholder(ctx, lp, false); err != nil {
 			return fmt.Errorf(
-				"cannot clear placeholder property for forced receive: %s", err)
+				"cannot clear placeholder property for forced receive: %w", err)
 		}
 	}
 
@@ -1050,7 +1050,8 @@ func doDestroySnapshots(ctx context.Context, lp *zfs.DatasetPath, snaps []*pdu.F
 	zfs.ZFSDestroyFilesystemVersions(ctx, reqs)
 	for i := range reqs {
 		if errs[i] != nil {
-			if de, ok := errs[i].(*zfs.DestroySnapshotsError); ok && len(de.Reason) == 1 {
+			var de *zfs.DestroySnapshotsError
+			if errors.As(errs[i], &de) && len(de.Reason) == 1 {
 				ress[i].Error = de.Reason[0]
 			} else {
 				ress[i].Error = errs[i].Error()

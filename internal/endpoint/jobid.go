@@ -40,7 +40,7 @@ func MakeJobID(s string) (JobID, error) {
 
 	_, err := zfs.NewDatasetPath(s)
 	if err != nil {
-		return JobID{}, fmt.Errorf("must be usable in a ZFS dataset path: %s", err)
+		return JobID{}, fmt.Errorf("must be usable in a ZFS dataset path: %w", err)
 	}
 
 	return JobID{s}, nil

@@ -11,7 +11,7 @@ func ZFSGetEncryptionEnabled(ctx context.Context, fs string,
 ) (enabled bool, err error) {
 	defer func(e *error) {
 		if *e != nil {
-			*e = fmt.Errorf("zfs get encryption enabled fs=%q: %s", fs, *e)
+			*e = fmt.Errorf("zfs get encryption enabled fs=%q: %w", fs, *e)
 		}
 	}(&err)
 

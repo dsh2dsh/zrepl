@@ -81,7 +81,7 @@ func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter,
 		}
 		delete(unmatchedUserSpecifiedDatasets, path.ToString())
 		if pass, err := filter.Filter(path); err != nil {
-			return nil, fmt.Errorf("error calling filter: %s", err)
+			return nil, fmt.Errorf("error calling filter: %w", err)
 		} else if pass {
 			datasets = append(datasets, ZFSListMappingPropertiesResult{
 				Path:   path,

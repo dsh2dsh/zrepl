@@ -3,7 +3,7 @@ linters:
     - "asciicheck"
     - "bidichk"
     - "copyloopvar"
-    # - "errorlint"
+    - "errorlint"
     - "gocritic"
     - "gofumpt"
     - "goimports"

@@ -14,7 +14,7 @@ func ListFromConfig(in []config.HookCommand) (List, error) {
 	for i, h := range in {
 		h, err := NewCommandHook(&h)
 		if err != nil {
-			return nil, fmt.Errorf("create hook #%d: %s", i+1, err)
+			return nil, fmt.Errorf("create hook #%d: %w", i+1, err)
 		}
 		hl[i] = h
 	}

@@ -118,7 +118,7 @@ func (g ReplicationGuaranteeIncremental) SenderPreSend(ctx context.Context, jid 
 	if sendArgs.FromVersion != nil {
 		from, err := CreateTentativeReplicationCursor(ctx, sendArgs.FS, *sendArgs.FromVersion, jid)
 		if err != nil {
-			if err == zfs.ErrBookmarkCloningNotSupported {
+			if errors.Is(err, zfs.ErrBookmarkCloningNotSupported) {
 				getLogger(ctx).WithField("replication_guarantee", g).
 					WithField("bookmark", sendArgs.From.FullPath(sendArgs.FS)).
 					Info("bookmark cloning is not supported, speculating that `from` will not be destroyed until step is done")
@@ -192,7 +192,7 @@ func senderPostRecvConfirmedCommon(ctx context.Context, jid JobID, fs string, to
 
 	toReplicationCursor, err := CreateReplicationCursor(ctx, fs, to, jid)
 	if err != nil {
-		if err == zfs.ErrBookmarkCloningNotSupported {
+		if errors.Is(err, zfs.ErrBookmarkCloningNotSupported) {
 			log.Debug("not setting replication cursor, bookmark cloning not supported")
 		} else {
 			msg := "cannot move replication cursor, keeping hold on `to` until successful"

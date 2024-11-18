@@ -161,7 +161,7 @@ func createBookmarkAbstraction(ctx context.Context, abstractionType AbstractionT
 
 	cursorBookmark, err := zfs.ZFSBookmark(ctx, fs, target, bookmarkname)
 	if err != nil {
-		if err == zfs.ErrBookmarkCloningNotSupported {
+		if errors.Is(err, zfs.ErrBookmarkCloningNotSupported) {
 			return nil, err // TODO go1.13 use wrapping
 		}
 		return nil, fmt.Errorf("cannot create bookmark: %w", err)
@@ -202,7 +202,7 @@ func ReplicationCursorV1Extractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion) 
 	}
 	fullname := v.ToAbsPath(fs)
 	_, _, err := ParseReplicationCursorBookmarkName(fullname)
-	if err == ErrV1ReplicationCursor {
+	if errors.Is(err, ErrV1ReplicationCursor) {
 		return &ReplicationCursorV1{
 			Type:              AbstractionReplicationCursorBookmarkV1,
 			FS:                fs.ToString(),

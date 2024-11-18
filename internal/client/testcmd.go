@@ -69,7 +69,7 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 
 	f, err := filters.NewFromConfig(ff, df)
 	if err != nil {
-		return fmt.Errorf("filter invalid: %s", err)
+		return fmt.Errorf("filter invalid: %w", err)
 	}
 
 	var fsnames []string
@@ -78,7 +78,7 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 	} else {
 		out, err := zfs.ZFSList(ctx, []string{"name"})
 		if err != nil {
-			return fmt.Errorf("could not list ZFS filesystems: %s", err)
+			return fmt.Errorf("could not list ZFS filesystems: %w", err)
 		}
 		for _, row := range out {
 			fsnames = append(fsnames, row[0])

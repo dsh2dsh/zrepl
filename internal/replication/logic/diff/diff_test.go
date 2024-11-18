@@ -68,14 +68,14 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 	// no common ancestor
 	doTest(l(), l("@a,1"), func(path []*FilesystemVersion, conflict error) {
 		assert.Nil(t, path)
-		ca, ok := conflict.(*ConflictNoCommonAncestor)
-		require.True(t, ok)
+		var ca *ConflictNoCommonAncestor
+		require.ErrorAs(t, conflict, &ca)
 		assert.Equal(t, l("@a,1"), ca.SortedSenderVersions)
 	})
 	doTest(l("@a,1", "@b,2"), l("@c,3", "@d,4"), func(path []*FilesystemVersion, conflict error) {
 		assert.Nil(t, path)
-		ca, ok := conflict.(*ConflictNoCommonAncestor)
-		require.True(t, ok)
+		var ca *ConflictNoCommonAncestor
+		require.ErrorAs(t, conflict, &ca)
 		assert.Equal(t, l("@a,1", "@b,2"), ca.SortedReceiverVersions)
 		assert.Equal(t, l("@c,3", "@d,4"), ca.SortedSenderVersions)
 	})
@@ -83,8 +83,8 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 	// divergence is detected
 	doTest(l("@a,1", "@b1,2"), l("@a,1", "@b2,3"), func(path []*FilesystemVersion, conflict error) {
 		assert.Nil(t, path)
-		cd, ok := conflict.(*ConflictDiverged)
-		require.True(t, ok)
+		var cd *ConflictDiverged
+		require.ErrorAs(t, conflict, &cd)
 		assert.Equal(t, l("@a,1")[0], cd.CommonAncestor)
 		assert.Equal(t, l("@b1,2"), cd.ReceiverOnly)
 		assert.Equal(t, l("@b2,3"), cd.SenderOnly)
@@ -99,15 +99,15 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 	doTest(l("@a,1", "@b,2"), l("@a,1", "@b,2"), func(incpath []*FilesystemVersion, conflict error) {
 		assert.Nil(t, incpath)
 		require.Error(t, conflict)
-		_, ok := conflict.(*ConflictMostRecentSnapshotAlreadyPresent)
-		assert.True(t, ok)
+		var cm *ConflictMostRecentSnapshotAlreadyPresent
+		require.ErrorAs(t, conflict, &cm)
 	})
 
 	// ...but it's sufficient if the most recent snapshot is present
 	doTest(l("@c,3"), l("@a,1", "@b,2", "@c,3"), func(path []*FilesystemVersion, conflict error) {
 		assert.Nil(t, path)
-		_, ok := conflict.(*ConflictMostRecentSnapshotAlreadyPresent)
-		assert.True(t, ok)
+		var errConflict *ConflictMostRecentSnapshotAlreadyPresent
+		require.ErrorAs(t, conflict, &errConflict)
 	})
 
 	// no sender snapshots errors: empty receiver
@@ -115,8 +115,8 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 		assert.Nil(t, incpath)
 		require.Error(t, conflict)
 		t.Logf("%T", conflict)
-		_, ok := conflict.(*ConflictNoSenderSnapshots)
-		assert.True(t, ok)
+		var errConflict *ConflictNoSenderSnapshots
+		require.ErrorAs(t, conflict, &errConflict)
 	})
 
 	// no sender snapshots errors: snapshots on receiver
@@ -124,8 +124,8 @@ func TestIncrementalPath_SnapshotsOnly(t *testing.T) {
 		assert.Nil(t, incpath)
 		require.Error(t, conflict)
 		t.Logf("%T", conflict)
-		_, ok := conflict.(*ConflictNoSenderSnapshots)
-		assert.True(t, ok)
+		var errConflict *ConflictNoSenderSnapshots
+		require.ErrorAs(t, conflict, &errConflict)
 	})
 }
 
@@ -159,8 +159,8 @@ func TestIncrementalPath_BookmarkSupport(t *testing.T) {
 	})
 	doTest(l("#a,1"), l("@a,1", "@b,2"), func(path []*FilesystemVersion, conflict error) {
 		assert.Nil(t, path)
-		ca, ok := conflict.(*ConflictNoCommonAncestor)
-		require.True(t, ok)
+		var ca *ConflictNoCommonAncestor
+		require.ErrorAs(t, conflict, &ca)
 		assert.Equal(t, l(), ca.SortedReceiverVersions, "See comment in IncrementalPath() on why we don't include the boomkmark here")
 	})
 }
