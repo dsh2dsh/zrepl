@@ -17,7 +17,7 @@ var (
 	Var2 = ExampleVarType{"var2"}
 )
 
-func (m ExampleVarType) String() string { return string(m.string) }
+func (m ExampleVarType) String() string { return m.string }
 func (m *ExampleVarType) Set(s string) error {
 	switch s {
 	case Var1.String():

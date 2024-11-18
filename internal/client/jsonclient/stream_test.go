@@ -14,16 +14,16 @@ import (
 )
 
 func TestPostStream(t *testing.T) {
-	testJson := struct{ Num int }{Num: 42}
+	testData := struct{ Num int }{Num: 42}
 	testStream := []byte("foo\nbar\n")
 
 	httpClient := testHttpClient{
 		doer: func(r *http.Request) (*http.Response, error) {
 			defer r.Body.Close()
-			in := testJson
+			in := testData
 			in.Num = 0
 			require.NoError(t, ReadJsonPayload(r.Header, r.Body, &in))
-			assert.Equal(t, testJson, in)
+			assert.Equal(t, testData, in)
 
 			b, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestPostStream(t *testing.T) {
 	client, err := New("http://server", WithHTTPClient(&httpClient))
 	require.NoError(t, err)
 	require.NoError(t, client.PostStream(context.Background(),
-		"/", &testJson, nil, bytes.NewBuffer(testStream)))
+		"/", &testData, nil, bytes.NewBuffer(testStream)))
 }
 
 type testHttpClient struct {
@@ -52,15 +52,15 @@ func (self *testHttpClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestPostResponseStream(t *testing.T) {
-	testJson := struct{ Num int }{Num: 42}
+	testData := struct{ Num int }{Num: 42}
 	testStream := []byte("foo\nbar\n")
 
 	httpClient := testHttpClient{
 		doer: func(req *http.Request) (*http.Response, error) {
-			in := testJson
+			in := testData
 			in.Num = 0
 			require.NoError(t, json.NewDecoder(req.Body).Decode(&in))
-			assert.Equal(t, testJson, in)
+			assert.Equal(t, testData, in)
 			require.NoError(t, req.Body.Close())
 
 			resp := &http.Response{
@@ -81,12 +81,12 @@ func TestPostResponseStream(t *testing.T) {
 	client, err := New("http://server", WithHTTPClient(&httpClient))
 	require.NoError(t, err)
 
-	out := testJson
+	out := testData
 	r, err := client.PostResponseStream(context.Background(),
-		"/", &testJson, &out)
+		"/", &testData, &out)
 	require.NoError(t, err)
 	defer r.Close()
-	assert.Equal(t, testJson.Num+1, out.Num)
+	assert.Equal(t, testData.Num+1, out.Num)
 
 	b, err := io.ReadAll(r)
 	require.NoError(t, err)

@@ -91,13 +91,12 @@ func (self *logFile) exists() (bool, error) {
 		return false, fmt.Errorf("stat of %q: %w", self.filename, err)
 	}
 
-	var nlink uint64
 	if finfo.Sys() != nil {
 		if stat, ok := finfo.Sys().(*syscall.Stat_t); ok {
-			nlink = uint64(stat.Nlink)
+			return stat.Nlink > 0, nil
 		}
 	}
-	return nlink > 0, nil
+	return false, nil
 }
 
 func (self *logFile) reopen() error {

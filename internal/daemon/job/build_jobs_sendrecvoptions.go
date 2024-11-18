@@ -68,10 +68,10 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 		PlaceholderCreationEncryptionPropertyString(
 			recvOpts.Placeholder.Encryption)
 	if err != nil {
-		options := []string{}
-		for _, v := range endpoint.PlaceholderCreationEncryptionPropertyValues() {
-			options = append(options,
-				endpoint.PlaceholderCreationEncryptionProperty(v).String())
+		propValues := endpoint.PlaceholderCreationEncryptionPropertyValues()
+		options := make([]string, len(propValues))
+		for i := range propValues {
+			options[i] = propValues[i].String()
 		}
 		return rc, fmt.Errorf(
 			"placeholder encryption value %q is invalid, must be one of %s",

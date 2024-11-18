@@ -480,7 +480,7 @@ jobs:
 
 				// Check for expected errors
 				if hook.ErrorTest != nil {
-					hook.ErrorTest(t, string(report[i].Report.Error()))
+					hook.ErrorTest(t, report[i].Report.Error())
 				}
 			}
 		})

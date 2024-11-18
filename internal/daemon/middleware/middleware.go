@@ -35,5 +35,5 @@ func getLogger(r *http.Request) logger.Logger {
 }
 
 func GzipResponse(next http.Handler) http.Handler {
-	return http.HandlerFunc(gzhttp.GzipHandler(next))
+	return gzhttp.GzipHandler(next)
 }

@@ -217,7 +217,7 @@ func Do(ctx context.Context, config Config, planner Planner,
 
 		var prev *attempt
 		mainLog := log
-		for ano := 0; ano < int(config.MaxAttempts); ano++ {
+		for ano := 0; ano < config.MaxAttempts; ano++ {
 			log := mainLog.WithField("attempt_number", ano)
 			log.Debug("start attempt")
 
