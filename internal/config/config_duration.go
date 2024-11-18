@@ -81,10 +81,9 @@ func parseDuration(e string) (d time.Duration, err error) {
 		if durationFactor != 0 {
 			err = errors.New("missing time unit")
 			return
-		} else {
-			// It's the case where user specified '0'.
-			// We want to allow this, just like time.ParseDuration.
 		}
+		// It's the case where user specified '0'. We want to allow this, just like
+		// time.ParseDuration.
 	case "s":
 		durationUnit = time.Second
 	case "m":
