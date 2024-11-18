@@ -20,21 +20,22 @@ func TestExtractJobName(t *testing.T) {
 		{
 			name: "without job name",
 			req: func() *http.Request {
-				return httptest.NewRequest("GET", "/", nil)
+				return httptest.NewRequest(http.MethodGet, "/", nil)
 			},
 			statusCode: http.StatusNotFound,
 		},
 		{
 			name: "job name not found",
 			req: func() *http.Request {
-				return httptest.NewRequest("GET", "/zfs/datasets/foobar", nil)
+				return httptest.NewRequest(http.MethodGet, "/zfs/datasets/foobar", nil)
 			},
 			statusCode: http.StatusNotFound,
 		},
 		{
 			name: "with job name",
 			req: func() *http.Request {
-				return httptest.NewRequest("GET", "/zfs/datasets/"+testJobName, nil)
+				return httptest.NewRequest(http.MethodGet,
+					"/zfs/datasets/"+testJobName, nil)
 			},
 			statusCode: http.StatusOK,
 		},

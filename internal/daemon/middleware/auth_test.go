@@ -29,14 +29,14 @@ func TestCheckClientIdentity(t *testing.T) {
 		{
 			name: "without Authorization",
 			req: func() *http.Request {
-				return httptest.NewRequest("GET", "/", nil)
+				return httptest.NewRequest(http.MethodGet, "/", nil)
 			},
 			statusCode: http.StatusUnauthorized,
 		},
 		{
 			name: "without bearer",
 			req: func() *http.Request {
-				r := httptest.NewRequest("GET", "/", nil)
+				r := httptest.NewRequest(http.MethodGet, "/", nil)
 				r.Header.Set("Authorization", "Basic "+keyToken)
 				return r
 			},
@@ -45,7 +45,7 @@ func TestCheckClientIdentity(t *testing.T) {
 		{
 			name: "with wrong token",
 			req: func() *http.Request {
-				r := httptest.NewRequest("GET", "/", nil)
+				r := httptest.NewRequest(http.MethodGet, "/", nil)
 				r.Header.Set("Authorization", "Bearer foobar")
 				return r
 			},
@@ -54,7 +54,7 @@ func TestCheckClientIdentity(t *testing.T) {
 		{
 			name: "with client identity",
 			req: func() *http.Request {
-				r := httptest.NewRequest("GET", "/", nil)
+				r := httptest.NewRequest(http.MethodGet, "/", nil)
 				r.Header.Set("Authorization", "Bearer "+keyToken)
 				return r
 			},
