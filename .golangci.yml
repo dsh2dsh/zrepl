@@ -5,7 +5,7 @@ linters:
     - "copyloopvar"
     # - "errorlint"
     # - "gocritic"
-    # - "gofumpt"
+    - "gofumpt"
     - "goimports"
     - "makezero"
     - "misspell"
@@ -16,6 +16,8 @@ linters:
     - "testifylint"
     - "unconvert"
     - "usestdlibvars"
+    - "wastedassign"
+    # - "wrapcheck"
 
 linters-settings:
   goconst:

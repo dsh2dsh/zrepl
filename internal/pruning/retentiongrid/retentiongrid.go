@@ -30,7 +30,6 @@ func NewGrid(l []Interval) *Grid {
 }
 
 func (g Grid) FitEntries(entries []Entry) (keep, remove []Entry) {
-
 	if len(entries) == 0 {
 		return
 	}
@@ -84,7 +83,6 @@ func (b *bucket) AddIfContains(e Entry) (added bool) {
 }
 
 func (b *bucket) RemoveYoungerSnapsExceedingKeepCount() (removed []Entry) {
-
 	if b.keepCount == RetentionGridKeepCountAll {
 		return nil
 	}
@@ -103,7 +101,6 @@ func (b *bucket) RemoveYoungerSnapsExceedingKeepCount() (removed []Entry) {
 }
 
 func (g Grid) fitEntriesWithNow(now time.Time, entries []Entry) (keep, remove []Entry) {
-
 	buckets := make([]bucket, len(g.intervals))
 
 	buckets[0] = makeBucketFromInterval(now, g.intervals[0])

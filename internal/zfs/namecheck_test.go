@@ -6,7 +6,6 @@ import (
 )
 
 func TestEntityNamecheck(t *testing.T) {
-
 	type testcase struct {
 		input      string
 		entityType EntityType
@@ -60,5 +59,4 @@ func TestEntityNamecheck(t *testing.T) {
 			}
 		})
 	}
-
 }

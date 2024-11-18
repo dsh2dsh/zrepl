@@ -43,7 +43,6 @@ type DatasetPathsVisitor func(v *DatasetPathVisit) (visitChildTree bool)
 // If there are gaps, i.e. the intermediary component a/b between a and a/b/c,
 // those gaps are still visited but the FilledIn property of the visit is set to true.
 func (f *DatasetPathForest) WalkTopDown(visitor DatasetPathsVisitor) {
-
 	for _, r := range f.roots {
 		r.WalkTopDown(&DatasetPathVisit{
 			Path:     &DatasetPath{nil},
@@ -51,7 +50,6 @@ func (f *DatasetPathForest) WalkTopDown(visitor DatasetPathsVisitor) {
 			Parent:   nil,
 		}, visitor)
 	}
-
 }
 
 /* PRIVATE IMPLEMENTATION */
@@ -63,7 +61,6 @@ type datasetPathTree struct {
 }
 
 func (t *datasetPathTree) Add(p []string) bool {
-
 	if len(p) == 0 {
 		return true
 	}
@@ -86,15 +83,11 @@ func (t *datasetPathTree) Add(p []string) bool {
 		return true
 
 	} else {
-
 		return false
-
 	}
-
 }
 
 func (t *datasetPathTree) WalkTopDown(parent *DatasetPathVisit, visitor DatasetPathsVisitor) {
-
 	thisVisitPath := parent.Path.Copy()
 	thisVisitPath.Extend(&DatasetPath{[]string{t.Component}})
 
@@ -110,7 +103,6 @@ func (t *datasetPathTree) WalkTopDown(parent *DatasetPathVisit, visitor DatasetP
 			c.WalkTopDown(thisVisit, visitor)
 		}
 	}
-
 }
 
 func newDatasetPathTree(initialComps []string) (t *datasetPathTree) {

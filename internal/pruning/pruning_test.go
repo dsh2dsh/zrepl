@@ -66,9 +66,8 @@ func testTable(tcs map[string]testCase, t *testing.T) {
 }
 
 func TestPruneSnapshots(t *testing.T) {
-
 	inputs := map[string][]Snapshot{
-		"s1": []Snapshot{
+		"s1": {
 			stubSnap{name: "foo_123"},
 			stubSnap{name: "foo_456"},
 			stubSnap{name: "bar_123"},

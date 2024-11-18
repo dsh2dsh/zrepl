@@ -55,7 +55,6 @@ type testSnap struct {
 func (ds testSnap) Date() time.Time { return ds.date }
 
 func validateRetentionGridFitEntries(t *testing.T, now time.Time, input, keep, remove []Entry) {
-
 	snapDescr := func(d testSnap) string {
 		return fmt.Sprintf("%s@%s", d.Name, d.date.Sub(now))
 	}
@@ -148,7 +147,6 @@ func TestRespectsKeepCountAll(t *testing.T) {
 }
 
 func TestComplex(t *testing.T) {
-
 	g := gridFromString("10m,-1|10m|10m,2|1h")
 
 	t.Logf("%#v\n", g)
@@ -181,5 +179,4 @@ func TestComplex(t *testing.T) {
 	keep, remove := g.fitEntriesWithNow(now, snaps)
 
 	validateRetentionGridFitEntries(t, now, snaps, keep, remove)
-
 }

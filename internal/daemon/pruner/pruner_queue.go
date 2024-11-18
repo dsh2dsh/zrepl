@@ -78,5 +78,4 @@ func (q *execQueue) Put(fs *fs, err error, done bool) {
 		return strings.Compare(q.pending[i].path, q.pending[j].path) == -1
 	})
 	q.mtx.Unlock()
-
 }

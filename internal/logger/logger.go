@@ -72,7 +72,6 @@ func (l *loggerImpl) logInternalError(outlet Outlet, err string) {
 }
 
 func (l *loggerImpl) log(level Level, msg string) {
-
 	l.mtx.Lock()
 	defer l.mtx.Unlock()
 
@@ -92,7 +91,6 @@ func (l *loggerImpl) log(level Level, msg string) {
 		}
 	}
 	close(ech)
-
 }
 
 func (l *loggerImpl) WithOutlet(outlet Outlet, level Level) Logger {
@@ -111,7 +109,6 @@ func (l *loggerImpl) WithOutlet(outlet Outlet, level Level) Logger {
 
 // callers must hold l.mtx
 func (l *loggerImpl) forkLogger(field string, val interface{}) *loggerImpl {
-
 	child := &loggerImpl{
 		fields:        make(Fields, len(l.fields)+1),
 		outlets:       l.outlets,

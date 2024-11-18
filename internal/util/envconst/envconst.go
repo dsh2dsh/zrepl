@@ -124,7 +124,6 @@ func String(varname string, def string) (d string) {
 }
 
 func Var(varname string, def flag.Value) (d interface{}) {
-
 	// use def's type to instantiate a new object of that same type
 	// and call flag.Value.Set() on it
 	defType := reflect.TypeOf(def)

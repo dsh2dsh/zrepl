@@ -7,7 +7,6 @@ import (
 )
 
 func TestKeepRegexNegation(t *testing.T) {
-
 	noneg := MustKeepRegex("^zrepl_", false)
 	neg := MustKeepRegex("^zrepl_", true)
 
@@ -28,5 +27,4 @@ func TestKeepRegexNegation(t *testing.T) {
 	assert.False(t, destroyNeg.ContainsName("zrepl"))
 	assert.False(t, destroyNeg.ContainsName("barfoo"))
 	assert.True(t, destroyNeg.ContainsName("zrepl_foobar"))
-
 }
