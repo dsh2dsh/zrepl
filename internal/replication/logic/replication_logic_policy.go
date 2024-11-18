@@ -66,7 +66,7 @@ type PlannerPolicy struct {
 
 func (p PlannerPolicy) Validate() error {
 	if err := config.Validator().Struct(&p); err != nil {
-		return err
+		return fmt.Errorf("config validator: %w", err)
 	}
 	if err := p.ConflictResolution.Validate(); err != nil {
 		return err

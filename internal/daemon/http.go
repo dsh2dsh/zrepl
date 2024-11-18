@@ -51,6 +51,7 @@ func (self *server) WithUnix(path string, mode uint32) error {
 	return nil
 }
 
+//nolint:wrapcheck // not needed
 func (self *server) Serve() error {
 	self.initTLSConfig()
 	switch {

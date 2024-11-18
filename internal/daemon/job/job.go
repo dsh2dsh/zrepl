@@ -75,30 +75,37 @@ type JobStatus interface {
 func (s *Status) MarshalJSON() ([]byte, error) {
 	typeJson, err := json.Marshal(s.Type)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal type: %w", err)
 	}
+
 	jobJSON, err := json.Marshal(s.JobSpecific)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal job: %w", err)
 	}
+
 	m := map[string]json.RawMessage{
 		"type":         typeJson,
 		string(s.Type): jobJSON,
 	}
-	return json.Marshal(m)
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal status: %w", err)
+	}
+	return b, nil
 }
 
 func (s *Status) UnmarshalJSON(in []byte) (err error) {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(in, &m); err != nil {
-		return err
+		return fmt.Errorf("unmarshal status: %w", err)
 	}
 	tJSON, ok := m["type"]
 	if !ok {
 		return errors.New("field 'type' not found")
 	}
 	if err := json.Unmarshal(tJSON, &s.Type); err != nil {
-		return err
+		return fmt.Errorf("unmarshal type: %w", err)
 	}
 	key := string(s.Type)
 	jobJSON, ok := m[key]

@@ -259,7 +259,7 @@ func listFilesystems(ctx context.Context, sender Sender, target Target,
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, nil, err
+		return nil, nil, err //nolint:wrapcheck // it's our error
 	}
 	return sfss, tfss, nil
 }

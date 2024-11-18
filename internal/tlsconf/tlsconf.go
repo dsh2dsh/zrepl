@@ -13,7 +13,7 @@ func ParseCAFile(certfile string) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	pem, err := os.ReadFile(certfile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading %q: %w", certfile, err)
 	}
 	if !pool.AppendCertsFromPEM(pem) {
 		return nil, errors.New("PEM parsing error")

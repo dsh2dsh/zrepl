@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"log/syslog"
 	"net"
@@ -137,10 +138,11 @@ func (o *SyslogOutlet) WriteEntry(entry logger.Entry) error {
 		o.lastConnectAttempt = time.Now()
 		if err != nil {
 			o.writer = nil
-			return err
+			return fmt.Errorf("new syslog writer: %w", err)
 		}
 	}
 
+	//nolint:wrapcheck // not needed
 	switch entry.Level {
 	case logger.Debug:
 		return o.writer.Debug(s)

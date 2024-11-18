@@ -17,7 +17,7 @@ linters:
     - "unconvert"
     - "usestdlibvars"
     - "wastedassign"
-    # - "wrapcheck"
+    - "wrapcheck"
 
 linters-settings:
   goconst:
@@ -49,6 +49,8 @@ linters-settings:
     # useful for broadly ignoring packages and/or subpackages from wrapcheck
     # analysis. There are no defaults for this value.
     ignorePackageGlobs:
+      - "encoding/*"
+      - "gopkg.in/yaml.v3"
       - "github.com/dsh2dsh/zrepl/*"
 
 issues:

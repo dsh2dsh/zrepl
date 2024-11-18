@@ -102,12 +102,19 @@ func (p *DatasetPath) Copy() (c *DatasetPath) {
 }
 
 func (p *DatasetPath) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.comps)
+	b, err := json.Marshal(p.comps)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+	return b, nil
 }
 
 func (p *DatasetPath) UnmarshalJSON(b []byte) error {
 	p.comps = make([]string, 0)
-	return json.Unmarshal(b, &p.comps)
+	if err := json.Unmarshal(b, &p.comps); err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	return nil
 }
 
 func (p *DatasetPath) Pool() (string, error) {
@@ -342,6 +349,7 @@ type SendStream struct {
 	testMode bool
 }
 
+//nolint:wrapcheck // not needed
 func (s *SendStream) Read(p []byte) (int, error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -1348,7 +1356,7 @@ func ZFSGet(ctx context.Context, fs *DatasetPath, props []string) (*ZFSPropertie
 }
 
 // The returned error includes requested filesystem and version as quoted strings in its error message
-func ZFSGetGUID(ctx context.Context, fs string, version string) (g uint64, err error) {
+func ZFSGetGUID(ctx context.Context, fs string, version string) (_ uint64, err error) {
 	defer func(e *error) {
 		if *e != nil {
 			*e = fmt.Errorf("zfs get guid fs=%q version=%q: %w", fs, version, *e)
@@ -1368,7 +1376,12 @@ func ZFSGetGUID(ctx context.Context, fs string, version string) (g uint64, err e
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseUint(props.Get("guid"), 10, 64)
+
+	g, err := strconv.ParseUint(props.Get("guid"), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing guid %s: %w", props.Get("guid"), err)
+	}
+	return g, nil
 }
 
 type GetMountpointOutput struct {

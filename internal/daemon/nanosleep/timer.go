@@ -1,6 +1,7 @@
 package nanosleep
 
 import (
+	"fmt"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -10,7 +11,7 @@ import (
 func SleepUntil(t time.Time) error {
 	rqtp, err := unix.TimeToTimespec(t)
 	if err != nil {
-		return err
+		return fmt.Errorf("timespec from %q: %w", t, err)
 	}
 
 	for {

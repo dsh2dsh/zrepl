@@ -72,7 +72,7 @@ func parseDuration(e string) (d time.Duration, err error) {
 
 	durationFactor, err := strconv.ParseInt(comps[1], 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("parse %q to int: %w", comps[1], err)
 	}
 
 	var durationUnit time.Duration

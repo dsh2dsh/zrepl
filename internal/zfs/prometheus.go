@@ -46,6 +46,7 @@ func init() {
 	}, []string{"jobid"})
 }
 
+//nolint:wrapcheck // not needed
 func PrometheusRegister(registry prometheus.Registerer) error {
 	if err := registry.Register(prom.ZFSListFilesystemVersionDuration); err != nil {
 		return err

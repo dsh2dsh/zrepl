@@ -305,7 +305,7 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // out error
 	}
 
 	q := make([]*Filesystem, 0, len(sfss))
@@ -561,7 +561,7 @@ func (fs *Filesystem) listBothVersions(ctx context.Context,
 		resps[1] = resp
 		return nil
 	})
-	return resps, g.Wait()
+	return resps, g.Wait() //nolint:wrapcheck // our error
 }
 
 func (fs *Filesystem) updateSizeEstimates(ctx context.Context, steps []*Step,

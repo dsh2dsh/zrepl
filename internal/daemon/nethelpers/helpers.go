@@ -44,5 +44,9 @@ func ListenUnixPrivate(sockaddr *net.UnixAddr) (*net.UnixListener, error) {
 		return nil, err
 	}
 
-	return net.ListenUnix("unix", sockaddr)
+	l, err := net.ListenUnix("unix", sockaddr)
+	if err != nil {
+		return nil, fmt.Errorf("unix listener: %w", err)
+	}
+	return l, nil
 }

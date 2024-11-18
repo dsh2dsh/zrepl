@@ -354,7 +354,7 @@ func (s *Sender) SendDry(ctx context.Context, req *pdu.SendDryReq,
 			return
 		})
 	}
-	return resp, g.Wait()
+	return resp, g.Wait() //nolint:wrapcheck // it's our error
 }
 
 func (s *Sender) makeSendArgsList(ctx context.Context, items []pdu.SendReq,

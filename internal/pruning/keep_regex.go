@@ -1,6 +1,7 @@
 package pruning
 
 import (
+	"fmt"
 	"regexp"
 )
 
@@ -14,7 +15,7 @@ var _ KeepRule = &KeepRegex{}
 func NewKeepRegex(expr string, negate bool) (*KeepRegex, error) {
 	re, err := regexp.Compile(expr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("re compile %q: %w", expr, err)
 	}
 	return &KeepRegex{re, negate}, nil
 }

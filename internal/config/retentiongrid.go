@@ -63,7 +63,7 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 
 	times, err := strconv.Atoi(comps[1])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse %q to int: %w", comps[1], err)
 	} else if times <= 0 {
 		return nil, errors.New("contains factor <= 0")
 	}

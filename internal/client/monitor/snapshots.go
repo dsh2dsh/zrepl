@@ -226,7 +226,7 @@ func (self *SnapCheck) preloadSnapshots(ctx context.Context,
 			return nil
 		})
 	}
-	return g.Wait()
+	return g.Wait() //nolint:wrapcheck // our error
 }
 
 func zfsListSnapshots(ctx context.Context, dataset string,

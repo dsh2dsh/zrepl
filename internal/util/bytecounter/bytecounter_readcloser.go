@@ -29,7 +29,7 @@ func (r *readCloser) Count() uint64 {
 var _ io.ReadCloser = &readCloser{}
 
 func (r *readCloser) Close() error {
-	return r.rc.Close()
+	return r.rc.Close() //nolint:wrapcheck // not needed
 }
 
 func (r *readCloser) Read(p []byte) (int, error) {
@@ -38,5 +38,5 @@ func (r *readCloser) Read(p []byte) (int, error) {
 		panic("expecting n >= 0")
 	}
 	atomic.AddUint64(&r.count, uint64(n))
-	return n, err
+	return n, err //nolint:wrapcheck // not needed
 }

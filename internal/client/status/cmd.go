@@ -144,7 +144,7 @@ func raw(c *Client) error {
 		return err
 	}
 	if _, err := io.Copy(os.Stdout, bytes.NewReader(b)); err != nil {
-		return err
+		return err //nolint:wrapcheck // not needed
 	}
 	return nil
 }

@@ -189,7 +189,10 @@ type Config struct {
 }
 
 func (c Config) Validate() error {
-	return config.Validator().Struct(&c)
+	if err := config.Validator().Struct(&c); err != nil {
+		return fmt.Errorf("config validation: %w", err)
+	}
+	return nil
 }
 
 // caller must ensure config.Validate() == nil

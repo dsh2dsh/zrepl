@@ -81,6 +81,7 @@ func (c *Cmd) Output() (o []byte, err error) {
 	return
 }
 
+//nolint:wrapcheck // not needed
 func (c *Cmd) StdoutPipeWithErrorBuf(w io.Writer) (io.ReadCloser, error) {
 	c.cmd.Stderr = w
 	return c.cmd.StdoutPipe()

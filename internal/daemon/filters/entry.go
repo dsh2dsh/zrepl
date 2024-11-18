@@ -41,7 +41,12 @@ func (self *filterItem) Clone() *filterItem {
 func (self *filterItem) Match(p *zfs.DatasetPath) (bool, error) {
 	switch {
 	case self.shellPattern:
-		return filepath.Match(self.pattern, p.ToString())
+		matched, err := filepath.Match(self.pattern, p.ToString())
+		if err != nil {
+			return matched, fmt.Errorf("matching %q to %q: %w",
+				p.ToString(), self.pattern, err)
+		}
+		return matched, nil
 	case self.recursive:
 		return p.HasPrefix(self.path), nil
 	}

@@ -73,7 +73,10 @@ var (
 func (j JobID) MarshalJSON() ([]byte, error) { return json.Marshal(j.jid) }
 
 func (j *JobID) UnmarshalJSON(b []byte) error {
-	return json.Unmarshal(b, &j.jid)
+	if err := json.Unmarshal(b, &j.jid); err != nil {
+		return fmt.Errorf("unmarshal: %w", err)
+	}
+	return nil
 }
 
 func (j JobID) MustValidate() { j.expectInitialized() }

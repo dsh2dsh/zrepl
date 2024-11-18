@@ -36,7 +36,7 @@ func ParseConfig(path string, opts ...Option) (*Config, error) {
 
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading %q: %w", path, err)
 	}
 	return ParseConfigBytes(path, b, opts...)
 }
