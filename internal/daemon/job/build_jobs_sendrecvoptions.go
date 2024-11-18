@@ -36,8 +36,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		SendEmbeddedData:     sendOpts.EmbeddedData,
 		SendSaved:            sendOpts.Saved,
 
-		Concurrency: int64(sendOpts.Concurrency),
-		ExecPipe:    sendOpts.ExecPipe,
+		ExecPipe: sendOpts.ExecPipe,
 	}
 
 	if err := sc.Validate(); err != nil {
@@ -88,8 +87,7 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 		OverrideProperties:    recvOpts.Properties.Override,
 		PlaceholderEncryption: placeholderEncryption,
 
-		Concurrency: int64(recvOpts.Concurrency),
-		ExecPipe:    recvOpts.ExecPipe,
+		ExecPipe: recvOpts.ExecPipe,
 	}
 
 	if err = rc.Validate(); err != nil {

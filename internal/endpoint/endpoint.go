@@ -3,7 +3,6 @@
 package endpoint
 
 import (
-	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -13,12 +12,9 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"time"
 
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
@@ -39,8 +35,7 @@ type SenderConfig struct {
 	SendEmbeddedData     bool
 	SendSaved            bool
 
-	Concurrency int64
-	ExecPipe    [][]string
+	ExecPipe [][]string
 }
 
 func (c *SenderConfig) Validate() error {
@@ -59,8 +54,6 @@ type Sender struct {
 	FSFilter zfs.DatasetFilter
 	jobId    JobID
 	config   SenderConfig
-
-	sem *semaphore.Weighted
 }
 
 func NewSender(conf SenderConfig) *Sender {
@@ -73,11 +66,6 @@ func NewSender(conf SenderConfig) *Sender {
 		jobId:    conf.JobID,
 		config:   conf,
 	}
-	return s
-}
-
-func (s *Sender) WithSemaphore(sem *semaphore.Weighted) *Sender {
-	s.sem = sem
 	return s
 }
 
@@ -332,12 +320,6 @@ func (s *Sender) Send(ctx context.Context, r *pdu.SendReq) (*pdu.SendRes,
 		return nil, nil, fmt.Errorf("zfs send failed: %w", err)
 	}
 
-	if s.sem != nil {
-		ctx = logging.WithLogger(ctx,
-			getLogger(ctx).WithField("proto_fs", r.GetFilesystem()))
-		sendStream = NewWeightedReader(ctx, s.sem, sendStream)
-	}
-
 	res := &pdu.SendRes{UsedResumeToken: r.ResumeToken != ""}
 	return res, sendStream, nil
 }
@@ -516,8 +498,7 @@ type ReceiverConfig struct {
 
 	PlaceholderEncryption PlaceholderCreationEncryptionProperty
 
-	Concurrency int64
-	ExecPipe    [][]string
+	ExecPipe [][]string
 }
 
 //go:generate enumer -type=PlaceholderCreationEncryptionProperty -transform=kebab -trimprefix=PlaceholderCreationEncryptionProperty
@@ -591,18 +572,11 @@ type Receiver struct {
 	recvParentCreationMtx *chainlock.L
 	clientIdentity        string
 
-	sem *semaphore.Weighted
-
 	Test_OverrideClientIdentityFunc func() string // for use by platformtest
 }
 
 func (s *Receiver) WithClientIdentity(identity string) *Receiver {
 	s.clientIdentity = identity
-	return s
-}
-
-func (s *Receiver) WithSemaphore(sem *semaphore.Weighted) *Receiver {
-	s.sem = sem
 	return s
 }
 
@@ -975,33 +949,6 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		if err := zfs.ZFSRecvClearResumeToken(ctx, lp.ToString()); err != nil {
 			return fmt.Errorf("cannot clear resume token: %w", err)
 		}
-	}
-
-	if s.sem != nil {
-		b := new(bytes.Buffer)
-		b.Grow(1024 << 10) // 1M
-		n, err := io.CopyN(b, receive, int64(b.Available()))
-		if err != nil && !errors.Is(err, io.EOF) {
-			log.WithField("n", n).WithError(err).
-				Error("error copying from receive")
-			return err
-		}
-		log.WithField("n", n).Info("waiting for concurrency semaphore")
-		begin := time.Now()
-		if err := s.sem.Acquire(ctx, 1); err != nil {
-			log.WithError(err).Error("failed waiting for semaphore")
-			return err
-		}
-		defer func() {
-			log.Debug("release concurrency semaphore")
-			s.sem.Release(1)
-		}()
-		log.WithField("duration", time.Since(begin)).
-			Info("acquired concurrency semaphore")
-		r := receive
-		receive = NewCloser(io.MultiReader(b, receive), func() error {
-			return r.Close()
-		})
 	}
 
 	log.WithField("opts", fmt.Sprintf("%#v", recvOpts)).

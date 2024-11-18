@@ -9,7 +9,6 @@ import (
 
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/reset"
@@ -129,8 +128,6 @@ func modePushFromConfig(g *config.Global, in *config.PushJob,
 	m.senderConfig, err = buildSenderConfig(in, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("sender config: %w", err)
-	} else if m.senderConfig.Concurrency > 0 {
-		m.sem = semaphore.NewWeighted(m.senderConfig.Concurrency)
 	}
 
 	replicationConfig, err := logic.ReplicationConfigFromConfig(
@@ -170,8 +167,7 @@ type modePush struct {
 	snapper       snapper.Snapper
 	cronSpec      string
 
-	sem *semaphore.Weighted
-	wg  sync.WaitGroup
+	wg sync.WaitGroup
 }
 
 func (m *modePush) ConnectEndpoints(ctx context.Context, cn Connected) {
@@ -188,7 +184,7 @@ func (m *modePush) ConnectEndpoints(ctx context.Context, cn Connected) {
 		Info("connect to receiver")
 
 	m.receiver = cn.Endpoint()
-	m.sender = endpoint.NewSender(*m.senderConfig).WithSemaphore(m.sem)
+	m.sender = endpoint.NewSender(*m.senderConfig)
 }
 
 func (m *modePush) DisconnectEndpoints() {
@@ -260,8 +256,6 @@ type modePull struct {
 	sender         Endpoint
 	plannerPolicy  *logic.PlannerPolicy
 	cronSpec       string
-
-	sem *semaphore.Weighted
 }
 
 func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
@@ -276,7 +270,7 @@ func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
 		WithField("from", cn.Name()).
 		Info("connect to sender")
 
-	m.receiver = endpoint.NewReceiver(m.receiverConfig).WithSemaphore(m.sem)
+	m.receiver = endpoint.NewReceiver(m.receiverConfig)
 	m.sender = cn.Endpoint()
 }
 
@@ -359,8 +353,6 @@ func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 	m.receiverConfig, err = buildReceiverConfig(in, jobID)
 	if err != nil {
 		return nil, err
-	} else if m.receiverConfig.Concurrency > 0 {
-		m.sem = semaphore.NewWeighted(m.receiverConfig.Concurrency)
 	}
 	return m, nil
 }

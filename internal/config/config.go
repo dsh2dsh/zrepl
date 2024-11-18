@@ -194,8 +194,7 @@ type SendOptions struct {
 	EmbeddedData     bool `yaml:"embedded_data"`
 	Saved            bool `yaml:"saved"`
 
-	Concurrency uint64     `yaml:"concurrency"`
-	ExecPipe    [][]string `yaml:"execpipe" validate:"dive,required"`
+	ExecPipe [][]string `yaml:"execpipe" validate:"dive,required"`
 }
 
 type RecvOptions struct {
@@ -209,8 +208,7 @@ type RecvOptions struct {
 	Properties  PropertyRecvOptions    `yaml:"properties"`
 	Placeholder PlaceholderRecvOptions `yaml:"placeholder"`
 
-	Concurrency uint64     `yaml:"concurrency"`
-	ExecPipe    [][]string `yaml:"execpipe" validate:"dive,required"`
+	ExecPipe [][]string `yaml:"execpipe" validate:"dive,required"`
 }
 
 type Replication struct {
