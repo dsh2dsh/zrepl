@@ -144,7 +144,6 @@ jobs:
       prefix: "zrepl_frequently_"
     pruning:
       keep_sender:
-        - type: "not_replicated"
         - type: "last_n"
           count: 16
           regex: "^zrepl_frequently_"
