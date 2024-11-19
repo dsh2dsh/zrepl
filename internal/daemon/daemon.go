@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
@@ -29,7 +28,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 		return fmt.Errorf("daemon: cannot build jobs from config: %w", err)
 	}
 
-	log := logger.NewLogger(outlets, 1*time.Second)
+	log := logger.NewLogger(outlets)
 	log.Info(version.NewZreplVersionInformation().String())
 	ctx = logging.WithLogger(ctx, log)
 
@@ -45,7 +44,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	return nil
 }
 
-func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
+func startServer(log *logger.Logger, conf *config.Config, jobs *jobs,
 	logOutlets *logger.Outlets, connecter *job.Connecter,
 ) error {
 	server := newServerJob(log,
@@ -69,7 +68,7 @@ func startServer(log logger.Logger, conf *config.Config, jobs *jobs,
 	if has, err := defaultMetrics(hasMetrics, server, conf); err != nil {
 		return err
 	} else if has {
-		logOutlets.Add(newPrometheusLogOutlet(), logger.Debug)
+		logOutlets.Add(newPrometheusLogOutlet())
 	}
 
 	log.Info("starting server")
@@ -116,7 +115,7 @@ func defaultMetrics(exists bool, api *serverJob, conf *config.Config,
 	return exists, nil
 }
 
-func waitDone(ctx context.Context, log logger.Logger, jobs *jobs) {
+func waitDone(ctx context.Context, log *logger.Logger, jobs *jobs) {
 	sigReload := make(chan os.Signal, 1)
 	signal.Notify(sigReload, syscall.SIGHUP)
 

@@ -6,51 +6,13 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"log/syslog"
-	"os"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/tlsconf"
 )
-
-func OutletsFromConfig(in config.LoggingOutletEnumList,
-) (*logger.Outlets, error) {
-	outlets := logger.NewOutlets()
-	if len(in) == 0 {
-		// Default config
-		out := WriterOutlet{NewSlogFormatter(), os.Stdout}
-		outlets.Add(out, logger.Warn)
-		return outlets, nil
-	}
-
-	var syslogOutlets, stdoutOutlets int
-	for lei, le := range in {
-		outlet, minLevel, err := ParseOutlet(le)
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse outlet #%d: %w", lei, err)
-		}
-		var _ logger.Outlet = WriterOutlet{}
-		var _ logger.Outlet = &SyslogOutlet{}
-		switch outlet.(type) {
-		case *SyslogOutlet:
-			syslogOutlets++
-		case WriterOutlet:
-			stdoutOutlets++
-		}
-		outlets.Add(outlet, minLevel)
-	}
-
-	if syslogOutlets > 1 {
-		return nil, errors.New("can only define one 'syslog' outlet")
-	}
-	if stdoutOutlets > 1 {
-		return nil, errors.New("can only define one 'stdout' outlet")
-	}
-	return outlets, nil
-}
-
-type Subsystem string
 
 const (
 	SubsysCron        Subsystem = "cron"
@@ -63,15 +25,33 @@ const (
 	SubsysZFSCmd      Subsystem = "zfs.cmd"
 )
 
-var AllSubsystems = []Subsystem{
-	SubsysCron,
-	SubsysJob,
-	SubsysReplication,
-	SubsysEndpoint,
-	SubsysPruning,
-	SubsysSnapshot,
-	SubsysHooks,
-	SubsysZFSCmd,
+type ctxKey struct{}
+
+var ctxKeyLogger ctxKey = struct{}{}
+
+type Subsystem string
+
+func OutletsFromConfig(in config.LoggingOutletEnumList,
+) (*logger.Outlets, error) {
+	outlets := logger.NewOutlets()
+	if len(in) == 0 {
+		// Default config
+		o, err := NewFileOutlet("", NewSlogFormatter())
+		if err != nil {
+			return nil, err
+		}
+		outlets.Add(o)
+		return outlets, nil
+	}
+
+	for lei, le := range in {
+		outlet, err := ParseOutlet(le)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse outlet #%d: %w", lei, err)
+		}
+		outlets.Add(outlet)
+	}
+	return outlets, nil
 }
 
 func WithField(ctx context.Context, field string, value any,
@@ -79,25 +59,23 @@ func WithField(ctx context.Context, field string, value any,
 	return WithLogger(ctx, FromContext(ctx).WithField(field, value))
 }
 
-func WithLogger(ctx context.Context, l logger.Logger) context.Context {
-	return context.WithValue(ctx, contextKeyLoggers, l)
+func WithLogger(ctx context.Context, l *logger.Logger) context.Context {
+	return context.WithValue(ctx, ctxKeyLogger, l)
 }
 
-func GetLogger(ctx context.Context, subsys Subsystem) logger.Logger {
+func GetLogger(ctx context.Context, subsys Subsystem) *logger.Logger {
 	return FromContext(ctx).WithField(SubsysField, subsys)
 }
 
-func FromContext(ctx context.Context) logger.Logger {
-	l, ok := ctx.Value(contextKeyLoggers).(logger.Logger)
+func FromContext(ctx context.Context) *logger.Logger {
+	l, ok := ctx.Value(ctxKeyLogger).(*logger.Logger)
 	if ok && l != nil {
 		return l
 	}
 	return logger.NewNullLogger()
 }
 
-func parseLogFormat(common config.LoggingOutletCommon) (f EntryFormatter,
-	err error,
-) {
+func parseLogFormat(common config.LoggingOutletCommon) (*SlogFormatter, error) {
 	switch common.Format {
 	case "human":
 		return parseSlogFormatter(&common).WithTextHandler(), nil
@@ -112,42 +90,40 @@ func parseLogFormat(common config.LoggingOutletCommon) (f EntryFormatter,
 	}
 }
 
-func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet,
-	level logger.Level, err error,
-) {
-	parseCommon := func(common config.LoggingOutletCommon) (logger.Level,
-		EntryFormatter, error,
-	) {
+func ParseOutlet(in config.LoggingOutletEnum) (o slog.Handler, err error) {
+	parseCommon := func(common config.LoggingOutletCommon,
+	) (*SlogFormatter, error) {
 		if common.Level == "" || common.Format == "" {
-			return 0, nil, errors.New("must specify 'level' and 'format' field")
+			return nil, errors.New("must specify 'level' and 'format' field")
 		}
-		minLevel, err := logger.ParseLevel(common.Level)
+		minLevel, err := parseLevel(common.Level)
 		if err != nil {
-			return 0, nil, fmt.Errorf("cannot parse 'level' field: %w", err)
+			return nil, fmt.Errorf("cannot parse 'level' field: %w", err)
 		}
 		formatter, err := parseLogFormat(common)
 		if err != nil {
-			return 0, nil, fmt.Errorf("cannot parse 'formatter' field: %w", err)
+			return nil, fmt.Errorf("cannot parse 'formatter' field: %w", err)
 		}
-		return minLevel, formatter, nil
+		formatter.WithLevel(minLevel)
+		return formatter, nil
 	}
 
-	var f EntryFormatter
+	var f *SlogFormatter
 	switch v := in.Ret.(type) {
 	case *config.TCPLoggingOutlet:
-		level, f, err = parseCommon(v.LoggingOutletCommon)
+		f, err = parseCommon(v.LoggingOutletCommon)
 		if err != nil {
 			break
 		}
 		o, err = parseTCPOutlet(v, f)
 	case *config.SyslogLoggingOutlet:
-		level, f, err = parseCommon(v.LoggingOutletCommon)
+		f, err = parseCommon(v.LoggingOutletCommon)
 		if err != nil {
 			break
 		}
 		o, err = parseSyslogOutlet(v, f)
 	case *config.FileLoggingOutlet:
-		level, f, err = parseCommon(v.LoggingOutletCommon)
+		f, err = parseCommon(v.LoggingOutletCommon)
 		if err != nil {
 			break
 		}
@@ -155,10 +131,17 @@ func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet,
 	default:
 		panic(v)
 	}
-	return o, level, err
+	return o, err
 }
 
-func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter,
+func parseLevel(s string) (l slog.Level, err error) {
+	if err = l.UnmarshalText([]byte(s)); err != nil {
+		err = fmt.Errorf("unparseable level '%s': %w", s, err)
+	}
+	return
+}
+
+func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter *SlogFormatter,
 ) (_ *TCPOutlet, err error) {
 	var tlsConfig *tls.Config
 	if in.TLS != nil {
@@ -190,19 +173,14 @@ func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter,
 		}
 	}
 
-	formatter.SetMetadataFlags(MetadataAll)
-	o := NewTCPOutlet(formatter, in.Net, in.Address, tlsConfig,
-		in.RetryInterval)
+	o := NewTCPOutlet(formatter.WithLogMetadata(true), in.Net, in.Address,
+		tlsConfig, in.RetryInterval)
 	return o, nil
 }
 
-func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter EntryFormatter,
+func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter *SlogFormatter,
 ) (*SyslogOutlet, error) {
-	formatter.SetMetadataFlags(MetadataNone)
-	o := &SyslogOutlet{
-		Formatter:     formatter,
-		Facility:      syslog.Priority(in.Facility),
-		RetryInterval: in.RetryInterval,
-	}
+	o := NewSyslogOutlet(formatter, syslog.Priority(in.Facility),
+		in.RetryInterval)
 	return o, nil
 }

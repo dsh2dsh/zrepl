@@ -83,11 +83,11 @@ func (self *server) certificate(*tls.ClientHelloInfo) (*tls.Certificate,
 	return cert, nil
 }
 
-func (self *server) Reload(log logger.Logger) error {
+func (self *server) Reload(log *logger.Logger) error {
 	return self.LoadCert(log)
 }
 
-func (self *server) LoadCert(log logger.Logger) error {
+func (self *server) LoadCert(log *logger.Logger) error {
 	if self.certFile == "" {
 		return nil
 	}

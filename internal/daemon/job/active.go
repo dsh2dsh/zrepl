@@ -909,7 +909,7 @@ func (j *ActiveSide) Shutdown() {
 	j.shutdown()
 }
 
-func (j *ActiveSide) wait(l logger.Logger) {
+func (j *ActiveSide) wait(l *logger.Logger) {
 	if j.mode.PeriodicSnapshots() {
 		l = l.WithField("mode", j.mode.Type())
 		l.Info("waiting for snapper exit")

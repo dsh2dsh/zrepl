@@ -230,7 +230,7 @@ func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
 
 func (j *SnapJob) prune(ctx context.Context) { j.doPrune(ctx) }
 
-func (j *SnapJob) wait(l logger.Logger) {
+func (j *SnapJob) wait(l *logger.Logger) {
 	if j.snapper.Periodic() {
 		l.Info("waiting for snapper job exit")
 		defer l.Info("snapper job exited")

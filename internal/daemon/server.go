@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
@@ -17,7 +18,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
-func newServerJob(log logger.Logger, controlJob *controlJob, zfsJob *zfsJob,
+func newServerJob(log *logger.Logger, controlJob *controlJob, zfsJob *zfsJob,
 ) *serverJob {
 	j := &serverJob{
 		reqBegin: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -54,7 +55,7 @@ type serverJob struct {
 	middlewares []middleware.Middleware
 	prometheus  middleware.Middleware
 
-	log      logger.Logger
+	log      *logger.Logger
 	servers  []*server
 	shutdown context.CancelFunc
 
@@ -69,8 +70,8 @@ func (self *serverJob) init() *serverJob {
 	self.middlewares = []middleware.Middleware{
 		middleware.RequestLogger(
 			// don't log requests to status endpoint, too spammy
-			middleware.WithCustomLevel(ControlJobEndpointStatus, logger.Debug),
-			middleware.WithCustomLevel("/metrics", logger.Debug)),
+			middleware.WithCustomLevel(ControlJobEndpointStatus, slog.LevelDebug),
+			middleware.WithCustomLevel("/metrics", slog.LevelDebug)),
 		self.prometheus,
 	}
 	return self

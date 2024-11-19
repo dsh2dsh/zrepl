@@ -7,9 +7,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
-type Logger = logger.Logger
-
-func getLogger(ctx context.Context) Logger {
+func getLogger(ctx context.Context) *logger.Logger {
 	return logging.GetLogger(ctx, logging.SubsysSnapshot)
 }
 

@@ -338,7 +338,7 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 
 func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 ) ([]*Step, error) {
-	log := func(ctx context.Context) logger.Logger {
+	log := func(ctx context.Context) *logger.Logger {
 		return getLogger(ctx).WithField("filesystem", fs.Path)
 	}
 	log(ctx).Debug("assessing filesystem")

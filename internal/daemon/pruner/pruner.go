@@ -48,7 +48,7 @@ const (
 	contextKeyPruneSide contextKey = 1 + iota
 )
 
-func GetLogger(ctx context.Context) logger.Logger {
+func GetLogger(ctx context.Context) *logger.Logger {
 	pruneSide := ctx.Value(contextKeyPruneSide).(string)
 	return logging.GetLogger(ctx, logging.SubsysPruning).
 		WithField("prune_side", pruneSide)

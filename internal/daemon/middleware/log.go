@@ -1,18 +1,17 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 func RequestLogger(opts ...LoggerOption) Middleware {
 	l := &LogReq{
-		levels:         make(map[string]logger.Level, 1),
-		completedLevel: logger.Debug,
+		levels:         make(map[string]slog.Level, 1),
+		completedLevel: slog.LevelDebug,
 	}
 
 	for _, fn := range opts {
@@ -24,34 +23,34 @@ func RequestLogger(opts ...LoggerOption) Middleware {
 type LoggerOption func(l *LogReq)
 
 func WithCompletedInfo() LoggerOption {
-	return func(self *LogReq) { self.completedLevel = logger.Info }
+	return func(self *LogReq) { self.completedLevel = slog.LevelInfo }
 }
 
-func WithCustomLevel(url string, level logger.Level) LoggerOption {
+func WithCustomLevel(url string, level slog.Level) LoggerOption {
 	return func(self *LogReq) { self.WithCustomLevel(url, level) }
 }
 
 type LogReq struct {
-	levels map[string]logger.Level
+	levels map[string]slog.Level
 
-	completedLevel logger.Level
+	completedLevel slog.Level
 }
 
-func (self *LogReq) WithCustomLevel(url string, level logger.Level) *LogReq {
+func (self *LogReq) WithCustomLevel(url string, level slog.Level) *LogReq {
 	self.levels[url] = level
 	return self
 }
 
 func (self *LogReq) middleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		log := getLogger(r)
-		logLevel := self.requestLevel(r)
+		log := getLogger(r).With(
+			slog.String("proto", r.Proto),
+			slog.String("remote_addr", r.RemoteAddr))
 
+		logLevel := self.requestLevel(r)
 		methodURL := r.Method + " " + r.URL.String()
-		log.WithField("proto", r.Proto).
-			WithField("remote_addr", r.RemoteAddr).
-			Log(logLevel, "\""+methodURL+"\"")
-		log = log.WithField("req", methodURL)
+		log.Log(r.Context(), logLevel, methodURL)
+		log = log.With(slog.String("req", methodURL))
 
 		if next == nil {
 			log.Error("no next handler configured")
@@ -60,17 +59,18 @@ func (self *LogReq) middleware(next http.Handler) http.Handler {
 
 		t := time.Now()
 		next.ServeHTTP(w, r)
-		log.WithField("duration", time.Since(t)).Log(
-			min(logLevel, self.completedLevel), "request completed")
+		log.With(slog.Duration("duration", time.Since(t))).
+			Log(r.Context(),
+				min(logLevel, self.completedLevel), "request completed")
 	}
 	return http.HandlerFunc(fn)
 }
 
-func (self *LogReq) requestLevel(r *http.Request) logger.Level {
+func (self *LogReq) requestLevel(r *http.Request) slog.Level {
 	if level, ok := self.levels[r.URL.String()]; ok {
 		return level
 	}
-	return logger.Info
+	return slog.LevelInfo
 }
 
 // --------------------------------------------------

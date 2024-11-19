@@ -17,9 +17,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-type Logger = logger.Logger
-
-func GetLogger(ctx context.Context) Logger {
+func GetLogger(ctx context.Context) *logger.Logger {
 	return logging.GetLogger(ctx, logging.SubsysJob)
 }
 

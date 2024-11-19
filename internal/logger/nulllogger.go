@@ -1,15 +1,21 @@
 package logger
 
-type nullLogger struct{}
+import (
+	"context"
+	"log/slog"
+)
 
-var _ Logger = (*nullLogger)(nil)
+func NewNullLogger() *Logger {
+	return NewLogger(NewOutlets().Add(NewNullOutlet()))
+}
 
-func NewNullLogger() Logger { return nullLogger{} }
+func NewNullOutlet() nullOutlet { return nullOutlet{} }
 
-func (n nullLogger) WithField(field string, val any) Logger { return n }
-func (n nullLogger) WithError(err error) Logger             { return n }
-func (nullLogger) Log(level Level, msg string)              {}
-func (nullLogger) Debug(msg string)                         {}
-func (nullLogger) Info(msg string)                          {}
-func (nullLogger) Warn(msg string)                          {}
-func (nullLogger) Error(msg string)                         {}
+type nullOutlet struct{}
+
+var _ slog.Handler = (*nullOutlet)(nil)
+
+func (nullOutlet) Enabled(context.Context, slog.Level) bool   { return true }
+func (nullOutlet) Handle(context.Context, slog.Record) error  { return nil }
+func (n nullOutlet) WithAttrs(attrs []slog.Attr) slog.Handler { return n }
+func (n nullOutlet) WithGroup(name string) slog.Handler       { return n }

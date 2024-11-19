@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"slices"
@@ -64,7 +65,7 @@ func (self *Cmd) Run(ctx context.Context) error {
 
 	output, err := cmd.Output()
 	self.output = output
-	logOutput(l, logger.Info, "stdout", self.output)
+	logOutput(l, slog.LevelInfo, "stdout", self.output)
 
 	if err != nil {
 		return fmt.Errorf("exec %q: %w",
@@ -73,7 +74,7 @@ func (self *Cmd) Run(ctx context.Context) error {
 	return nil
 }
 
-func (self *Cmd) wrapError(ctx context.Context, l logger.Logger, err error,
+func (self *Cmd) wrapError(ctx context.Context, l *logger.Logger, err error,
 ) error {
 	if err == nil {
 		return nil
@@ -81,7 +82,7 @@ func (self *Cmd) wrapError(ctx context.Context, l logger.Logger, err error,
 
 	var ee *exec.ExitError
 	if errors.As(err, &ee) && len(ee.Stderr) != 0 {
-		logOutput(l, logger.Error, "stderr", ee.Stderr)
+		logOutput(l, slog.LevelError, "stderr", ee.Stderr)
 		self.output = slices.Concat(self.output, ee.Stderr)
 	}
 

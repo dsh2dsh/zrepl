@@ -42,7 +42,7 @@ type jobs struct {
 	ctx context.Context
 
 	cron *cron.Cron
-	log  logger.Logger
+	log  *logger.Logger
 
 	wakeups map[string]wakeup.Func // by Job.Name
 	resets  map[string]reset.Func  // by Job.Name
@@ -148,7 +148,7 @@ func (self *jobs) mustCheckJobName(s string) {
 	}
 }
 
-func (self *jobs) start(ctx context.Context, j job.Internal, log logger.Logger,
+func (self *jobs) start(ctx context.Context, j job.Internal, log *logger.Logger,
 ) {
 	self.g.Go(func() error {
 		log.Info("starting job")

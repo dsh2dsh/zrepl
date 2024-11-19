@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,19 +48,37 @@ func metricsEndpoints(mux *http.ServeMux, m ...middleware.Middleware) {
 
 // --------------------------------------------------
 
-type prometheusJobOutlet struct{}
-
-var _ logger.Outlet = prometheusJobOutlet{}
-
-func newPrometheusLogOutlet() prometheusJobOutlet {
-	return prometheusJobOutlet{}
+type promLogOutlet struct {
+	jobName string
 }
 
-func (o prometheusJobOutlet) WriteEntry(entry logger.Entry) error {
-	jobFieldVal, ok := entry.Fields[logging.JobField].(string)
-	if !ok {
-		jobFieldVal = "_nojobid"
+var _ slog.Handler = (*promLogOutlet)(nil)
+
+func newPrometheusLogOutlet() *promLogOutlet { return &promLogOutlet{} }
+
+func (promLogOutlet) Enabled(context.Context, slog.Level) bool { return true }
+
+func (self *promLogOutlet) Handle(_ context.Context, r slog.Record) error {
+	jobName := self.jobName
+	if jobName == "" {
+		jobName = "_nojobid"
 	}
-	metricLogEntries.WithLabelValues(jobFieldVal, entry.Level.String()).Inc()
+	metricLogEntries.WithLabelValues(jobName, r.Level.String()).Inc()
 	return nil
+}
+
+func (self *promLogOutlet) WithAttrs(attrs []slog.Attr) slog.Handler {
+	for _, a := range attrs {
+		if a.Key == logging.JobField {
+			return &promLogOutlet{jobName: a.Value.String()}
+		}
+	}
+	return self
+}
+
+func (self *promLogOutlet) WithGroup(name string) slog.Handler {
+	if name == "" {
+		return self
+	}
+	return logger.NewNullOutlet()
 }

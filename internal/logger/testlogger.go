@@ -1,26 +1,23 @@
 package logger
 
 import (
+	"io"
+	"log/slog"
 	"testing"
 )
 
-type testLogger struct {
-	Logger
+func NewTestLogger(t *testing.T) *Logger {
+	h := slog.NewTextHandler(&testingWriter{t}, nil)
+	return NewLogger(NewOutlets().Add(h))
 }
 
-type testingLoggerOutlet struct {
+type testingWriter struct {
 	t *testing.T
 }
 
-func (o testingLoggerOutlet) WriteEntry(entry Entry) error {
-	o.t.Logf("%#v", entry)
-	return nil
-}
+var _ io.Writer = (*testingWriter)(nil)
 
-var _ Logger = (*testLogger)(nil)
-
-func NewTestLogger(t *testing.T) *testLogger {
-	outlets := NewOutlets()
-	outlets.Add(&testingLoggerOutlet{t}, Debug)
-	return &testLogger{Logger: NewLogger(outlets, 0)}
+func (self *testingWriter) Write(p []byte) (int, error) {
+	self.t.Log(string(p))
+	return len(p), nil
 }

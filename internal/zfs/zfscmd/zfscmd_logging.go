@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"log/slog"
 	"os/exec"
 	"time"
 
@@ -34,27 +35,27 @@ func waitPreLogging(c *Cmd, _ time.Time) {
 }
 
 func waitPostLogging(c *Cmd, err error, debug bool) {
-	log := c.logWithCmd().
-		WithField("total_time_s", c.usage.total_secs).
-		WithField("systemtime_s", c.usage.system_secs).
-		WithField("usertime_s", c.usage.user_secs)
+	log := c.logWithCmd().With(
+		slog.Float64("total_time_s", c.usage.total_secs),
+		slog.Float64("systemtime_s", c.usage.system_secs),
+		slog.Float64("usertime_s", c.usage.user_secs))
 
 	if err == nil {
 		log.Debug("command exited without error")
 		return
 	}
-	log = log.WithError(err)
 
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
-		log = log.WithField("status", exitError.ExitCode())
+		log = log.With(slog.Int("status", exitError.ExitCode()))
 	}
 
-	level := logger.Error
+	level := slog.LevelError
 	if debug {
-		level = logger.Debug
+		level = slog.LevelDebug
 	}
-	log.Log(level, "command exited with error")
+	log = logger.WithError(log, err, "")
+	log.Log(c.ctx, level, "command exited with error")
 
 	if len(c.stderrOutput) == 0 {
 		return
@@ -62,6 +63,6 @@ func waitPostLogging(c *Cmd, err error, debug bool) {
 
 	s := bufio.NewScanner(bytes.NewReader(c.stderrOutput))
 	for s.Scan() {
-		c.log().Log(level, "output: "+s.Text())
+		c.log().Log(c.ctx, level, "output: "+s.Text())
 	}
 }

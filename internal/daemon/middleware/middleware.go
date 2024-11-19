@@ -30,7 +30,7 @@ func AppendHandler(m []Middleware, h http.Handler) http.Handler {
 	return Append(m, func(http.Handler) http.Handler { return h })
 }
 
-func getLogger(r *http.Request) logger.Logger {
+func getLogger(r *http.Request) *logger.Logger {
 	return logging.FromContext(r.Context())
 }
 
