@@ -53,39 +53,25 @@ func OutletsFromConfig(in config.LoggingOutletEnumList,
 type Subsystem string
 
 const (
-	SubsysCron         Subsystem = "cron"
-	SubsysMeta         Subsystem = "meta"
-	SubsysJob          Subsystem = "job"
-	SubsysReplication  Subsystem = "repl"
-	SubsysEndpoint     Subsystem = "endpoint"
-	SubsysPruning      Subsystem = "pruning"
-	SubsysSnapshot     Subsystem = "snapshot"
-	SubsysHooks        Subsystem = "hook"
-	SubsysTransport    Subsystem = "transport"
-	SubsysTransportMux Subsystem = "transportmux"
-	SubsysRPC          Subsystem = "rpc"
-	SubsysRPCControl   Subsystem = "rpc.ctrl"
-	SubsysRPCData      Subsystem = "rpc.data"
-	SubsysZFSCmd       Subsystem = "zfs.cmd"
-	SubsysPlatformtest Subsystem = "platformtest"
+	SubsysCron        Subsystem = "cron"
+	SubsysJob         Subsystem = "job"
+	SubsysReplication Subsystem = "repl"
+	SubsysEndpoint    Subsystem = "endpoint"
+	SubsysPruning     Subsystem = "pruning"
+	SubsysSnapshot    Subsystem = "snapshot"
+	SubsysHooks       Subsystem = "hook"
+	SubsysZFSCmd      Subsystem = "zfs.cmd"
 )
 
 var AllSubsystems = []Subsystem{
 	SubsysCron,
-	SubsysMeta,
 	SubsysJob,
 	SubsysReplication,
 	SubsysEndpoint,
 	SubsysPruning,
 	SubsysSnapshot,
 	SubsysHooks,
-	SubsysTransport,
-	SubsysTransportMux,
-	SubsysRPC,
-	SubsysRPCControl,
-	SubsysRPCData,
 	SubsysZFSCmd,
-	SubsysPlatformtest,
 }
 
 func WithField(ctx context.Context, field string, value any,
@@ -102,14 +88,16 @@ func GetLogger(ctx context.Context, subsys Subsystem) logger.Logger {
 }
 
 func FromContext(ctx context.Context) logger.Logger {
-	if l, ok := ctx.Value(contextKeyLoggers).(logger.Logger); ok && l != nil {
+	l, ok := ctx.Value(contextKeyLoggers).(logger.Logger)
+	if ok && l != nil {
 		return l
 	}
 	return logger.NewNullLogger()
 }
 
-func parseLogFormat(common config.LoggingOutletCommon,
-) (f EntryFormatter, err error) {
+func parseLogFormat(common config.LoggingOutletCommon) (f EntryFormatter,
+	err error,
+) {
 	switch common.Format {
 	case "human":
 		return parseSlogFormatter(&common).WithTextHandler(), nil
@@ -124,10 +112,12 @@ func parseLogFormat(common config.LoggingOutletCommon,
 	}
 }
 
-func ParseOutlet(in config.LoggingOutletEnum,
-) (o logger.Outlet, level logger.Level, err error) {
-	parseCommon := func(common config.LoggingOutletCommon,
-	) (logger.Level, EntryFormatter, error) {
+func ParseOutlet(in config.LoggingOutletEnum) (o logger.Outlet,
+	level logger.Level, err error,
+) {
+	parseCommon := func(common config.LoggingOutletCommon) (logger.Level,
+		EntryFormatter, error,
+	) {
 		if common.Level == "" || common.Format == "" {
 			return 0, nil, errors.New("must specify 'level' and 'format' field")
 		}
@@ -143,7 +133,6 @@ func ParseOutlet(in config.LoggingOutletEnum,
 	}
 
 	var f EntryFormatter
-
 	switch v := in.Ret.(type) {
 	case *config.TCPLoggingOutlet:
 		level, f, err = parseCommon(v.LoggingOutletCommon)
@@ -169,10 +158,12 @@ func ParseOutlet(in config.LoggingOutletEnum,
 	return o, level, err
 }
 
-func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter) (out *TCPOutlet, err error) {
+func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter,
+) (_ *TCPOutlet, err error) {
 	var tlsConfig *tls.Config
 	if in.TLS != nil {
-		tlsConfig, err = func(m *config.TCPLoggingOutletTLS, host string) (*tls.Config, error) {
+		tlsConfig, err = func(m *config.TCPLoggingOutletTLS, host string,
+		) (*tls.Config, error) {
 			clientCert, err := tls.LoadX509KeyPair(m.Cert, m.Key)
 			if err != nil {
 				return nil, fmt.Errorf("cannot load client cert: %w", err)
@@ -192,7 +183,6 @@ func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter) (out 
 			if rootCAs == nil {
 				panic("invariant violated")
 			}
-
 			return tlsconf.ClientAuthClient(host, rootCAs, clientCert)
 		}(in.TLS, in.Address)
 		if err != nil {
@@ -201,14 +191,18 @@ func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter EntryFormatter) (out 
 	}
 
 	formatter.SetMetadataFlags(MetadataAll)
-	return NewTCPOutlet(formatter, in.Net, in.Address, tlsConfig, in.RetryInterval), nil
+	o := NewTCPOutlet(formatter, in.Net, in.Address, tlsConfig,
+		in.RetryInterval)
+	return o, nil
 }
 
-func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter EntryFormatter) (out *SyslogOutlet, err error) {
-	out = &SyslogOutlet{}
-	out.Formatter = formatter
-	out.Formatter.SetMetadataFlags(MetadataNone)
-	out.Facility = syslog.Priority(in.Facility)
-	out.RetryInterval = in.RetryInterval
-	return out, nil
+func parseSyslogOutlet(in *config.SyslogLoggingOutlet, formatter EntryFormatter,
+) (*SyslogOutlet, error) {
+	formatter.SetMetadataFlags(MetadataNone)
+	o := &SyslogOutlet{
+		Formatter:     formatter,
+		Facility:      syslog.Priority(in.Facility),
+		RetryInterval: in.RetryInterval,
+	}
+	return o, nil
 }

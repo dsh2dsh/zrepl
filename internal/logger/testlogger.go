@@ -17,12 +17,10 @@ func (o testingLoggerOutlet) WriteEntry(entry Entry) error {
 	return nil
 }
 
-var _ Logger = testLogger{}
+var _ Logger = (*testLogger)(nil)
 
-func NewTestLogger(t *testing.T) Logger {
+func NewTestLogger(t *testing.T) *testLogger {
 	outlets := NewOutlets()
 	outlets.Add(&testingLoggerOutlet{t}, Debug)
-	return &testLogger{
-		Logger: NewLogger(outlets, 0),
-	}
+	return &testLogger{Logger: NewLogger(outlets, 0)}
 }
