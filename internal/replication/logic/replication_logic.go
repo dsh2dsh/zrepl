@@ -332,7 +332,6 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 			promBytesReplicated: ctr,
 		})
 	}
-
 	return q, nil
 }
 
@@ -361,7 +360,8 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 
 	fsvsResps, err := fs.listBothVersions(ctx)
 	if err != nil {
-		log(ctx).WithError(err).Error("cannot get filesystem versions")
+		log(ctx).WithError(err).
+			Error("cannot get sender/receiver filesystem versions")
 		return nil, err
 	}
 	sfsvs := fsvsResps[0].GetVersions()
@@ -372,7 +372,7 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 	}
 
 	var rfsvs []*pdu.FilesystemVersion
-	if fs.receiverFS != nil && !fs.receiverFS.GetIsPlaceholder() {
+	if fs.needReceiverVersions() {
 		rfsvs = fsvsResps[1].GetVersions()
 	} else {
 		rfsvs = []*pdu.FilesystemVersion{}
@@ -553,15 +553,21 @@ func (fs *Filesystem) listBothVersions(ctx context.Context,
 		return nil
 	})
 
-	g.Go(func() error {
-		resp, err := fs.receiver.ListFilesystemVersions(ctx, &req)
-		if err != nil {
-			return fmt.Errorf("receiver: %w", err)
-		}
-		resps[1] = resp
-		return nil
-	})
+	if fs.needReceiverVersions() {
+		g.Go(func() error {
+			resp, err := fs.receiver.ListFilesystemVersions(ctx, &req)
+			if err != nil {
+				return fmt.Errorf("receiver: %w", err)
+			}
+			resps[1] = resp
+			return nil
+		})
+	}
 	return resps, g.Wait() //nolint:wrapcheck // our error
+}
+
+func (fs *Filesystem) needReceiverVersions() bool {
+	return fs.receiverFS != nil && !fs.receiverFS.GetIsPlaceholder()
 }
 
 func (fs *Filesystem) updateSizeEstimates(ctx context.Context, steps []*Step,

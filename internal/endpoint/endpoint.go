@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"path"
 	"slices"
@@ -669,10 +670,9 @@ func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	if err != nil {
 		var errNotExist *zfs.DatasetDoesNotExist
 		if errors.As(err, &errNotExist) {
-			msg := "root_fs does not exist"
-			err = fmt.Errorf("%s: %w", msg, err)
-			getLogger(ctx).WithError(err).WithField("root_fs", rootStr).Error(msg)
-			return nil, err
+			getLogger(ctx).With(slog.String("root", rootStr)).
+				Debug("no filesystems found")
+			return &pdu.ListFilesystemRes{}, nil
 		}
 		return nil, fmt.Errorf(
 			"failed get properties of fs %q: %w", rootStr, err)
