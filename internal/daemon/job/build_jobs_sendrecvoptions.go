@@ -27,6 +27,8 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		FSF:   fsf,
 		JobID: jobID,
 
+		ListPlaceholders: sendOpts.ListPlaceholders,
+
 		Encrypt:              &nodefault.Bool{B: sendOpts.Encrypted},
 		SendRaw:              sendOpts.Raw,
 		SendProperties:       sendOpts.SendProperties,

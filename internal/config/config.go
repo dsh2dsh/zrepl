@@ -185,6 +185,7 @@ type DatasetFilter struct {
 }
 
 type SendOptions struct {
+	ListPlaceholders bool `yaml:"list_placeholders"`
 	Encrypted        bool `yaml:"encrypted"`
 	Raw              bool `yaml:"raw" default:"true"`
 	SendProperties   bool `yaml:"send_properties"`

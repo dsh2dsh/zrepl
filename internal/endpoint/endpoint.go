@@ -11,11 +11,14 @@ import (
 	"log/slog"
 	"maps"
 	"path"
+	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
@@ -26,6 +29,8 @@ import (
 type SenderConfig struct {
 	FSF   zfs.DatasetFilter
 	JobID JobID
+
+	ListPlaceholders bool
 
 	Encrypt              *nodefault.Bool
 	SendRaw              bool
@@ -100,13 +105,62 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	for i, p := range fss {
 		rfss[i] = &pdu.Filesystem{
 			Path: p.ToString(),
-			// ResumeToken does not make sense from Sender. And IsPlaceholder too,
-			// because after FSFilter we got non plaseholder datasets only.
+			// ResumeToken does not make sense from Sender.
 		}
 	}
 
+	if s.config.ListPlaceholders {
+		if err := s.listPlaceholders(ctx, fss, rfss); err != nil {
+			return nil, err
+		}
+	}
 	res := &pdu.ListFilesystemRes{Filesystems: rfss}
 	return res, nil
+}
+
+func (s *Sender) listPlaceholders(ctx context.Context, fss []*zfs.DatasetPath,
+	rfss []*pdu.Filesystem,
+) error {
+	concurrency := runtime.GOMAXPROCS(0)
+	getLogger(ctx).
+		With(
+			slog.Int("fs_count", len(fss)),
+			slog.Int("concurrency", concurrency)).
+		Info("get placeholder states")
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrency)
+
+	begin := time.Now()
+	for i, p := range fss {
+		g.Go(func() error {
+			l := getLogger(ctx).With(slog.String("fs", p.ToString()))
+			ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, p)
+			if err != nil {
+				logger.WithError(l, err, "error getting placeholder state")
+				return fmt.Errorf(
+					"cannot get placeholder state for fs %q: %w", p.ToString(), err)
+			}
+			l.With(slog.String("placeholder_state", fmt.Sprintf("%#v", ph))).
+				Debug("placeholder state")
+			if !ph.FSExists {
+				l.Error("inconsistent placeholder state: filesystem must exists")
+				return fmt.Errorf(
+					"inconsistent placeholder state: filesystem %q must exist in this context",
+					p.ToString())
+			}
+			rfss[i].IsPlaceholder = ph.IsPlaceholder
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err //nolint:wrapcheck // from our package
+	}
+
+	getLogger(ctx).With(slog.Duration("duration", time.Since(begin))).
+		Info("got all placeholder states")
+	return nil
 }
 
 func (s *Sender) ListFilesystemVersions(ctx context.Context, r *pdu.ListFilesystemVersionsReq) (*pdu.ListFilesystemVersionsRes, error) {
