@@ -13,7 +13,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/replication/logic"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -37,12 +36,6 @@ type Job interface {
 	OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool)
 	SenderConfig() *endpoint.SenderConfig
 	Runnable() bool
-}
-
-type Endpoint interface {
-	logic.Endpoint
-	logic.Receiver
-	logic.Sender
 }
 
 type Type string

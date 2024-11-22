@@ -280,33 +280,19 @@ func (j *SnapJob) doPrune(ctx context.Context) {
 // But the pruner.Pruner gives up on an FS if no replication
 // cursor is present, which is why this pruner returns the
 // most recent filesystem version.
-func NewLocalSender(ctx context.Context, target pruner.Target) *LocalSender {
-	return &LocalSender{
-		Target: target,
-
-		listFilesystemsOnce: sync.OnceValues(
-			func() (*pdu.ListFilesystemRes, error) {
-				return target.ListFilesystems(ctx)
-			}),
-	}
+func NewLocalSender(ctx context.Context, target *endpoint.Sender) *LocalSender {
+	return &LocalSender{NewSenderOnce(ctx, target)}
 }
 
 type LocalSender struct {
 	// the Target passed as Target to BuildLocalPruner
 	pruner.Target
-
-	listFilesystemsOnce func() (*pdu.ListFilesystemRes, error)
 }
 
 var (
 	_ pruner.Sender = (*LocalSender)(nil)
 	_ pruner.Target = (*LocalSender)(nil)
 )
-
-func (self *LocalSender) ListFilesystems(ctx context.Context,
-) (*pdu.ListFilesystemRes, error) {
-	return self.listFilesystemsOnce()
-}
 
 func (self *LocalSender) ReplicationCursor(ctx context.Context,
 	req *pdu.ReplicationCursorReq,
@@ -325,10 +311,10 @@ func (self *LocalSender) ReplicationCursor(ctx context.Context,
 	}
 
 	// always return must recent version
-	mostRecent := slices.MaxFunc(fsvs,
-		func(a, b *pdu.FilesystemVersion) int {
-			return cmp.Compare(a.CreateTXG, b.CreateTXG)
-		})
+	mostRecent := slices.MaxFunc(fsvs, func(a, b *pdu.FilesystemVersion) int {
+		return cmp.Compare(a.CreateTXG, b.CreateTXG)
+	})
+
 	return &pdu.ReplicationCursorRes{
 		Result: &pdu.ReplicationCursorRes_Result{Guid: mostRecent.GetGuid()},
 	}, nil

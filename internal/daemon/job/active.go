@@ -856,10 +856,11 @@ func (j *ActiveSide) pruneSender(ctx context.Context) error {
 		Info("start pruning sender")
 
 	sender, _ := j.mode.SenderReceiver()
+	senderOnce := NewSenderOnce(ctx, sender)
 	tasks := j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.state = ActiveSidePruneSender
 		tasks.prunerSender = j.prunerFactory.BuildSenderPruner(
-			ctx, sender, sender)
+			ctx, senderOnce, senderOnce)
 	})
 
 	begin := time.Now()
