@@ -68,3 +68,10 @@ func (self *filterItem) CompatCompare(b *filterItem) int {
 	}
 	return cmp.Compare(self.path.Length(), b.path.Length())
 }
+
+func (self *filterItem) RecursiveDataset() *zfs.DatasetPath {
+	if !self.recursive || !self.mapping {
+		return nil
+	}
+	return self.path
+}

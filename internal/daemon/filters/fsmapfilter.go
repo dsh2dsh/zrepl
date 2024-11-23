@@ -152,3 +152,10 @@ func (self *DatasetFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet 
 func (self *DatasetFilter) AsFilter() endpoint.FSFilter { return self }
 
 func (self *DatasetFilter) Empty() bool { return len(self.entries) == 0 }
+
+func (self *DatasetFilter) SingleRecursiveDataset() *zfs.DatasetPath {
+	if len(self.entries) != 1 {
+		return nil
+	}
+	return self.entries[0].RecursiveDataset()
+}

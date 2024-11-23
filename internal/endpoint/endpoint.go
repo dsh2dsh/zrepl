@@ -96,6 +96,10 @@ func (s *Sender) filterCheckFS(fs string) (*zfs.DatasetPath, error) {
 func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	error,
 ) {
+	if root := s.FSFilter.SingleRecursiveDataset(); root != nil {
+		return listFilesystemsRecursive(ctx, root, zfs.PlaceholderPropertyName)
+	}
+
 	fss, err := zfs.ZFSListMapping(ctx, s.FSFilter)
 	if err != nil {
 		return nil, err
@@ -710,17 +714,25 @@ func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
 	return c, nil
 }
 
+func (f subroot) SingleRecursiveDataset() *zfs.DatasetPath {
+	return f.localRoot
+}
+
 const receiveResumeToken = "receive_resume_token"
 
 func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	error,
 ) {
-	root := s.clientRootFromCtx(ctx)
+	return listFilesystemsRecursive(ctx, s.clientRootFromCtx(ctx),
+		zfs.PlaceholderPropertyName, receiveResumeToken)
+}
+
+func listFilesystemsRecursive(ctx context.Context, root *zfs.DatasetPath,
+	props ...string,
+) (*pdu.ListFilesystemRes, error) {
 	rootStr := root.ToString()
 	fsProps, err := zfs.ZFSGetRecursive(ctx, rootStr, -1,
-		[]string{"filesystem"},
-		[]string{zfs.PlaceholderPropertyName, receiveResumeToken},
-		zfs.SourceAny)
+		[]string{"filesystem"}, props, zfs.SourceAny)
 	if err != nil {
 		var errNotExist *zfs.DatasetDoesNotExist
 		if errors.As(err, &errNotExist) {

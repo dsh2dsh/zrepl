@@ -14,13 +14,14 @@ type DatasetFilter interface {
 	// The caller owns the returned set.
 	// Implementations should return a copy.
 	UserSpecifiedDatasets() UserSpecifiedDatasetsSet
+	SingleRecursiveDataset() *DatasetPath
 }
 
 // A set of dataset names that the user specified in the configuration file.
 type UserSpecifiedDatasetsSet map[string]bool
 
 // Returns a DatasetFilter that does not filter (passes all paths)
-func NoFilter() DatasetFilter {
+func NoFilter() noFilter {
 	return noFilter{}
 }
 
@@ -35,6 +36,8 @@ func (noFilter) Filter(p *DatasetPath) (bool, error) {
 func (noFilter) UserSpecifiedDatasets() UserSpecifiedDatasetsSet { return nil }
 
 func (noFilter) Empty() bool { return true }
+
+func (noFilter) SingleRecursiveDataset() *DatasetPath { return nil }
 
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 ) ([]*DatasetPath, error) {
