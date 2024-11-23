@@ -74,11 +74,11 @@ func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter,
 
 	unmatchedUserSpecifiedDatasets := filter.UserSpecifiedDatasets()
 	datasets := []ZFSListMappingPropertiesResult{}
-	for r := range zfsList {
-		if r.Err != nil {
-			return nil, r.Err
+	for fields, err := range zfsList {
+		if err != nil {
+			return nil, err
 		}
-		path, err := NewDatasetPath(r.Fields[0])
+		path, err := NewDatasetPath(fields[0])
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter,
 		} else if pass {
 			datasets = append(datasets, ZFSListMappingPropertiesResult{
 				Path:   path,
-				Fields: r.Fields[1:],
+				Fields: fields[1:],
 			})
 		}
 	}

@@ -159,15 +159,15 @@ func (self *SnapCheck) datasetsFromFilter(
 	}
 
 	filtered := []string{}
-	for item := range zfs.ZFSListIter(ctx, []string{"name"}, nil) {
-		if item.Err != nil {
-			return nil, item.Err
-		} else if path, err := zfs.NewDatasetPath(item.Fields[0]); err != nil {
+	for fields, err := range zfs.ZFSListIter(ctx, []string{"name"}, nil) {
+		if err != nil {
+			return nil, err
+		} else if path, err := zfs.NewDatasetPath(fields[0]); err != nil {
 			return nil, err
 		} else if ok, err := filesystems.Filter(path); err != nil {
 			return nil, err
 		} else if ok {
-			filtered = append(filtered, item.Fields[0])
+			filtered = append(filtered, fields[0])
 		}
 	}
 	return filtered, nil

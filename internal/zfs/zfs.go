@@ -194,18 +194,13 @@ func (self *ZFSError) Unwrap() error {
 func ZFSList(ctx context.Context, properties []string, zfsArgs ...string,
 ) ([][]string, error) {
 	res := [][]string{}
-	for r := range ZFSListIter(ctx, properties, nil, zfsArgs...) {
-		if r.Err != nil {
-			return nil, r.Err
+	for fields, err := range ZFSListIter(ctx, properties, nil, zfsArgs...) {
+		if err != nil {
+			return nil, err
 		}
-		res = append(res, r.Fields)
+		res = append(res, fields)
 	}
 	return res, nil
-}
-
-type ZFSListResult struct {
-	Fields []string
-	Err    error
 }
 
 // ZFSListIter executes `zfs list` and returns an iterator with the results.
@@ -214,18 +209,18 @@ type ZFSListResult struct {
 // attempted to be interpreted as a *DatasetDoesNotExist error.
 func ZFSListIter(ctx context.Context, properties []string,
 	notExistHint *DatasetPath, zfsArgs ...string,
-) iter.Seq[ZFSListResult] {
+) iter.Seq2[[]string, error] {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin,
 		zfsListArgs(properties, zfsArgs)...).WithLogError(false)
 	var stderrBuf bytes.Buffer
 	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
 
-	iter := func(yield func(ZFSListResult) bool) {
+	iter := func(yield func([]string, error) bool) {
 		if err != nil {
-			yield(ZFSListResult{Err: err})
+			yield(nil, err)
 			return
 		} else if err := cmd.Start(); err != nil {
-			yield(ZFSListResult{Err: err})
+			yield(nil, err)
 			return
 		}
 
@@ -237,7 +232,7 @@ func ZFSListIter(ctx context.Context, properties []string,
 				} else if ctx.Err() != nil {
 					return nil, false
 				}
-				return nil, yield(ZFSListResult{Fields: fields})
+				return nil, yield(fields, nil)
 			})
 		if err != nil {
 			if notExistHint != nil {
@@ -245,7 +240,7 @@ func ZFSListIter(ctx context.Context, properties []string,
 			} else {
 				cmd.WithStderrOutput(stderrBuf.Bytes()).LogError(err, false)
 			}
-			yield(ZFSListResult{Err: err})
+			yield(nil, err)
 		}
 	}
 	return iter

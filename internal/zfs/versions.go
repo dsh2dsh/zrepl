@@ -266,11 +266,11 @@ func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath,
 		"-s", "createtxg", fs.ToString())
 
 	res := []FilesystemVersion{}
-	for r := range listResults {
-		if r.Err != nil {
-			return nil, r.Err
+	for fields, err := range listResults {
+		if err != nil {
+			return nil, err
 		}
-		line := r.Fields
+		line := fields
 		var args ParseFilesystemVersionArgs
 		args = args.
 			WithFullName(line[0]).
