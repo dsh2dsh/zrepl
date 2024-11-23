@@ -52,7 +52,7 @@ func doMigratePlaceholder0_1(ctx context.Context, sc *cli.Subcommand, args []str
 
 	cfg := sc.Config()
 
-	allFSS, err := zfs.ZFSListMapping(ctx, zfs.NoFilter())
+	allFSS, err := zfs.ZFSListPaths(ctx)
 	if err != nil {
 		return fmt.Errorf("cannot list filesystems: %w", err)
 	}
@@ -154,7 +154,7 @@ func doMigrateReplicationCursor(ctx context.Context, sc *cli.Subcommand, args []
 
 	// scan all filesystems for v1 replication cursors
 
-	fss, err := zfs.ZFSListMapping(ctx, zfs.NoFilter())
+	fss, err := zfs.ZFSListPaths(ctx)
 	if err != nil {
 		return fmt.Errorf("list filesystems: %w", err)
 	}

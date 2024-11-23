@@ -203,6 +203,23 @@ func ZFSList(ctx context.Context, properties []string, zfsArgs ...string,
 	return res, nil
 }
 
+func ZFSListPaths(ctx context.Context) ([]*DatasetPath, error) {
+	paths := []*DatasetPath{}
+	zfsList := ZFSListIter(ctx, []string{"name"}, nil, "-r", "-t",
+		"filesystem,volume")
+	for fields, err := range zfsList {
+		if err != nil {
+			return nil, err
+		}
+		path, err := NewDatasetPath(fields[0])
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
+}
+
 // ZFSListIter executes `zfs list` and returns an iterator with the results.
 //
 // If notExistHint is not nil and zfs exits with an error, the stderr is
