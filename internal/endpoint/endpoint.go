@@ -682,42 +682,6 @@ func clientRoot(rootFS *zfs.DatasetPath, clientIdentity string) (*zfs.DatasetPat
 	return clientRoot, nil
 }
 
-type subroot struct {
-	localRoot *zfs.DatasetPath
-}
-
-var _ zfs.DatasetFilter = subroot{}
-
-// Filters local p
-func (f subroot) Filter(p *zfs.DatasetPath) (pass bool, err error) {
-	return p.HasPrefix(f.localRoot) && !p.Equal(f.localRoot), nil
-}
-
-func (f subroot) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet {
-	return zfs.UserSpecifiedDatasetsSet{
-		f.localRoot.ToString(): true,
-	}
-}
-
-func (f subroot) Empty() bool { return false }
-
-func (f subroot) MapToLocal(fs string) (*zfs.DatasetPath, error) {
-	p, err := zfs.NewDatasetPath(fs)
-	if err != nil {
-		return nil, err
-	}
-	if p.Length() == 0 {
-		return nil, errors.New("cannot map empty filesystem")
-	}
-	c := f.localRoot.Copy()
-	c.Extend(p)
-	return c, nil
-}
-
-func (f subroot) SingleRecursiveDataset() *zfs.DatasetPath {
-	return f.localRoot
-}
-
 const receiveResumeToken = "receive_resume_token"
 
 func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
@@ -804,8 +768,7 @@ func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,
 func (s *Receiver) ListFilesystemVersions(ctx context.Context,
 	req *pdu.ListFilesystemVersionsReq,
 ) (*pdu.ListFilesystemVersionsRes, error) {
-	root := s.clientRootFromCtx(ctx)
-	lp, err := subroot{root}.MapToLocal(req.GetFilesystem())
+	lp, err := mapToLocal(s.clientRootFromCtx(ctx), req.GetFilesystem())
 	if err != nil {
 		return nil, err
 	}
@@ -821,6 +784,19 @@ func (s *Receiver) ListFilesystemVersions(ctx context.Context,
 		rfsvs[i] = pdu.FilesystemVersionFromZFS(&fsvs[i])
 	}
 	return &pdu.ListFilesystemVersionsRes{Versions: rfsvs}, nil
+}
+
+func mapToLocal(root *zfs.DatasetPath, fs string) (*zfs.DatasetPath, error) {
+	p, err := zfs.NewDatasetPath(fs)
+	if err != nil {
+		return nil, err
+	}
+	if p.Length() == 0 {
+		return nil, errors.New("cannot map empty filesystem")
+	}
+	c := root.Copy()
+	c.Extend(p)
+	return c, nil
 }
 
 func (s *Receiver) WaitForConnectivity(ctx context.Context) error {
@@ -874,7 +850,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	getLogger(ctx).Debug("incoming Receive")
 
 	root := s.clientRootFromCtx(ctx)
-	lp, err := subroot{root}.MapToLocal(req.Filesystem)
+	lp, err := mapToLocal(root, req.Filesystem)
 	if err != nil {
 		return fmt.Errorf("`Filesystem` invalid: %w", err)
 	}
@@ -1082,8 +1058,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 }
 
 func (s *Receiver) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
-	root := s.clientRootFromCtx(ctx)
-	lp, err := subroot{root}.MapToLocal(req.Filesystem)
+	lp, err := mapToLocal(s.clientRootFromCtx(ctx), req.Filesystem)
 	if err != nil {
 		return nil, err
 	}
