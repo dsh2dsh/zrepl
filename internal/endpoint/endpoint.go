@@ -97,7 +97,8 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	error,
 ) {
 	if root := s.FSFilter.SingleRecursiveDataset(); root != nil {
-		return listFilesystemsRecursive(ctx, root, zfs.PlaceholderPropertyName)
+		return listFilesystemsRecursive(ctx, root, true,
+			zfs.PlaceholderPropertyName)
 	}
 
 	fss, err := zfs.ZFSListMapping(ctx, s.FSFilter)
@@ -687,12 +688,12 @@ const receiveResumeToken = "receive_resume_token"
 func (s *Receiver) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	error,
 ) {
-	return listFilesystemsRecursive(ctx, s.clientRootFromCtx(ctx),
+	return listFilesystemsRecursive(ctx, s.clientRootFromCtx(ctx), false,
 		zfs.PlaceholderPropertyName, receiveResumeToken)
 }
 
 func listFilesystemsRecursive(ctx context.Context, root *zfs.DatasetPath,
-	props ...string,
+	includingRoot bool, props ...string,
 ) (*pdu.ListFilesystemRes, error) {
 	rootStr := root.ToString()
 	fsProps, err := zfs.ZFSGetRecursive(ctx, rootStr, -1,
@@ -707,7 +708,10 @@ func listFilesystemsRecursive(ctx context.Context, root *zfs.DatasetPath,
 		return nil, fmt.Errorf(
 			"failed get properties of fs %q: %w", rootStr, err)
 	}
-	delete(fsProps, rootStr)
+
+	if !includingRoot {
+		delete(fsProps, rootStr)
+	}
 
 	sortedProps := slices.SortedFunc(maps.Values(fsProps),
 		func(a, b *zfs.ZFSProperties) int {
