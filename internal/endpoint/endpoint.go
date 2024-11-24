@@ -718,7 +718,7 @@ func listFilesystemsRecursive(ctx context.Context, root *zfs.DatasetPath,
 			return cmp.Compare(a.Order(), b.Order())
 		})
 
-	fss, err := makeFilesystems(ctx, root, sortedProps)
+	fss, err := makeFilesystems(ctx, root, includingRoot, sortedProps)
 	if err != nil {
 		return nil, err
 	} else if len(fss) == 0 {
@@ -729,7 +729,7 @@ func listFilesystemsRecursive(ctx context.Context, root *zfs.DatasetPath,
 }
 
 func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,
-	items []*zfs.ZFSProperties,
+	includingRoot bool, items []*zfs.ZFSProperties,
 ) ([]*pdu.Filesystem, error) {
 	// present filesystem without the root_fs prefix
 	fss := make([]*pdu.Filesystem, 0, len(items))
@@ -759,7 +759,10 @@ func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,
 		}
 		l.WithField("receive_resume_token", token).Debug("receive resume token")
 
-		p.TrimPrefix(root)
+		if !includingRoot {
+			p.TrimPrefix(root)
+		}
+
 		fss = append(fss, &pdu.Filesystem{
 			Path:          p.ToString(),
 			IsPlaceholder: state.IsPlaceholder,
