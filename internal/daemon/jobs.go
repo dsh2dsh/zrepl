@@ -10,7 +10,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
-	"github.com/dsh2dsh/zrepl/internal/daemon/job/reset"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
@@ -27,7 +26,7 @@ func newJobs(ctx context.Context, cancel context.CancelFunc) *jobs {
 		cron: newCron(ctx, true),
 
 		wakeups: make(map[string]wakeup.Func),
-		resets:  make(map[string]reset.Func),
+		resets:  make(map[string]func() error),
 
 		jobs:         make(map[string]job.Job, 2),
 		internalJobs: make([]job.Internal, 0, 1),
@@ -44,8 +43,8 @@ type jobs struct {
 	cron *cron.Cron
 	log  *logger.Logger
 
-	wakeups map[string]wakeup.Func // by Job.Name
-	resets  map[string]reset.Func  // by Job.Name
+	wakeups map[string]wakeup.Func  // by Job.Name
+	resets  map[string]func() error // by Job.Name
 
 	jobs         map[string]job.Job
 	internalJobs []job.Internal
@@ -165,7 +164,7 @@ func (self *jobs) withJobSignals(jobName string) context.Context {
 	ctx := self.context(jobName)
 	ctx, wakeup := wakeup.Context(ctx)
 	self.wakeups[jobName] = wakeup
-	ctx, resetFunc := reset.Context(ctx)
+	ctx, resetFunc := job.ContextWithReset(ctx)
 	self.resets[jobName] = resetFunc
 	return ctx
 }

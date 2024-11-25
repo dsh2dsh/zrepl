@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/job/reset"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
@@ -750,7 +749,7 @@ func (j *ActiveSide) do(ctx context.Context) {
 	log := GetLogger(ctx)
 	go func() {
 		select {
-		case <-reset.Wait(ctx):
+		case <-WaitReset(ctx):
 			log.Info("reset received, cancelling current invocation")
 			cancelThisRun()
 		case <-ctx.Done():
