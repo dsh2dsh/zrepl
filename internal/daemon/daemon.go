@@ -122,6 +122,10 @@ func waitDone(ctx context.Context, jobs *jobs) {
 	sigReload := make(chan os.Signal, 1)
 	signal.Notify(sigReload, syscall.SIGHUP)
 
+	sigTerm := make(chan os.Signal, 1)
+	signal.Reset(syscall.SIGTERM)
+	signal.Notify(sigTerm, syscall.SIGTERM)
+
 	log := logging.FromContext(ctx)
 	log.Info("waiting for jobs to finish")
 	wait := jobs.wait()
@@ -134,6 +138,9 @@ func waitDone(ctx context.Context, jobs *jobs) {
 		case <-sigReload:
 			log.Info("got HUP signal")
 			jobs.Reload()
+		case <-sigTerm:
+			log.Info("got TERM signal")
+			jobs.Shutdown()
 		}
 	}
 }

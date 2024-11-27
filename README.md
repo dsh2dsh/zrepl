@@ -460,14 +460,16 @@ pkg install zrepl-dsh2dsh
 
   * New command `zrepl signal stop`
 
-    Stop the daemon right now. Actually it's the same like sending `SIGTERM` or
-    `SIGINT` to the daemon.
+    Stop the daemon right now. Actually it's the same like sending `SIGINT` to
+    the daemon.
 
   * New command `zrepl signal shutdown`
 
     Stop the daemon gracefully. After this signal, zrepl daemon will exit as
     soon as it'll be safe. It interrupts any operation, except replication
     steps. The daemon will wait for all replication steps completed and exit.
+
+    Sending `SIGTERM` has the same effect.
 
   * Redesigned `zrepl status`
 
