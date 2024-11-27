@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sort"
 	"sync"
@@ -14,9 +15,11 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -75,8 +78,7 @@ type periodicArgs struct {
 }
 
 type Periodic struct {
-	args     periodicArgs
-	shutdown context.CancelCauseFunc
+	args periodicArgs
 
 	mtx   sync.Mutex
 	state State
@@ -134,12 +136,17 @@ func (s *Periodic) Periodic() bool { return true }
 func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 	cron *cron.Cron,
 ) {
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-	s.shutdown = cancel
+	log := getLogger(ctx)
+	log.Info("start periodic snapshotter")
+	defer log.Info("exiting periodic snapshotter")
 
-	getLogger(ctx).Debug("start")
-	defer getLogger(ctx).Debug("stop")
+	ctx, gracefulStop := context.WithCancelCause(ctx)
+	defer gracefulStop(nil)
+	graceful := signal.GracefulFrom(ctx)
+	defer context.AfterFunc(graceful, func() {
+		log.Info("graceful stop received")
+		gracefulStop(context.Cause(graceful))
+	})()
 
 	s.args.snapshotsTaken = snapshotsTaken
 	s.args.ctx = ctx
@@ -168,8 +175,7 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 		pre := u(nil)
 		st = st(s.args, u)
 		post := u(nil)
-		getLogger(ctx).
-			WithField("transition", fmt.Sprintf("%s=>%s", pre, post)).
+		log.With(slog.String("transition", fmt.Sprintf("%s=>%s", pre, post))).
 			Debug("state transition")
 
 	}
@@ -177,23 +183,22 @@ func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
 
 func (s *Periodic) runPeriodic(ctx context.Context) {
 	cronSpec := s.args.cronSpec
-	log := getLogger(ctx).WithField("cron", cronSpec)
+	log := getLogger(ctx).With(slog.String("cron", cronSpec))
 	id, err := s.args.cron.AddFunc(cronSpec, func() {
 		select {
 		case s.args.wakeUp <- struct{}{}:
 			s.wakeupBusy = 0
-		case <-ctx.Done():
 		default:
 			s.wakeupBusy++
 			log.Warn("job took longer than its interval")
 		}
 	})
 	if err != nil {
-		log.WithError(err).Error("add cron job")
+		logger.WithError(log, err, "add cron job")
 		return
 	}
 	s.cronId = id
-	log.WithField("id", id).Info("add cron job")
+	log.With(slog.Any("id", id)).Info("add cron job")
 }
 
 func onErr(err error, u updater) state {
@@ -214,7 +219,7 @@ func onErr(err error, u updater) state {
 
 func onMainCtxDone(ctx context.Context, u updater) state {
 	return u(func(s *Periodic) {
-		s.err = ctx.Err()
+		s.err = context.Cause(ctx)
 		s.state = Stopped
 	}).sf()
 }
@@ -531,6 +536,4 @@ func (self *PeriodicReport) CompletionProgress() (expected, completed uint64) {
 	return
 }
 
-func (s *Periodic) Shutdown() {
-	s.shutdown(errors.New("shutdown received"))
-}
+func (s *Periodic) Shutdown() {}

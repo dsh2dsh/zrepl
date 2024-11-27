@@ -153,7 +153,7 @@ func TestReplication(t *testing.T) {
 		MaxAttempts:              1,
 		ReconnectHardFailTimeout: 1 * time.Second,
 	}
-	getReport, wait := Do(ctx, driverConfig, mp, context.Background())
+	getReport, wait := Do(ctx, driverConfig, mp)
 	begin := time.Now()
 	fireAt := []time.Duration{
 		// the following values are relative to the start

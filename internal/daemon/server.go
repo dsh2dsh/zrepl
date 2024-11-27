@@ -14,6 +14,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/middleware"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
@@ -55,14 +57,15 @@ type serverJob struct {
 	middlewares []middleware.Middleware
 	prometheus  middleware.Middleware
 
-	log      *logger.Logger
-	servers  []*server
-	shutdown context.CancelFunc
+	log     *logger.Logger
+	servers []*server
 
 	controlJob *controlJob
 	hasMetrics bool
 	zfsJob     *zfsJob
 }
+
+var _ job.Internal = (*serverJob)(nil)
 
 func (self *serverJob) init() *serverJob {
 	self.prometheus = middleware.PrometheusMetrics(self.reqBegin,
@@ -85,11 +88,13 @@ func (self *serverJob) RegisterMetrics(registerer prometheus.Registerer) {
 }
 
 func (self *serverJob) AddServer(c *config.Listen) error {
-	self.log.WithField("addr", c.Addr).WithField("unix", c.Unix).
-		WithField("control", c.Control).
-		WithField("metrics", c.Metrics).
-		WithField("zfs", c.Zfs).
-		Info("adding listener")
+	self.log.With(
+		slog.String("addr", c.Addr),
+		slog.String("unix", c.Unix),
+		slog.Bool("control", c.Control),
+		slog.Bool("metrics", c.Metrics),
+		slog.Bool("zfs", c.Zfs),
+	).Info("adding listener")
 
 	s := &server{
 		Server: &http.Server{
@@ -134,10 +139,16 @@ func (self *serverJob) mux(c *config.Listen) *http.ServeMux {
 
 func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) error {
 	defer self.log.Info("server finished")
-
 	g, ctx := errgroup.WithContext(ctx)
-	baseContext := func(l net.Listener) context.Context { return ctx }
-	ctx, self.shutdown = context.WithCancel(ctx)
+	baseContext := func(net.Listener) context.Context { return ctx }
+
+	ctx, gracefulStop := context.WithCancelCause(ctx)
+	defer gracefulStop(nil)
+	graceful := signal.GracefulFrom(ctx)
+	defer context.AfterFunc(graceful, func() {
+		self.log.Info("graceful stop server")
+		gracefulStop(context.Cause(graceful))
+	})()
 
 	for _, s := range self.servers {
 		s.BaseContext = baseContext
@@ -149,28 +160,22 @@ func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) error {
 
 	self.log.Info("waiting for listeners to finish")
 	<-ctx.Done()
-	self.log.WithError(context.Cause(ctx)).Info("context done")
+	self.log.WithError(context.Cause(ctx)).Info("server context done")
 	self.shutdownServers()
+
 	if err := g.Wait(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		self.log.WithError(err).Error("error serving")
-		return fmt.Errorf("daemon: %w", err)
+		return fmt.Errorf("daemon server: %w", err)
 	}
 	return nil
 }
 
 func (self *serverJob) shutdownServers() {
 	for _, s := range self.servers {
-		self.log.WithField("addr", s.Addr).Info("shutdown listener")
+		self.log.WithField("addr", s.Addr).Info("graceful stop listener")
 		if err := s.Shutdown(context.Background()); err != nil {
 			self.log.WithError(err).Error("can't shutdown server")
 		}
-	}
-}
-
-func (self *serverJob) Shutdown() {
-	if self.shutdown != nil {
-		self.log.Info("cancel context on shutdown")
-		self.shutdown()
 	}
 }
 

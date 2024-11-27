@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -29,6 +30,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	}
 
 	log := logger.NewLogger(outlets)
+	slog.SetDefault(log.Logger)
 	log.Info(version.NewZreplVersionInformation().String())
 	ctx = logging.WithLogger(ctx, log)
 
@@ -36,17 +38,18 @@ func Run(ctx context.Context, conf *config.Config) error {
 	jobs := newJobs(ctx, cancel)
 	// start regular jobs
 	jobs.startCronJobs(confJobs)
-	if err := startServer(log, conf, jobs, outlets, connector); err != nil {
+	if err := startServer(ctx, conf, jobs, outlets, connector); err != nil {
 		return fmt.Errorf("daemon: %w", err)
 	}
 
-	waitDone(ctx, log, jobs)
+	waitDone(ctx, jobs)
 	return nil
 }
 
-func startServer(log *logger.Logger, conf *config.Config, jobs *jobs,
+func startServer(ctx context.Context, conf *config.Config, jobs *jobs,
 	logOutlets *logger.Outlets, connecter *job.Connecter,
 ) error {
+	log := logging.FromContext(ctx)
 	server := newServerJob(log,
 		newControlJob(jobs),
 		newZfsJob(connecter, conf.Keys).WithTimeout(conf.Global.RpcTimeout))
@@ -115,26 +118,22 @@ func defaultMetrics(exists bool, api *serverJob, conf *config.Config,
 	return exists, nil
 }
 
-func waitDone(ctx context.Context, log *logger.Logger, jobs *jobs) {
+func waitDone(ctx context.Context, jobs *jobs) {
 	sigReload := make(chan os.Signal, 1)
 	signal.Notify(sigReload, syscall.SIGHUP)
 
+	log := logging.FromContext(ctx)
+	log.Info("waiting for jobs to finish")
 	wait := jobs.wait()
-waiting:
+
 	for {
 		select {
 		case <-wait.Done():
-			break waiting
-		case <-ctx.Done():
-			log.WithError(context.Cause(ctx)).Info("context canceled")
-			break waiting
+			log.Info("daemon exiting")
+			return
 		case <-sigReload:
 			log.Info("got HUP signal")
 			jobs.Reload()
 		}
 	}
-
-	log.Info("waiting for jobs to finish")
-	<-wait.Done()
-	log.Info("daemon exiting")
 }

@@ -63,14 +63,20 @@ func WithLogger(ctx context.Context, l *logger.Logger) context.Context {
 	return context.WithValue(ctx, ctxKeyLogger, l)
 }
 
+func WithLoggerWrap(ctx context.Context, l *slog.Logger) context.Context {
+	return context.WithValue(ctx, ctxKeyLogger, logger.Wrap(l))
+}
+
 func GetLogger(ctx context.Context, subsys Subsystem) *logger.Logger {
 	return FromContext(ctx).WithField(SubsysField, subsys)
 }
 
 func FromContext(ctx context.Context) *logger.Logger {
-	l, ok := ctx.Value(ctxKeyLogger).(*logger.Logger)
-	if ok && l != nil {
+	switch l := ctx.Value(ctxKeyLogger).(type) {
+	case *logger.Logger:
 		return l
+	case *slog.Logger:
+		return logger.Wrap(l)
 	}
 	return logger.NewNullLogger()
 }

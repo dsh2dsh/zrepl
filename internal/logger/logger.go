@@ -19,6 +19,8 @@ func WithError(l *slog.Logger, err error, msg string) *slog.Logger {
 	return l
 }
 
+func Wrap(l *slog.Logger) *Logger { return &Logger{l} }
+
 type Logger struct {
 	*slog.Logger
 }

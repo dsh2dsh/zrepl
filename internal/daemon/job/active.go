@@ -2,7 +2,6 @@ package job
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
@@ -46,12 +46,11 @@ type ActiveSide struct {
 	cronId     cron.EntryID
 	wakeupBusy int
 
-	running  context.Context
-	shutdown context.CancelFunc
-
 	preHook  *Hook
 	postHook *Hook
 }
+
+var _ Job = (*ActiveSide)(nil)
 
 //go:generate enumer -type=ActiveSideState
 type ActiveSideState int
@@ -101,7 +100,6 @@ type activeMode interface {
 	Cron() string
 	SnapperReport() *snapper.Report
 	ResetConnectBackoff()
-	Shutdown()
 	Wait()
 	Running() (time.Duration, bool)
 }
@@ -169,6 +167,8 @@ type modePush struct {
 	wg sync.WaitGroup
 }
 
+var _ activeMode = (*modePush)(nil)
+
 func (m *modePush) ConnectEndpoints(ctx context.Context, cn Connected) {
 	m.setupMtx.Lock()
 	defer m.setupMtx.Unlock()
@@ -233,12 +233,6 @@ func (m *modePush) SnapperReport() *snapper.Report {
 
 func (m *modePush) ResetConnectBackoff() {}
 
-func (m *modePush) Shutdown() {
-	if m.snapper.Periodic() {
-		m.snapper.Shutdown()
-	}
-}
-
 func (m *modePush) Wait() { m.wg.Wait() }
 
 func (m *modePush) Running() (time.Duration, bool) {
@@ -256,6 +250,8 @@ type modePull struct {
 	plannerPolicy  *logic.PlannerPolicy
 	cronSpec       string
 }
+
+var _ activeMode = (*modePull)(nil)
 
 func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
 	m.setupMtx.Lock()
@@ -306,8 +302,6 @@ func (m *modePull) RunSnapper(ctx context.Context, wakeUpCommon chan<- struct{},
 func (m *modePull) SnapperReport() *snapper.Report { return nil }
 
 func (m *modePull) ResetConnectBackoff() {}
-
-func (m *modePull) Shutdown() {}
 
 func (m *modePull) Wait() {}
 
@@ -687,9 +681,7 @@ func (j *ActiveSide) Run(ctx context.Context, cron *cron.Cron) error {
 
 	periodicDone := make(chan struct{})
 	wakeupSig := j.runPeriodic(ctx, periodicDone, cron)
-
-	j.running, j.shutdown = context.WithCancel(context.Background())
-	defer j.shutdown()
+	graceful := signal.GracefulFrom(ctx)
 
 forLoop:
 	for {
@@ -701,8 +693,8 @@ forLoop:
 		case <-wakeupSig:
 			j.mode.ResetConnectBackoff()
 		case <-periodicDone:
-		case <-j.running.Done():
-			log.Info("shutdown received")
+		case <-graceful.Done():
+			log.Info("graceful stop received, exiting")
 			break forLoop
 		}
 		j.do(ctx)
@@ -724,7 +716,6 @@ func (j *ActiveSide) runPeriodic(ctx context.Context,
 		select {
 		case wakeUpCommon <- struct{}{}:
 			j.wakeupBusy = 0
-		case <-ctx.Done():
 		default:
 			j.wakeupBusy++
 			log.Warn("job took longer than its interval")
@@ -746,6 +737,7 @@ func (j *ActiveSide) do(ctx context.Context) {
 	// allow cancellation of an invocation (this function)
 	ctx, cancelThisRun := context.WithCancel(ctx)
 	defer cancelThisRun()
+
 	log := GetLogger(ctx)
 	go func() {
 		select {
@@ -756,15 +748,13 @@ func (j *ActiveSide) do(ctx context.Context) {
 		}
 	}()
 
-	running, shutdown := context.WithCancelCause(ctx)
-	stopShutdown := context.AfterFunc(j.running, func() {
-		log.Info("shutdown received, gracefully stop current invocation")
-		shutdown(errors.New("shutdown recevived"))
-	})
-	defer func() {
-		stopShutdown()
-		shutdown(nil)
-	}()
+	graceful, gracefulStop := context.WithCancelCause(ctx)
+	defer gracefulStop(nil)
+	defer context.AfterFunc(signal.GracefulFrom(ctx), func() {
+		log.Info("graceful stop received")
+		gracefulStop(context.Cause(signal.GracefulFrom(ctx)))
+	})()
+	ctx = signal.WithGraceful(ctx, graceful)
 
 	steps := []func(context.Context) error{
 		func(context.Context) error { return j.beforeReplication(ctx) },
@@ -772,7 +762,7 @@ func (j *ActiveSide) do(ctx context.Context) {
 		j.pruneSender, j.pruneReceiver,
 		func(context.Context) error { return j.afterPruning(ctx) },
 	}
-	if j.activeSteps(running, steps) {
+	if j.activeSteps(graceful, steps) {
 		log.Info("task completed")
 	}
 }
@@ -834,8 +824,7 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 		tasks.replicationReport, repWait = replication.Do(
 			ctx, j.replicationDriverConfig, logic.NewPlanner(
 				j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
-				j.mode.PlannerPolicy()),
-			j.running)
+				j.mode.PlannerPolicy()))
 	})
 	repWait(true) // wait blocking
 
@@ -900,13 +889,6 @@ func (j *ActiveSide) afterPruning(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func (j *ActiveSide) Shutdown() {
-	if j.mode.PeriodicSnapshots() {
-		j.mode.Shutdown()
-	}
-	j.shutdown()
 }
 
 func (j *ActiveSide) wait(l *logger.Logger) {

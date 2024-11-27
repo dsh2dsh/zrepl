@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -196,9 +197,9 @@ func (c Config) Validate() error {
 }
 
 // caller must ensure config.Validate() == nil
-func Do(ctx context.Context, config Config, planner Planner,
-	running context.Context,
-) (ReportFunc, WaitFunc) {
+func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
+	WaitFunc,
+) {
 	if err := config.Validate(); err != nil {
 		panic(err)
 	}
@@ -217,6 +218,7 @@ func Do(ctx context.Context, config Config, planner Planner,
 
 		log.Debug("begin run")
 		defer log.Debug("run ended")
+		graceful := signal.GracefulFrom(ctx)
 
 		var prev *attempt
 		mainLog := log
@@ -236,14 +238,11 @@ func Do(ctx context.Context, config Config, planner Planner,
 			}
 			run.attempts = append(run.attempts, cur)
 			run.l.DropWhile(func() {
-				cur.do(ctx, prev, running)
+				cur.do(ctx, prev)
 			})
 			prev = cur
-			if ctx.Err() != nil {
-				log.WithError(ctx.Err()).Info("context error")
-				return
-			} else if running.Err() != nil {
-				log.WithError(running.Err()).Info("shutdown")
+			if graceful.Err() != nil {
+				log.WithError(graceful.Err()).Info("context done")
 				return
 			}
 
@@ -322,31 +321,29 @@ func Do(ctx context.Context, config Config, planner Planner,
 	return report, wait
 }
 
-func (a *attempt) do(ctx context.Context, prev *attempt,
-	running context.Context,
-) {
-	prevs := a.doGlobalPlanning(ctx, prev, running)
+func (a *attempt) do(ctx context.Context, prev *attempt) {
+	prevs := a.doGlobalPlanning(ctx, prev)
 	if prevs == nil {
 		return
 	}
-	a.doFilesystems(ctx, prevs, running)
+	a.doFilesystems(ctx, prevs)
 }
 
 // if no error occurs, returns a map that maps this attempt's a.fss to `prev`'s
 // a.fss
 func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
-	running context.Context,
 ) map[*fs]*fs {
 	pfss, err := a.planner.Plan(ctx)
 	errTime := time.Now()
 	defer a.l.Lock().Unlock()
+	graceful := signal.GracefulFrom(ctx)
 	if err != nil {
 		a.planErr = newTimedError(err, errTime)
 		a.fss = nil
 		a.finishedAt = time.Now()
 		return nil
-	} else if running.Err() != nil {
-		a.planErr = newTimedError(context.Cause(running), errTime)
+	} else if graceful.Err() != nil {
+		a.planErr = newTimedError(context.Cause(graceful), errTime)
 		a.fss = nil
 		a.finishedAt = time.Now()
 		return nil
@@ -453,9 +450,7 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
 	return prevs
 }
 
-func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
-	running context.Context,
-) {
+func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs) {
 	defer a.l.Lock().Unlock()
 	stepQueue := newStepQueue()
 	defer stepQueue.Start(a.config.StepQueueConcurrency)()
@@ -466,7 +461,7 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs,
 		go func(f *fs) {
 			defer fssesDone.Done()
 			// avoid explosion of tasks with name f.report().Info.Name
-			f.do(ctx, stepQueue, prevs[f], a.config.OneStep, running)
+			f.do(ctx, stepQueue, prevs[f], a.config.OneStep)
 			f.l.HoldWhile(func() {
 				// every return from f means it's unblocked...
 				f.blockedOn = report.FsBlockedOnNothing
@@ -499,11 +494,10 @@ func (f *fs) initialRepOrdWakeupChildren() {
 	}
 }
 
-func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
-	running context.Context,
-) {
+func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 	defer f.l.Lock().Unlock()
 	defer f.initialRepOrdWakeupChildren()
+	graceful := signal.GracefulFrom(ctx)
 
 	// get planned steps from replication logic
 	var psteps []Step
@@ -520,8 +514,8 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 			// transition before we call PlanFS
 			f.blockedOn = report.FsBlockedOnNothing
 		})
-		if ctx.Err() == nil && running.Err() == nil {
-			psteps, err = f.fs.PlanFS(ctx, oneStep) // no shadow
+		if graceful.Err() == nil {
+			psteps, err = f.fs.PlanFS(graceful, oneStep) // no shadow
 		}
 		errTime = time.Now() // no shadow
 	})
@@ -530,11 +524,8 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 	case err != nil:
 		f.planning.err = newTimedError(err, errTime)
 		return
-	case ctx.Err() != nil:
-		f.planning.err = newTimedError(context.Cause(ctx), errTime)
-		return
-	case running.Err() != nil:
-		f.planning.err = newTimedError(context.Cause(running), errTime)
+	case graceful.Err() != nil:
+		f.planning.err = newTimedError(context.Cause(graceful), errTime)
 		return
 	}
 
@@ -684,10 +675,8 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 		// lock must not be held while waiting in order for reporting to work
 		f.l.DropWhile(func() {
 			select {
-			case <-ctx.Done():
-				f.planned.stepErr = newTimedError(ctx.Err(), time.Now())
-			case <-running.Done():
-				f.planned.stepErr = newTimedError(context.Cause(running), time.Now())
+			case <-graceful.Done():
+				f.planned.stepErr = newTimedError(context.Cause(graceful), time.Now())
 			case <-f.initialRepOrd.parentDidUpdate:
 				// loop
 			}
@@ -709,7 +698,7 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 			defer pq.WaitReady(ctx, f, targetDate)()
 			f.l.HoldWhile(func() { f.blockedOn = report.FsBlockedOnNothing })
 			// do the step
-			if ctx.Err() == nil && running.Err() == nil {
+			if graceful.Err() == nil {
 				err = s.step.Step(ctx) // no shadow
 			}
 			errTime = time.Now()
@@ -719,18 +708,11 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool,
 		case err != nil:
 			f.planned.stepErr = newTimedError(err, errTime)
 			return
-		case ctx.Err() != nil:
+		case graceful.Err() != nil:
 			f.planned.stepErr = newTimedError(
 				fmt.Errorf(
 					"fs %q: planned step=%v: %w", f.fs.ReportInfo().Name, i,
-					context.Cause(ctx)),
-				errTime)
-			return
-		case running.Err() != nil:
-			f.planned.stepErr = newTimedError(
-				fmt.Errorf(
-					"fs %q: planned step=%v: running: %w", f.fs.ReportInfo().Name, i,
-					context.Cause(running)),
+					context.Cause(graceful)),
 				errTime)
 			return
 		}

@@ -3,7 +3,6 @@ package job
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
@@ -28,7 +28,6 @@ type SnapJob struct {
 	name     endpoint.JobID
 	fsfilter zfs.DatasetFilter
 	snapper  snapper.Snapper
-	shutdown context.CancelCauseFunc
 	wg       sync.WaitGroup
 
 	prunerFactory *pruner.LocalPrunerFactory
@@ -38,6 +37,8 @@ type SnapJob struct {
 	prunerMtx sync.Mutex
 	pruner    *pruner.Pruner
 }
+
+var _ Job = (*SnapJob)(nil)
 
 func (j *SnapJob) Name() string { return j.name.String() }
 
@@ -195,9 +196,13 @@ func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) error {
 	defer log.Info("job exiting")
 	wakeUp := j.goSnap(ctx, cron)
 
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-	j.shutdown = cancel
+	ctx, gracefulStop := context.WithCancelCause(ctx)
+	defer gracefulStop(nil)
+	graceful := signal.GracefulFrom(ctx)
+	defer context.AfterFunc(graceful, func() {
+		log.Info("graceful stop received")
+		gracefulStop(context.Cause(graceful))
+	})()
 
 forLoop:
 	for {
@@ -228,8 +233,6 @@ func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
 	return snapshots
 }
 
-func (j *SnapJob) prune(ctx context.Context) { j.doPrune(ctx) }
-
 func (j *SnapJob) wait(l *logger.Logger) {
 	if j.snapper.Periodic() {
 		l.Info("waiting for snapper job exit")
@@ -238,14 +241,7 @@ func (j *SnapJob) wait(l *logger.Logger) {
 	j.wg.Wait()
 }
 
-func (j *SnapJob) Shutdown() {
-	if j.snapper.Periodic() {
-		j.snapper.Shutdown()
-	}
-	j.shutdown(errors.New("shutdown received"))
-}
-
-func (j *SnapJob) doPrune(ctx context.Context) {
+func (j *SnapJob) prune(ctx context.Context) {
 	sender := endpoint.NewSender(endpoint.SenderConfig{
 		JobID: j.name,
 		FSF:   j.fsfilter,

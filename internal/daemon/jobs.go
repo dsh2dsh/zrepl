@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/dsh2dsh/cron/v3"
@@ -10,6 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
@@ -18,9 +20,15 @@ import (
 
 func newJobs(ctx context.Context, cancel context.CancelFunc) *jobs {
 	g, ctx := errgroup.WithContext(ctx)
+	graceful, gracefulStop := context.WithCancelCause(ctx)
+	ctx = signal.WithGraceful(ctx, graceful)
+
 	return &jobs{
-		g:   g,
-		ctx: ctx,
+		g:      g,
+		ctx:    ctx,
+		cancel: cancel,
+
+		gracefulStop: gracefulStop,
 
 		log:  logging.FromContext(ctx),
 		cron: newCron(ctx, true),
@@ -31,14 +39,15 @@ func newJobs(ctx context.Context, cancel context.CancelFunc) *jobs {
 		jobs:         make(map[string]job.Job, 2),
 		internalJobs: make([]job.Internal, 0, 1),
 		reloaders:    make([]func(), 0, 1),
-
-		cancel: cancel,
 	}
 }
 
 type jobs struct {
-	g   *errgroup.Group
-	ctx context.Context
+	g      *errgroup.Group
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	gracefulStop context.CancelCauseFunc
 
 	cron *cron.Cron
 	log  *logger.Logger
@@ -49,8 +58,6 @@ type jobs struct {
 	jobs         map[string]job.Job
 	internalJobs []job.Internal
 	reloaders    []func()
-
-	cancel context.CancelFunc
 }
 
 func (self *jobs) Job(name string) job.Job {
@@ -78,14 +85,9 @@ func (self *jobs) wait() context.Context {
 }
 
 func (self *jobs) Shutdown() {
-	self.log.Info("shutdown all jobs")
+	self.log.Info("graceful stop all jobs")
 	self.cron.Stop()
-	for _, j := range self.jobs {
-		j.Shutdown()
-	}
-	for _, j := range self.internalJobs {
-		j.Shutdown()
-	}
+	self.gracefulStop(signal.ErrGracefulStop)
 }
 
 func (self *jobs) status() map[string]*job.Status {
@@ -116,26 +118,30 @@ func (self *jobs) reset(job string) error {
 
 func (self *jobs) startCronJobs(confJobs []job.Job) {
 	log := job.GetLogger(self.ctx)
+	var runCount int
 	for _, j := range confJobs {
 		jobName := j.Name()
 		self.mustCheckJobName(jobName)
 		if self.ctx.Err() != nil {
-			self.log.WithError(context.Cause(self.ctx)).
-				WithField("next_job", jobName).
-				Error("break starting jobs")
+			logger.WithError(self.log.With(slog.String("next_job", jobName)),
+				context.Cause(self.ctx), "break starting jobs")
 			break
 		}
 		self.jobs[jobName] = j
 		j.RegisterMetrics(prometheus.DefaultRegisterer)
-		log := log.WithField(logging.JobField, jobName)
+		log := log.With(slog.String(logging.JobField, jobName))
 		if j.Runnable() {
-			self.start(self.withJobSignals(jobName), j, log)
+			self.start(self.withJobSignals(jobName), j, logger.Wrap(log))
+			runCount++
 		} else {
-			log.WithField("runnable", false).Info("job initialized")
+			log.With(slog.Bool("runnable", false)).Info("job initialized")
 		}
 	}
 	self.cron.Start()
-	self.log.WithField("count", len(self.jobs)).Info("started jobs")
+	self.log.
+		With(slog.Int("count", len(self.jobs)),
+			slog.Int("run", runCount)).
+		Info("started jobs")
 }
 
 func (self *jobs) mustCheckJobName(s string) {

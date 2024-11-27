@@ -21,13 +21,14 @@ type PassiveSide struct {
 	clientKeys map[string]struct{}
 }
 
+var _ Job = (*PassiveSide)(nil)
+
 type passiveMode interface {
 	Endpoint(clientIdentity string) Endpoint
 	Periodic() bool
 	RunPeriodic(ctx context.Context, cron *cron.Cron)
 	SnapperReport() *snapper.Report // may be nil
 	Type() Type
-	Shutdown()
 }
 
 func modeSinkFromConfig(in *config.SinkJob, jobID endpoint.JobID,
@@ -50,11 +51,9 @@ func (m *modeSink) Type() Type { return TypeSink }
 
 func (m *modeSink) Periodic() bool { return false }
 
-func (m *modeSink) RunPeriodic(_ context.Context, cron *cron.Cron) {}
+func (m *modeSink) RunPeriodic(context.Context, *cron.Cron) {}
 
 func (m *modeSink) SnapperReport() *snapper.Report { return nil }
-
-func (m *modeSink) Shutdown() {}
 
 func (m *modeSink) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewReceiver(m.receiverConfig).
@@ -100,8 +99,6 @@ func (m *modeSource) SnapperReport() *snapper.Report {
 	r := m.snapper.Report()
 	return &r
 }
-
-func (m *modeSource) Shutdown() { m.snapper.Shutdown() }
 
 func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
 	configJob any, connecter *Connecter,
@@ -245,5 +242,3 @@ func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) error {
 	GetLogger(ctx).Info("job exiting")
 	return nil
 }
-
-func (j *PassiveSide) Shutdown() { j.mode.Shutdown() }
