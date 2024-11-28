@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -419,60 +418,53 @@ func TestZFSSendArgsBuildSendFlags(t *testing.T) {
 		flagsExclude []string
 	}
 
-	withEncrypted := func(justFlags ZFSSendFlags) ZFSSendFlags {
-		if justFlags.Encrypted == nil {
-			justFlags.Encrypted = &nodefault.Bool{B: false}
-		}
-		return justFlags
-	}
-
 	sendTests := map[string]SendTest{
 		"Empty Args": {
-			conf:         withEncrypted(args{}),
+			conf:         args{},
 			flagsInclude: []string{},
 			flagsExclude: []string{"-w", "-p", "-b"},
 		},
 		"Raw": {
-			conf:         withEncrypted(args{Raw: true}),
+			conf:         args{Raw: true},
 			flagsInclude: []string{"-w"},
 			flagsExclude: []string{},
 		},
 		"Encrypted": {
-			conf:         withEncrypted(args{Encrypted: &nodefault.Bool{B: true}}),
+			conf:         args{Encrypted: true},
 			flagsInclude: []string{"-w"},
 			flagsExclude: []string{},
 		},
 		"Unencrypted_And_Raw": {
-			conf:         withEncrypted(args{Encrypted: &nodefault.Bool{B: false}, Raw: true}),
+			conf:         args{Raw: true},
 			flagsInclude: []string{"-w"},
 			flagsExclude: []string{},
 		},
 		"Encrypted_And_Raw": {
-			conf:         withEncrypted(args{Encrypted: &nodefault.Bool{B: true}, Raw: true}),
+			conf:         args{Encrypted: true, Raw: true},
 			flagsInclude: []string{"-w"},
 			flagsExclude: []string{},
 		},
 		"Send properties": {
-			conf:         withEncrypted(args{Properties: true}),
+			conf:         args{Properties: true},
 			flagsInclude: []string{"-p"},
 			flagsExclude: []string{},
 		},
 		"Send backup properties": {
-			conf:         withEncrypted(args{BackupProperties: true}),
+			conf:         args{BackupProperties: true},
 			flagsInclude: []string{"-b"},
 			flagsExclude: []string{},
 		},
 		"Send -b and -p": {
-			conf:         withEncrypted(args{Properties: true, BackupProperties: true}),
+			conf:         args{Properties: true, BackupProperties: true},
 			flagsInclude: []string{"-p", "-b"},
 			flagsExclude: []string{},
 		},
 		"Send resume state": {
-			conf:         withEncrypted(args{Saved: true}),
+			conf:         args{Saved: true},
 			flagsInclude: []string{"-S"},
 		},
 		"Resume token wins if not empty": {
-			conf:         withEncrypted(args{ResumeToken: "$theresumetoken$", Compressed: true}),
+			conf:         args{ResumeToken: "$theresumetoken$", Compressed: true},
 			flagsInclude: []string{"-t", "$theresumetoken$"},
 			exactMatch:   true,
 		},

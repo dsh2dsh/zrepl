@@ -21,7 +21,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 )
@@ -32,7 +31,7 @@ type SenderConfig struct {
 
 	ListPlaceholders bool
 
-	Encrypt              *nodefault.Bool
+	Encrypt              bool
 	SendRaw              bool
 	SendProperties       bool
 	SendBackupProperties bool
@@ -46,9 +45,6 @@ type SenderConfig struct {
 
 func (c *SenderConfig) Validate() error {
 	c.JobID.MustValidate()
-	if err := c.Encrypt.ValidateNoDefault(); err != nil {
-		return fmt.Errorf("`Encrypt` field invalid: %w", err)
-	}
 	if _, err := StepHoldTag(c.JobID); err != nil {
 		return fmt.Errorf("JobID cannot be used for hold tag: %w", err)
 	}

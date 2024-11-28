@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"sync"
+	"unicode"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 )
@@ -145,8 +146,12 @@ func (self *SlogFormatter) format(r slog.Record) error {
 	if err := self.h.Handle(ctx, r); err != nil {
 		return fmt.Errorf("failed slog handler: %w", err)
 	}
-	// Discard last byte (\n), added by slog.TextHandler.
-	self.b.Truncate(self.b.Len() - 1)
+
+	// Discard trailing '\n', added by slog.TextHandler, and trailing ' ' added by
+	// formatStd.
+	b := self.b.Bytes()
+	b = bytes.TrimRightFunc(b, unicode.IsSpace)
+	self.b.Truncate(len(b))
 	return nil
 }
 

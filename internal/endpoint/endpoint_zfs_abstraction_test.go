@@ -8,8 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 )
 
 func TestCreateTXGRange(t *testing.T) {
@@ -46,8 +44,8 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "wrong order obvious",
 			expectInvalid: true,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{23, &nodefault.Bool{B: true}},
-				Until: &CreateTXGRangeBound{20, &nodefault.Bool{B: true}},
+				Since: &CreateTXGRangeBound{23, true},
+				Until: &CreateTXGRangeBound{20, true},
 			},
 			expectString: "[23,20]",
 		},
@@ -55,8 +53,8 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "wrong order edge-case could also be empty",
 			expectInvalid: true,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{23, &nodefault.Bool{B: false}},
-				Until: &CreateTXGRangeBound{22, &nodefault.Bool{B: true}},
+				Since: &CreateTXGRangeBound{23, false},
+				Until: &CreateTXGRangeBound{22, true},
 			},
 			expectString: "(23,22]",
 		},
@@ -64,8 +62,8 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "empty",
 			expectInvalid: true,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{2, &nodefault.Bool{B: false}},
-				Until: &CreateTXGRangeBound{2, &nodefault.Bool{B: false}},
+				Since: &CreateTXGRangeBound{2, false},
+				Until: &CreateTXGRangeBound{2, false},
 			},
 			expectString: "(2,2)",
 		},
@@ -73,8 +71,8 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "inclusive-since-exclusive-until",
 			expectInvalid: false,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{2, &nodefault.Bool{B: true}},
-				Until: &CreateTXGRangeBound{5, &nodefault.Bool{B: false}},
+				Since: &CreateTXGRangeBound{2, true},
+				Until: &CreateTXGRangeBound{5, false},
 			},
 			expectString: "[2,5)",
 			expect: []testCaseExpectation{
@@ -91,8 +89,8 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "exclusive-since-inclusive-until",
 			expectInvalid: false,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{2, &nodefault.Bool{B: false}},
-				Until: &CreateTXGRangeBound{5, &nodefault.Bool{B: true}},
+				Since: &CreateTXGRangeBound{2, false},
+				Until: &CreateTXGRangeBound{5, true},
 			},
 			expectString: "(2,5]",
 			expect: []testCaseExpectation{
@@ -110,7 +108,7 @@ func TestCreateTXGRange(t *testing.T) {
 			expectInvalid: true,
 			config: &CreateTXGRange{
 				Since: nil,
-				Until: &CreateTXGRangeBound{0, &nodefault.Bool{B: true}},
+				Until: &CreateTXGRangeBound{0, true},
 			},
 			expectString: "~,0]",
 		},
@@ -118,7 +116,7 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "half-open-no-until",
 			expectInvalid: false,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{2, &nodefault.Bool{B: false}},
+				Since: &CreateTXGRangeBound{2, false},
 				Until: nil,
 			},
 			expectString: "(2,~",
@@ -137,7 +135,7 @@ func TestCreateTXGRange(t *testing.T) {
 			expectInvalid: false,
 			config: &CreateTXGRange{
 				Since: nil,
-				Until: &CreateTXGRangeBound{4, &nodefault.Bool{B: true}},
+				Until: &CreateTXGRangeBound{4, true},
 			},
 			expectString: "~,4]",
 			expect: []testCaseExpectation{
@@ -153,7 +151,7 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "edgeSince",
 			expectInvalid: false,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{math.MaxUint64, &nodefault.Bool{B: true}},
+				Since: &CreateTXGRangeBound{math.MaxUint64, true},
 				Until: nil,
 			},
 			expectString: "[18446744073709551615,~",
@@ -168,7 +166,7 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "edgeSinceNegative",
 			expectInvalid: true,
 			config: &CreateTXGRange{
-				Since: &CreateTXGRangeBound{math.MaxUint64, &nodefault.Bool{B: false}},
+				Since: &CreateTXGRangeBound{math.MaxUint64, false},
 				Until: nil,
 			},
 			expectString: "(18446744073709551615,~",
@@ -177,7 +175,7 @@ func TestCreateTXGRange(t *testing.T) {
 			name:          "edgeUntil",
 			expectInvalid: false,
 			config: &CreateTXGRange{
-				Until: &CreateTXGRangeBound{0, &nodefault.Bool{B: true}},
+				Until: &CreateTXGRangeBound{0, true},
 			},
 			configAllowZeroCreateTXG: true,
 			expectString:             "~,0]",
@@ -192,7 +190,7 @@ func TestCreateTXGRange(t *testing.T) {
 			expectInvalid:            true,
 			configAllowZeroCreateTXG: true,
 			config: &CreateTXGRange{
-				Until: &CreateTXGRangeBound{0, &nodefault.Bool{B: false}},
+				Until: &CreateTXGRangeBound{0, false},
 			},
 			expectString: "~,0)",
 		},

@@ -20,7 +20,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -248,7 +247,7 @@ func (j *SnapJob) prune(ctx context.Context) {
 		// FIXME the following config fields are irrelevant for SnapJob
 		// because the endpoint is only used as pruner.Target.
 		// However, the implementation requires them to be set.
-		Encrypt: &nodefault.Bool{B: true},
+		Encrypt: true,
 	})
 
 	localSender := NewLocalSender(ctx, sender)

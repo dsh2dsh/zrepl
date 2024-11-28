@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/util/envconst"
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -306,7 +305,7 @@ type ListZFSHoldsAndBookmarksQuery struct {
 
 type CreateTXGRangeBound struct {
 	CreateTXG uint64
-	Inclusive *nodefault.Bool // must not be nil
+	Inclusive bool
 }
 
 // A non-empty range of CreateTXGs
@@ -349,9 +348,6 @@ func (q *ListZFSHoldsAndBookmarksQuery) Validate() error {
 var createTXGRangeBoundAllowCreateTXG0 = envconst.Bool("ZREPL_ENDPOINT_LIST_ABSTRACTIONS_QUERY_CREATETXG_RANGE_BOUND_ALLOW_0", false)
 
 func (i *CreateTXGRangeBound) Validate() error {
-	if err := i.Inclusive.ValidateNoDefault(); err != nil {
-		return fmt.Errorf("Inclusive: %w", err)
-	}
 	if i.CreateTXG == 0 && !createTXGRangeBoundAllowCreateTXG0 {
 		return errors.New("CreateTXG must be non-zero")
 	}
@@ -432,7 +428,7 @@ func (r *CreateTXGRange) effectiveBounds() (bounds effectiveBounds, err error) {
 
 	if r.Since != nil {
 		bounds.sinceInclusive = r.Since.CreateTXG
-		if !r.Since.Inclusive.B {
+		if !r.Since.Inclusive {
 			if r.Since.CreateTXG == math.MaxUint64 {
 				return bounds, fmt.Errorf("Since-exclusive (%v) must be less than math.MaxUint64 (%v)",
 					r.Since.CreateTXG, uint64(math.MaxUint64))
@@ -443,7 +439,7 @@ func (r *CreateTXGRange) effectiveBounds() (bounds effectiveBounds, err error) {
 
 	if r.Until != nil {
 		bounds.untilInclusive = r.Until.CreateTXG
-		if !r.Until.Inclusive.B {
+		if !r.Until.Inclusive {
 			if r.Until.CreateTXG == 0 {
 				return bounds, fmt.Errorf("Until-exclusive (%v) must be greater than 0", r.Until.CreateTXG)
 			}
@@ -466,9 +462,7 @@ func (r *CreateTXGRange) String() string {
 	if r.Since == nil {
 		fmt.Fprintf(&buf, "~")
 	} else {
-		if err := r.Since.Inclusive.ValidateNoDefault(); err != nil {
-			fmt.Fprintf(&buf, "?")
-		} else if r.Since.Inclusive.B {
+		if r.Since.Inclusive {
 			fmt.Fprintf(&buf, "[")
 		} else {
 			fmt.Fprintf(&buf, "(")
@@ -482,9 +476,7 @@ func (r *CreateTXGRange) String() string {
 		fmt.Fprintf(&buf, "~")
 	} else {
 		fmt.Fprintf(&buf, "%d", r.Until.CreateTXG)
-		if err := r.Until.Inclusive.ValidateNoDefault(); err != nil {
-			fmt.Fprintf(&buf, "?")
-		} else if r.Until.Inclusive.B {
+		if r.Until.Inclusive {
 			fmt.Fprintf(&buf, "]")
 		} else {
 			fmt.Fprintf(&buf, ")")
@@ -878,7 +870,7 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 					untilBound = &CreateTXGRangeBound{
 						CreateTXG: (*sfnsc.cursor).GetCreateTXG(),
 						// if we have a cursor, can throw away step hold on both From and To
-						Inclusive: &nodefault.Bool{B: true},
+						Inclusive: true,
 					}
 				case sfnsc.step != nil:
 					untilBound = &CreateTXGRangeBound{
@@ -886,7 +878,7 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 						// if we don't have a cursor, the step most recent step hold is our
 						// initial replication cursor and it's possibly still live
 						// (interrupted initial replication)
-						Inclusive: &nodefault.Bool{B: false},
+						Inclusive: false,
 					}
 				default:
 					untilBound = nil // consider everything stale

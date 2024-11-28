@@ -20,7 +20,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -537,7 +536,7 @@ type ZFSSendArgsValidated struct {
 }
 
 type ZFSSendFlags struct {
-	Encrypted        *nodefault.Bool
+	Encrypted        bool
 	Properties       bool
 	BackupProperties bool
 	Raw              bool
@@ -551,7 +550,7 @@ type ZFSSendFlags struct {
 }
 
 type zfsSendArgsValidationContext struct {
-	encEnabled *nodefault.Bool
+	encEnabled bool
 }
 
 type ZFSSendArgsValidationErrorCode int
@@ -637,7 +636,7 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
 
 	valCtx := &zfsSendArgsValidationContext{}
 	var fsEncrypted bool
-	if a.Encrypted.B {
+	if a.Encrypted {
 		fsEncrypted, err = ZFSGetEncryptionEnabled(ctx, a.FS)
 		if err != nil {
 			return v, newValidationError(a, ZFSSendArgsFSEncryptionCheckFail,
@@ -656,7 +655,7 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
 				"policy mandates raw+unencrypted sends, but filesystem %q is encrypted",
 				a.FS))
 	}
-	valCtx.encEnabled = &nodefault.Bool{B: fsEncrypted}
+	valCtx.encEnabled = fsEncrypted
 
 	err = a.validateEncryptionFlagsCorrespondToResumeToken(ctx, valCtx)
 	if err != nil {
@@ -665,12 +664,7 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
 	return validated, nil
 }
 
-func (f ZFSSendFlags) Validate() error {
-	if err := f.Encrypted.ValidateNoDefault(); err != nil {
-		return fmt.Errorf("flag `Encrypted` invalid: %w", err)
-	}
-	return nil
-}
+func (f ZFSSendFlags) Validate() error { return nil }
 
 // If ResumeToken is empty, builds a command line with the flags specified.
 // If ResumeToken is not empty, build a command line with just `-t {{.ResumeToken}}`.
@@ -687,7 +681,7 @@ func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
 		return args
 	}
 
-	if a.Encrypted.B || a.Raw {
+	if a.Encrypted || a.Raw {
 		args = append(args, "-w")
 	}
 
@@ -835,13 +829,10 @@ func (a ZFSSendArgsUnvalidated) validateEncryptionFlagsCorrespondToResumeToken(c
 	}
 
 	// ensure resume stream will be encrypted/unencrypted as specified in policy
-	if err := valCtx.encEnabled.ValidateNoDefault(); err != nil {
-		panic(valCtx)
-	}
 	wouldSendEncryptedIfFilesystemIsEncrypted := t.RawOK
-	filesystemIsEncrypted := valCtx.encEnabled.B
+	filesystemIsEncrypted := valCtx.encEnabled
 	resumeWillBeEncryptedSend := filesystemIsEncrypted && wouldSendEncryptedIfFilesystemIsEncrypted
-	if a.Encrypted.B {
+	if a.Encrypted {
 		if resumeWillBeEncryptedSend {
 			return nil // encrypted send in policy, and that's what's going to happen
 		} else {

@@ -7,7 +7,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/util/nodefault"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -29,7 +28,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 
 		ListPlaceholders: sendOpts.ListPlaceholders,
 
-		Encrypt:              &nodefault.Bool{B: sendOpts.Encrypted},
+		Encrypt:              sendOpts.Encrypted,
 		SendRaw:              sendOpts.Raw,
 		SendProperties:       sendOpts.SendProperties,
 		SendBackupProperties: sendOpts.BackupProperties,
