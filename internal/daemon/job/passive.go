@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -25,9 +25,11 @@ var _ Job = (*PassiveSide)(nil)
 
 type passiveMode interface {
 	Endpoint(clientIdentity string) Endpoint
+	Cron() string
 	Periodic() bool
-	RunPeriodic(ctx context.Context, cron *cron.Cron)
-	SnapperReport() *snapper.Report // may be nil
+	Runnable() bool
+	Run(ctx context.Context)
+	Report() *snapper.Report // may be nil
 	Type() Type
 }
 
@@ -49,11 +51,15 @@ var _ passiveMode = (*modeSink)(nil)
 
 func (m *modeSink) Type() Type { return TypeSink }
 
+func (m *modeSink) Cron() string { return "" }
+
 func (m *modeSink) Periodic() bool { return false }
 
-func (m *modeSink) RunPeriodic(context.Context, *cron.Cron) {}
+func (m *modeSink) Runnable() bool { return false }
 
-func (m *modeSink) SnapperReport() *snapper.Report { return nil }
+func (m *modeSink) Run(context.Context) {}
+
+func (m *modeSink) Report() *snapper.Report { return nil }
 
 func (m *modeSink) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewReceiver(m.receiverConfig).
@@ -89,13 +95,15 @@ func (m *modeSource) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewSender(*m.senderConfig)
 }
 
+func (m *modeSource) Cron() string { return m.snapper.Cron() }
+
 func (m *modeSource) Periodic() bool { return m.snapper.Periodic() }
 
-func (m *modeSource) RunPeriodic(ctx context.Context, cron *cron.Cron) {
-	m.snapper.Run(ctx, nil, cron)
-}
+func (m *modeSource) Runnable() bool { return m.snapper.Runnable() }
 
-func (m *modeSource) SnapperReport() *snapper.Report {
+func (m *modeSource) Run(ctx context.Context) { m.snapper.Run(ctx) }
+
+func (m *modeSource) Report() *snapper.Report {
 	r := m.snapper.Report()
 	return &r
 }
@@ -132,10 +140,12 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
 
 func (j *PassiveSide) Name() string { return j.name.String() }
 
-func (j *PassiveSide) Runnable() bool { return j.mode.Periodic() }
+func (j *PassiveSide) Cron() string { return j.mode.Cron() }
+
+func (j *PassiveSide) Runnable() bool { return j.mode.Runnable() }
 
 func (s *PassiveSide) Status() *Status {
-	snapperReport := s.mode.SnapperReport()
+	snapperReport := s.mode.Report()
 	if snapperReport == nil || snapperReport.Type == snapper.TypeManual {
 		return nil
 	}
@@ -151,9 +161,7 @@ type PassiveStatus struct {
 
 func (self *PassiveStatus) Error() string {
 	if snap := self.Snapper; snap != nil {
-		if s := snap.Error(); s != "" {
-			return s
-		}
+		return snap.Error()
 	}
 	return ""
 }
@@ -172,11 +180,11 @@ func (self *PassiveStatus) Cron() string {
 	return ""
 }
 
-func (self *PassiveStatus) SleepingUntil() time.Time {
+func (self *PassiveStatus) SleepingUntil() (sleepUntil time.Time) {
 	if snap := self.Snapper; snap != nil {
-		return snap.SleepingUntil()
+		sleepUntil = snap.SleepingUntil()
 	}
-	return time.Time{}
+	return
 }
 
 func (self *PassiveStatus) Steps() (expected, step int) {
@@ -233,12 +241,8 @@ func (j *PassiveSide) KnownClient(clientIdentity string) bool {
 
 func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}
 
-func (j *PassiveSide) Run(ctx context.Context, cron *cron.Cron) error {
-	if !j.mode.Periodic() {
-		return fmt.Errorf("running not periodic job: %s", j.Name())
-	}
-
-	j.mode.RunPeriodic(ctx, cron)
+func (j *PassiveSide) Run(ctx context.Context) error {
+	j.mode.Run(signal.GracefulFrom(ctx))
 	GetLogger(ctx).Info("job exiting")
 	return nil
 }

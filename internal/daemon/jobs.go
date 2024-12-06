@@ -2,9 +2,11 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,7 +14,6 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
-	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
@@ -21,22 +22,19 @@ import (
 func newJobs(ctx context.Context, cancel context.CancelFunc) *jobs {
 	g, ctx := errgroup.WithContext(ctx)
 	graceful, gracefulStop := context.WithCancelCause(ctx)
-	ctx = signal.WithGraceful(ctx, graceful)
 
 	return &jobs{
 		g:      g,
 		ctx:    ctx,
 		cancel: cancel,
 
+		graceful:     graceful,
 		gracefulStop: gracefulStop,
 
 		log:  logging.FromContext(ctx),
 		cron: newCron(ctx, true),
 
-		wakeups: make(map[string]wakeup.Func),
-		resets:  make(map[string]func() error),
-
-		jobs:         make(map[string]job.Job, 2),
+		jobs:         make(map[string]*props, 2),
 		internalJobs: make([]job.Internal, 0, 1),
 		reloaders:    make([]func(), 0, 1),
 	}
@@ -47,21 +45,69 @@ type jobs struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	graceful     context.Context
 	gracefulStop context.CancelCauseFunc
 
 	cron *cron.Cron
 	log  *logger.Logger
 
-	wakeups map[string]wakeup.Func  // by Job.Name
-	resets  map[string]func() error // by Job.Name
-
-	jobs         map[string]job.Job
+	jobs         map[string]*props
 	internalJobs []job.Internal
 	reloaders    []func()
 }
 
-func (self *jobs) Job(name string) job.Job {
-	return self.jobs[name]
+type props struct {
+	job    job.Job
+	cronId cron.EntryID
+
+	mu     sync.Mutex
+	wakeup context.CancelCauseFunc
+	reset  context.CancelCauseFunc
+
+	wakeupBusy int
+}
+
+func (self *props) Context(ctx context.Context) context.Context {
+	wakeup, wakeupStop := context.WithCancelCause(context.Background())
+	ctx = signal.WithWakeup(ctx, wakeup)
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	self.wakeup = wakeupStop
+	ctx, self.reset = context.WithCancelCause(ctx)
+	return ctx
+}
+
+func (self *props) Stop() {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	self.wakeup(nil)
+	self.wakeup = nil
+	self.reset(nil)
+	self.reset = nil
+}
+
+func (self *props) Wakeup(cause error, wakeupBusy bool) bool {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	if !self.running() {
+		return false
+	} else if wakeupBusy {
+		self.wakeupBusy++
+	}
+	self.wakeup(cause)
+	return true
+}
+
+func (self *props) running() bool { return self.reset != nil }
+
+func (self *props) Reset(cause error) bool {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	if !self.running() {
+		return false
+	}
+	self.reset(cause)
+	return true
 }
 
 func (self *jobs) Cancel() {
@@ -87,60 +133,86 @@ func (self *jobs) wait() context.Context {
 func (self *jobs) Shutdown() {
 	self.log.Info("graceful stop all jobs")
 	self.cron.Stop()
-	self.gracefulStop(signal.ErrGracefulStop)
+	self.gracefulStop(errors.New("graceful stop"))
 }
 
 func (self *jobs) status() map[string]*job.Status {
 	ret := make(map[string]*job.Status, len(self.jobs))
 	for name, j := range self.jobs {
-		if st := j.Status(); st != nil {
-			ret[name] = st
+		if s := j.job.Status(); s != nil {
+			ret[name] = self.updateStatus(j, s)
 		}
 	}
 	return ret
 }
 
-func (self *jobs) wakeup(job string) error {
-	wu, ok := self.wakeups[job]
-	if !ok {
-		return fmt.Errorf("Job %q does not exist", job)
+func (self *jobs) updateStatus(j *props, s *job.Status) *job.Status {
+	if errStr := s.Error(); j.wakeupBusy > 0 && errStr == "" {
+		s.Err = fmt.Sprintf(
+			"job frequency is too high; was skipped %d times",
+			j.wakeupBusy)
 	}
-	return wu()
+	if j.cronId > 0 {
+		entry := self.cron.Entry(j.cronId)
+		s.NextCron = entry.Next
+	}
+	return s
 }
 
-func (self *jobs) reset(job string) error {
-	wu, ok := self.resets[job]
+func (self *jobs) wakeup(name string) error {
+	j, ok := self.jobs[name]
 	if !ok {
-		return fmt.Errorf("job %q does not exist", job)
+		return fmt.Errorf("job does not exist: %s", name)
 	}
-	return wu()
+
+	log := job.GetLogger(self.ctx).With(
+		slog.String(logging.JobField, name))
+	log.Info("wakeup job from signal")
+	if j.Wakeup(errors.New("wakeup from signal"), false) {
+		return nil
+	}
+
+	log.Info("start job from wakeup signal")
+	self.runJob(j, log)
+	return nil
+}
+
+func (self *jobs) reset(name string) error {
+	j, ok := self.jobs[name]
+	if !ok {
+		return fmt.Errorf("job does not exist: %s", name)
+	} else if !j.Reset(errors.New("reset signal")) {
+		return fmt.Errorf("job not running: %s", name)
+	}
+	return nil
 }
 
 func (self *jobs) startCronJobs(confJobs []job.Job) {
 	log := job.GetLogger(self.ctx)
 	var runCount int
 	for _, j := range confJobs {
-		jobName := j.Name()
-		self.mustCheckJobName(jobName)
+		name := j.Name()
+		self.mustCheckJobName(name)
 		if self.ctx.Err() != nil {
-			logger.WithError(self.log.With(slog.String("next_job", jobName)),
+			logger.WithError(self.log.With(slog.String("next_job", name)),
 				context.Cause(self.ctx), "break starting jobs")
 			break
 		}
-		self.jobs[jobName] = j
+		p := &props{job: j}
+		self.jobs[name] = p
 		j.RegisterMetrics(prometheus.DefaultRegisterer)
-		log := log.With(slog.String(logging.JobField, jobName))
+		log := log.With(slog.String(logging.JobField, name))
 		if j.Runnable() {
-			self.start(self.withJobSignals(jobName), j, logger.Wrap(log))
+			self.runJob(p, log)
 			runCount++
 		} else {
 			log.With(slog.Bool("runnable", false)).Info("job initialized")
 		}
+		self.registerCron(p, log)
 	}
+
 	self.cron.Start()
-	self.log.
-		With(slog.Int("count", len(self.jobs)),
-			slog.Int("run", runCount)).
+	self.log.With(slog.Int("count", len(self.jobs)), slog.Int("run", runCount)).
 		Info("started jobs")
 }
 
@@ -153,38 +225,85 @@ func (self *jobs) mustCheckJobName(s string) {
 	}
 }
 
-func (self *jobs) start(ctx context.Context, j job.Internal, log *logger.Logger,
-) {
+func (self *jobs) runJob(p *props, log *slog.Logger) {
+	fn := self.makeStartFunc(self.context(p), p.job, log)
 	self.g.Go(func() error {
+		defer p.Stop()
+		return fn()
+	})
+}
+
+func (self *jobs) makeStartFunc(ctx context.Context, j job.Internal,
+	log *slog.Logger,
+) func() error {
+	ctx, stopGraceful := self.gracefulContext(ctx, log)
+	fn := func() error {
+		defer stopGraceful()
 		log.Info("starting job")
-		if err := j.Run(ctx, self.cron); err != nil {
-			log.WithError(err).Error("job exited with error")
+		if err := j.Run(ctx); err != nil {
+			logger.WithError(log, err, "job exited with error")
 			return err
 		}
 		log.Info("job exited")
 		return nil
+	}
+	return fn
+}
+
+func (self *jobs) gracefulContext(ctx context.Context, log *slog.Logger,
+) (context.Context, func()) {
+	graceful, gracefulStop := context.WithCancelCause(ctx)
+	stop := context.AfterFunc(self.graceful, func() {
+		log.Info("graceful stop received")
+		gracefulStop(context.Cause(self.graceful))
 	})
+	ctx = signal.WithGraceful(ctx, graceful)
+
+	fn := func() {
+		gracefulStop(nil)
+		stop()
+	}
+	return ctx, fn
 }
 
-func (self *jobs) withJobSignals(jobName string) context.Context {
-	ctx := self.context(jobName)
-	ctx, wakeup := wakeup.Context(ctx)
-	self.wakeups[jobName] = wakeup
-	ctx, resetFunc := job.ContextWithReset(ctx)
-	self.resets[jobName] = resetFunc
-	return ctx
+func (self *jobs) context(p *props) context.Context {
+	name := p.job.Name()
+	ctx := logging.WithField(self.ctx, logging.JobField, name)
+	ctx = zfscmd.WithJobID(ctx, name)
+	return p.Context(ctx)
 }
 
-func (self *jobs) context(jobName string) context.Context {
-	ctx := logging.WithField(self.ctx, logging.JobField, jobName)
-	ctx = zfscmd.WithJobID(ctx, jobName)
-	return ctx
+func (self *jobs) registerCron(p *props, log *slog.Logger) {
+	cronSpec := p.job.Cron()
+	if cronSpec == "" {
+		log.Info("cron skip non periodic job")
+		return
+	}
+	log = log.With(slog.String("cron", cronSpec))
+
+	log.Info("register cron job")
+	id, err := self.cron.AddFunc(cronSpec, func() {
+		self.handleCron(p, log)
+	})
+	if err != nil {
+		logger.WithError(log, err, "failed add cron job")
+	}
+	p.cronId = id
+}
+
+func (self *jobs) handleCron(j *props, log *slog.Logger) {
+	log.Info("start job from cron")
+	if j.Wakeup(errors.New("wakeup from cron"), true) {
+		log.Warn("job took longer than its interval")
+		return
+	}
+	self.runJob(j, log)
 }
 
 func (self *jobs) startInternal(j job.Internal) {
 	j.RegisterMetrics(prometheus.DefaultRegisterer)
-	log := job.GetLogger(self.ctx)
-	self.start(self.ctx, j, log.WithField("server", true))
+	log := job.GetLogger(self.ctx).With(slog.Bool("internal", true))
+	self.g.Go(self.makeStartFunc(self.ctx, j, log))
 	self.internalJobs = append(self.internalJobs, j)
 }
 

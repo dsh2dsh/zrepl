@@ -3,11 +3,9 @@ package job
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
@@ -21,7 +19,7 @@ func GetLogger(ctx context.Context) *logger.Logger {
 }
 
 type Internal interface {
-	Run(ctx context.Context, cron *cron.Cron) error
+	Run(ctx context.Context) error
 	RegisterMetrics(registerer prometheus.Registerer)
 }
 
@@ -35,6 +33,7 @@ type Job interface {
 	OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool)
 	SenderConfig() *endpoint.SenderConfig
 	Runnable() bool
+	Cron() string
 }
 
 type Type string
@@ -49,6 +48,9 @@ const (
 )
 
 type Status struct {
+	Err      string
+	NextCron time.Time
+
 	Type        Type
 	JobSpecific JobStatus
 }
@@ -62,76 +64,44 @@ type JobStatus interface {
 	Progress() (expected, completed uint64)
 }
 
-func (s *Status) MarshalJSON() ([]byte, error) {
-	typeJson, err := json.Marshal(s.Type)
-	if err != nil {
-		return nil, fmt.Errorf("marshal type: %w", err)
+func (s *Status) UnmarshalJSON(b []byte) error {
+	st := struct{ Type Type }{}
+	if err := json.Unmarshal(b, &st); err != nil {
+		return fmt.Errorf("unmarshal status field 'Type': %w", err)
 	}
 
-	jobJSON, err := json.Marshal(s.JobSpecific)
-	if err != nil {
-		return nil, fmt.Errorf("marshal job: %w", err)
-	}
-
-	m := map[string]json.RawMessage{
-		"type":         typeJson,
-		string(s.Type): jobJSON,
-	}
-
-	b, err := json.Marshal(m)
-	if err != nil {
-		return nil, fmt.Errorf("marshal status: %w", err)
-	}
-	return b, nil
-}
-
-func (s *Status) UnmarshalJSON(in []byte) (err error) {
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(in, &m); err != nil {
-		return fmt.Errorf("unmarshal status: %w", err)
-	}
-	tJSON, ok := m["type"]
-	if !ok {
-		return errors.New("field 'type' not found")
-	}
-	if err := json.Unmarshal(tJSON, &s.Type); err != nil {
-		return fmt.Errorf("unmarshal type: %w", err)
-	}
-	key := string(s.Type)
-	jobJSON, ok := m[key]
-	if !ok {
-		return fmt.Errorf("field '%s', not found", key)
-	}
-	switch s.Type {
+	switch st.Type {
 	case TypeSnap:
-		var st SnapJobStatus
-		err = json.Unmarshal(jobJSON, &st)
-		s.JobSpecific = &st
+		s.JobSpecific = new(SnapJobStatus)
 
 	case TypePull:
 		fallthrough
 	case TypePush:
-		var st ActiveSideStatus
-		err = json.Unmarshal(jobJSON, &st)
-		s.JobSpecific = &st
+		s.JobSpecific = new(ActiveSideStatus)
 
 	case TypeSource:
 		fallthrough
 	case TypeSink:
-		var st PassiveStatus
-		err = json.Unmarshal(jobJSON, &st)
-		s.JobSpecific = &st
+		s.JobSpecific = new(PassiveStatus)
 
 	case TypeInternal:
 		// internal jobs do not report specifics
 	default:
-		err = fmt.Errorf("unknown job type '%s'", key)
+		return fmt.Errorf("unknown status type: %s", st.Type)
 	}
-	return err
+
+	type status Status
+	if err := json.Unmarshal(b, (*status)(s)); err != nil {
+		return fmt.Errorf("unmarshal status as %q type: %w", st.Type, err)
+	}
+	return nil
 }
 
 func (s *Status) Error() string {
-	return s.JobSpecific.Error()
+	if s := s.JobSpecific.Error(); s != "" {
+		return s
+	}
+	return s.Err
 }
 
 func (s *Status) Running() (time.Duration, bool) {
@@ -140,12 +110,19 @@ func (s *Status) Running() (time.Duration, bool) {
 
 func (s *Status) Internal() bool { return s.Type == TypeInternal }
 
-func (s *Status) Cron() string {
-	return s.JobSpecific.Cron()
-}
+func (s *Status) Cron() string { return s.JobSpecific.Cron() }
 
 func (s *Status) SleepingUntil() time.Time {
-	return s.JobSpecific.SleepingUntil()
+	t := s.JobSpecific.SleepingUntil()
+	switch {
+	case s.NextCron.IsZero():
+		return t
+	case t.IsZero():
+		return s.NextCron
+	case t.Before(s.NextCron):
+		return t
+	}
+	return s.NextCron
 }
 
 func (s *Status) CanSignal() string {
@@ -157,10 +134,6 @@ func (s *Status) CanSignal() string {
 	return ""
 }
 
-func (s *Status) Steps() (expected, step int) {
-	return s.JobSpecific.Steps()
-}
+func (s *Status) Steps() (expected, step int) { return s.JobSpecific.Steps() }
 
-func (s *Status) Progress() (uint64, uint64) {
-	return s.JobSpecific.Progress()
-}
+func (s *Status) Progress() (uint64, uint64) { return s.JobSpecific.Progress() }

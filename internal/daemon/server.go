@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
@@ -137,7 +136,7 @@ func (self *serverJob) mux(c *config.Listen) *http.ServeMux {
 	return mux
 }
 
-func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) error {
+func (self *serverJob) Run(ctx context.Context) error {
 	defer self.log.Info("server finished")
 	g, ctx := errgroup.WithContext(ctx)
 	baseContext := func(net.Listener) context.Context { return ctx }
@@ -160,7 +159,8 @@ func (self *serverJob) Run(ctx context.Context, cron *cron.Cron) error {
 
 	self.log.Info("waiting for listeners to finish")
 	<-ctx.Done()
-	self.log.WithError(context.Cause(ctx)).Info("server context done")
+	self.log.With(slog.String("cause", context.Cause(ctx).Error())).
+		Info("server context done")
 	self.shutdownServers()
 
 	if err := g.Wait(); err != nil && !errors.Is(err, http.ErrServerClosed) {

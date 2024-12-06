@@ -35,7 +35,6 @@ func makePlan(args planArgs, fss []*zfs.DatasetPath) *plan {
 	return &plan{snaps: snaps, args: args}
 }
 
-//go:generate stringer -type=SnapState
 type SnapState uint
 
 const (
@@ -44,6 +43,20 @@ const (
 	SnapDone
 	SnapError
 )
+
+func (self SnapState) String() string {
+	switch self {
+	case SnapPending:
+		return "SnapPending"
+	case SnapStarted:
+		return "SnapStarted"
+	case SnapDone:
+		return "SnapDone"
+	case SnapError:
+		return "SnapError"
+	}
+	return "SnapState(" + strconv.FormatInt(int64(self), 10) + ")"
+}
 
 // All fields protected by Snapper.mtx
 type snapProgress struct {

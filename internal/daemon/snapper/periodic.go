@@ -16,7 +16,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
-	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
 	"github.com/dsh2dsh/zrepl/internal/logger"
@@ -47,41 +46,40 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
 		return nil, fmt.Errorf("hook config error: %w", err)
 	}
 
-	args := periodicArgs{
-		interval: d.Truncate(time.Second),
-		fsf:      fsf,
-		planArgs: planArgs{
-			prefix:          in.Prefix,
-			timestampFormat: in.TimestampFormat,
-			timestampLocal:  in.TimestampLocal,
-			hooks:           hookList,
-		},
+	s := &Periodic{
 		cronSpec: cronSpec,
-		// ctx and log is set in Run()
-	}
+		args: periodicArgs{
+			interval: d.Truncate(time.Second),
+			fsf:      fsf,
+			planArgs: planArgs{
+				prefix:          in.Prefix,
+				timestampFormat: in.TimestampFormat,
+				timestampLocal:  in.TimestampLocal,
+				hooks:           hookList,
+			},
+			// ctx and log is set in Run()
+		},
 
-	return &Periodic{state: SyncUp, args: args}, nil
+		state:     Stopped,
+		nextState: Planning,
+	}
+	return s.init(), nil
 }
 
 type periodicArgs struct {
-	ctx            context.Context
-	interval       time.Duration
-	fsf            zfs.DatasetFilter
-	planArgs       planArgs
-	snapshotsTaken chan<- struct{}
-	dryRun         bool
-
-	cron     *cron.Cron
-	cronSpec string
-	wakeUp   chan struct{}
-	wakeSig  <-chan struct{}
+	ctx      context.Context
+	interval time.Duration
+	fsf      zfs.DatasetFilter
+	planArgs planArgs
 }
 
 type Periodic struct {
-	args periodicArgs
+	cronSpec string
+	args     periodicArgs
 
-	mtx   sync.Mutex
-	state State
+	mu        sync.Mutex
+	state     State
+	nextState State
 
 	// set in state Plan, used in Waiting
 	lastInvocation time.Time
@@ -91,244 +89,172 @@ type Periodic struct {
 
 	// valid for state SyncUp and Waiting
 	sleepUntil time.Time
-	cronId     cron.EntryID
 
 	// valid for state Err
-	err        error
-	wakeupBusy int
+	err error
 }
 
-//go:generate stringer -type=State
-type State uint
+var _ Snapper = (*Periodic)(nil)
 
-const (
-	SyncUp State = 1 << iota
-	SyncUpErrWait
-	Planning
-	Snapshotting
-	Waiting
-	ErrorWait
-	Stopped
-)
-
-func (s State) sf() state {
-	m := map[State]state{
-		SyncUp:        periodicStateSyncUp,
-		SyncUpErrWait: periodicStateWait,
-		Planning:      periodicStatePlan,
-		Snapshotting:  periodicStateSnapshot,
-		Waiting:       periodicStateWait,
-		ErrorWait:     periodicStateWait,
-		Stopped:       nil,
+func (self *Periodic) init() *Periodic {
+	if self.args.interval > 0 {
+		self.nextState = SyncUp
 	}
-	return m[s]
+	return self
 }
 
-func (s State) IsTerminal() bool { return s != Planning && s != Snapshotting }
+func (self *Periodic) Cron() string { return self.cronSpec }
 
-type (
-	updater func(u func(*Periodic)) State
-	state   func(a periodicArgs, u updater) state
-)
+func (self *Periodic) Periodic() bool { return true }
 
-func (s *Periodic) Periodic() bool { return true }
+func (self *Periodic) Runnable() bool { return self.nextState == SyncUp }
 
-func (s *Periodic) Run(ctx context.Context, snapshotsTaken chan<- struct{},
-	cron *cron.Cron,
-) {
-	log := getLogger(ctx)
-	log.Info("start periodic snapshotter")
-	defer log.Info("exiting periodic snapshotter")
+func (self *Periodic) Run(ctx context.Context) {
+	log := getLogger(ctx).With(slog.String("snapper", "periodic"))
+	state, err := self.switchState()
+	if err != nil {
+		logger.WithError(log.With(slog.String("state", state.String())),
+			err, "failed start snapper")
+	}
 
-	ctx, gracefulStop := context.WithCancelCause(ctx)
-	defer gracefulStop(nil)
-	graceful := signal.GracefulFrom(ctx)
-	defer context.AfterFunc(graceful, func() {
-		log.Info("graceful stop received")
-		gracefulStop(context.Cause(graceful))
-	})()
-
-	s.args.snapshotsTaken = snapshotsTaken
-	s.args.ctx = ctx
-	s.args.dryRun = false // for future expansion
-	s.args.cron = cron
-	s.args.wakeUp = make(chan struct{})
-	s.args.wakeSig = wakeup.Wait(ctx)
+	log.Info("start snapper")
+	defer log.Info("exiting snapper")
 
 	u := func(u func(*Periodic)) State {
-		s.mtx.Lock()
-		defer s.mtx.Unlock()
+		self.mu.Lock()
+		defer self.mu.Unlock()
 		if u != nil {
-			u(s)
+			u(self)
 		}
-		return s.state
+		return self.state
 	}
+	self.args.ctx = ctx
 
-	st := periodicStateSyncUp
-	if s.args.interval == 0 {
-		s.state = Waiting
-		st = periodicStateWait
-		s.runPeriodic(ctx)
-	}
-
-	for st != nil {
-		pre := u(nil)
-		st = st(s.args, u)
-		post := u(nil)
-		log.With(slog.String("transition", fmt.Sprintf("%s=>%s", pre, post))).
-			Debug("state transition")
-
+	for st := state.sf(); st != nil; {
+		preState := u(nil)
+		st = st(self.args, u)
+		nextState := u(nil)
+		log.With(slog.String("from", preState.String()),
+			slog.String("to", nextState.String()),
+		).Info("state transition")
 	}
 }
 
-func (s *Periodic) runPeriodic(ctx context.Context) {
-	cronSpec := s.args.cronSpec
-	log := getLogger(ctx).With(slog.String("cron", cronSpec))
-	id, err := s.args.cron.AddFunc(cronSpec, func() {
-		select {
-		case s.args.wakeUp <- struct{}{}:
-			s.wakeupBusy = 0
-		default:
-			s.wakeupBusy++
-			log.Warn("job took longer than its interval")
-		}
-	})
-	if err != nil {
-		logger.WithError(log, err, "add cron job")
-		return
+func (self *Periodic) switchState() (State, error) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	if self.state.Running() {
+		return self.state, fmt.Errorf("unexpected state: %s", self.state.String())
 	}
-	s.cronId = id
-	log.With(slog.Any("id", id)).Info("add cron job")
+
+	switch self.nextState {
+	case SyncUp:
+		self.state, self.nextState = self.nextState, Planning
+	case Planning:
+		self.state = self.nextState
+	default:
+		return self.state, fmt.Errorf("unexpected next state: %s",
+			self.nextState.String())
+	}
+	return self.state, nil
 }
 
 func onErr(err error, u updater) state {
-	return u(func(s *Periodic) {
-		s.err = err
-		preState := s.state
-		switch s.state {
+	return u(func(self *Periodic) {
+		self.err = err
+		preState := self.state
+		switch self.state {
 		case SyncUp:
-			s.state = SyncUpErrWait
-		case Planning:
-			fallthrough
-		case Snapshotting:
-			s.state = ErrorWait
+			self.state = SyncUpErrWait
+		case Planning, Snapshotting:
+			self.state = ErrorWait
 		}
-		getLogger(s.args.ctx).WithError(err).WithField("pre_state", preState).WithField("post_state", s.state).Error("snapshotting error")
+		log := getLogger(self.args.ctx).With(
+			slog.String("pre_state", preState.String()),
+			slog.String("post_state", self.state.String()))
+		logger.WithError(log, err, "snapshotting error")
 	}).sf()
 }
 
 func onMainCtxDone(ctx context.Context, u updater) state {
-	return u(func(s *Periodic) {
-		s.err = context.Cause(ctx)
-		s.state = Stopped
+	return u(func(self *Periodic) {
+		self.err = context.Cause(ctx)
+		self.state = Stopped
 	}).sf()
 }
 
 func periodicStateSyncUp(a periodicArgs, u updater) state {
-	u(func(snapper *Periodic) {
-		snapper.lastInvocation = time.Now()
-	})
-	fss, err := listFSes(a.ctx, a.fsf)
+	u(func(self *Periodic) { self.lastInvocation = time.Now() })
+
+	fss, err := zfs.ZFSListMapping(a.ctx, a.fsf)
 	if err != nil {
 		return onErr(err, u)
 	}
+
 	syncPoint, err := findSyncPoint(a.ctx, fss, a.planArgs.prefix, a.interval)
 	if err != nil {
 		return onErr(err, u)
 	}
-	u(func(s *Periodic) {
-		s.sleepUntil = syncPoint
-	})
 
 	if syncPoint.After(time.Now()) {
+		u(func(self *Periodic) { self.sleepUntil = syncPoint })
+		getLogger(a.ctx).With(
+			slog.Duration("duration",
+				time.Until(syncPoint).Truncate(time.Second)),
+			slog.Time("time", syncPoint),
+		).Info("waiting for sync point")
 		t := nanosleep.NewTimer(time.Until(syncPoint))
 		select {
 		case <-t.C():
-		case <-a.wakeSig:
+		case <-signal.WakeupFrom(a.ctx).Done():
 			t.Stop()
 		case <-a.ctx.Done():
 			t.Stop()
 		}
+		u(func(self *Periodic) { self.sleepUntil = time.Time{} })
 		if a.ctx.Err() != nil {
 			return onMainCtxDone(a.ctx, u)
 		}
 	}
-
-	return u(func(s *Periodic) {
-		s.state = Planning
-		s.runPeriodic(a.ctx)
-	}).sf()
+	return u(func(self *Periodic) { self.state = Planning }).sf()
 }
 
 func periodicStatePlan(a periodicArgs, u updater) state {
-	u(func(snapper *Periodic) {
-		snapper.lastInvocation = time.Now()
-	})
-	fss, err := listFSes(a.ctx, a.fsf)
+	u(func(self *Periodic) { self.lastInvocation = time.Now() })
+
+	fss, err := zfs.ZFSListMapping(a.ctx, a.fsf)
 	if err != nil {
 		return onErr(err, u)
 	}
 	p := makePlan(a.planArgs, fss)
-	return u(func(s *Periodic) {
-		s.state = Snapshotting
-		s.plan = p
-		s.err = nil
+
+	return u(func(self *Periodic) {
+		self.state = Snapshotting
+		self.plan = p
+		self.err = nil
 	}).sf()
 }
 
 func periodicStateSnapshot(a periodicArgs, u updater) state {
 	var plan *plan
-	u(func(snapper *Periodic) {
-		plan = snapper.plan
-	})
+	u(func(self *Periodic) { plan = self.plan })
 
-	ok := plan.execute(a.ctx, false)
-
-	select {
-	case a.snapshotsTaken <- struct{}{}:
-	default:
-		if a.snapshotsTaken != nil {
-			getLogger(a.ctx).Warn("callback channel is full, discarding snapshot update event")
-		}
+	if !plan.execute(a.ctx, false) {
+		return u(func(self *Periodic) {
+			self.state = ErrorWait
+			self.err = errors.New(
+				"one or more snapshots could not be created, check logs for details")
+		}).sf()
 	}
 
-	return u(func(snapper *Periodic) {
-		if !ok {
-			snapper.state = ErrorWait
-			snapper.err = errors.New("one or more snapshots could not be created, check logs for details")
-		} else {
-			snapper.state = Waiting
-			snapper.err = nil
-		}
+	return u(func(self *Periodic) {
+		self.state = Stopped
+		self.err = nil
 	}).sf()
 }
 
-func periodicStateWait(a periodicArgs, u updater) state {
-	u(func(snapper *Periodic) {
-		log := getLogger(a.ctx)
-		logFunc := log.Debug
-		if snapper.state == ErrorWait || snapper.state == SyncUpErrWait {
-			logFunc = log.Error
-		}
-		logFunc("enter wait-state after error")
-	})
-
-	select {
-	case <-a.wakeUp:
-	case <-a.wakeSig:
-	case <-a.ctx.Done():
-	}
-	if a.ctx.Err() != nil {
-		return onMainCtxDone(a.ctx, u)
-	}
-	return u(func(snapper *Periodic) { snapper.state = Planning }).sf()
-}
-
-func listFSes(ctx context.Context, mf zfs.DatasetFilter) (fss []*zfs.DatasetPath, err error) {
-	return zfs.ZFSListMapping(ctx, mf)
-}
-
-var syncUpWarnNoSnapshotUntilSyncupMinDuration = envconst.Duration("ZREPL_SNAPPER_SYNCUP_WARN_MIN_DURATION", 1*time.Second)
+var syncUpWarnNoSnapshotUntilSyncupMinDuration = envconst.Duration(
+	"ZREPL_SNAPPER_SYNCUP_WARN_MIN_DURATION", 1*time.Second)
 
 // see docs/snapshotting.rst
 func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
@@ -412,7 +338,8 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 	return winnerSyncPoint, nil
 }
 
-var findSyncPointFSNoFilesystemVersionsErr = errors.New("no filesystem versions")
+var findSyncPointFSNoFilesystemVersionsErr = errors.New(
+	"no filesystem versions")
 
 func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time,
 	interval time.Duration, prefix string, d *zfs.DatasetPath,
@@ -446,49 +373,36 @@ func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time,
 	return latest.Creation.Add(interval), nil
 }
 
-func (s *Periodic) Running() (d time.Duration, ok bool) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	if !s.lastInvocation.IsZero() {
-		d = time.Since(s.lastInvocation)
+func (self *Periodic) Running() (d time.Duration, ok bool) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	if !self.lastInvocation.IsZero() {
+		d = time.Since(self.lastInvocation)
 	}
-	switch s.state {
+	switch self.state {
 	case Planning, Snapshotting:
 		ok = true
 	}
 	return
 }
 
-func (s *Periodic) Report() Report {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+func (self *Periodic) Report() Report {
+	self.mu.Lock()
+	defer self.mu.Unlock()
 
 	var progress []*ReportFilesystem = nil
-	if s.plan != nil {
-		progress = s.plan.report()
-	}
-
-	sleepUntil := s.sleepUntil
-	if s.cronId > 0 {
-		sleepUntil = s.args.cron.Entry(s.cronId).Next
-	}
-
-	err := s.err
-	if err == nil && s.wakeupBusy > 0 {
-		err = fmt.Errorf(
-			"job frequency is too high; snapshots were not taken %d times",
-			s.wakeupBusy)
+	if self.plan != nil {
+		progress = self.plan.report()
 	}
 
 	r := &PeriodicReport{
-		CronSpec:   s.args.cronSpec,
-		State:      s.state,
-		SleepUntil: sleepUntil,
-		Error:      errOrEmptyString(err),
+		CronSpec:   self.cronSpec,
+		State:      self.state,
+		SleepUntil: self.sleepUntil,
+		Error:      errOrEmptyString(self.err),
 		Progress:   progress,
-		StartedAt:  s.lastInvocation,
+		StartedAt:  self.lastInvocation,
 	}
-
 	return Report{Type: TypePeriodic, Periodic: r}
 }
 
@@ -535,5 +449,3 @@ func (self *PeriodicReport) CompletionProgress() (expected, completed uint64) {
 	}
 	return
 }
-
-func (s *Periodic) Shutdown() {}

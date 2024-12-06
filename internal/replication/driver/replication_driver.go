@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"sort"
 	"strings"
@@ -242,7 +243,8 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 			})
 			prev = cur
 			if graceful.Err() != nil {
-				log.WithError(graceful.Err()).Info("context done")
+				log.With(slog.String("cause", context.Cause(graceful).Error())).
+					Info("context done")
 				return
 			}
 

@@ -3,24 +3,24 @@ package snapper
 import (
 	"context"
 	"time"
-
-	"github.com/dsh2dsh/cron/v3"
 )
 
 type manual struct{}
 
-func (s *manual) Periodic() bool { return false }
+var _ Snapper = (*manual)(nil)
 
-func (s *manual) Run(ctx context.Context, wakeUpCommon chan<- struct{},
-	cron *cron.Cron,
-) {
+func (self *manual) Cron() string { return "" }
+
+func (self *manual) Periodic() bool { return false }
+
+func (self *manual) Runnable() bool { return false }
+
+func (self *manual) Run(context.Context) {
 	// nothing to do
 }
 
-func (s *manual) Running() (time.Duration, bool) { return 0, false }
+func (self *manual) Running() (time.Duration, bool) { return 0, false }
 
-func (s *manual) Report() Report {
+func (self *manual) Report() Report {
 	return Report{Type: TypeManual, Manual: &struct{}{}}
 }
-
-func (s *manual) Shutdown() {}

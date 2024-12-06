@@ -4,48 +4,26 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
 
-	"github.com/dsh2dsh/cron/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
-	"github.com/dsh2dsh/zrepl/internal/daemon/job/wakeup"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-type SnapJob struct {
-	name     endpoint.JobID
-	fsfilter zfs.DatasetFilter
-	snapper  snapper.Snapper
-	wg       sync.WaitGroup
-
-	prunerFactory *pruner.LocalPrunerFactory
-
-	promPruneSecs *prometheus.HistogramVec // labels: prune_side
-
-	prunerMtx sync.Mutex
-	pruner    *pruner.Pruner
-}
-
-var _ Job = (*SnapJob)(nil)
-
-func (j *SnapJob) Name() string { return j.name.String() }
-
-func (j *SnapJob) Type() Type { return TypeSnap }
-
-func (j *SnapJob) Runnable() bool { return j.snapper.Periodic() }
-
-func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob, err error) {
+func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob,
+	err error,
+) {
 	j = &SnapJob{}
 	fsf, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
 	if err != nil {
@@ -67,12 +45,36 @@ func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob, err er
 		Help:        "seconds spent in pruner",
 		ConstLabels: prometheus.Labels{"zrepl_job": j.name.String()},
 	}, []string{"prune_side"})
-	j.prunerFactory, err = pruner.NewLocalPrunerFactory(in.Pruning, j.promPruneSecs)
+	j.prunerFactory, err = pruner.NewLocalPrunerFactory(
+		in.Pruning, j.promPruneSecs)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build snapjob pruning rules: %w", err)
 	}
 	return j, nil
 }
+
+type SnapJob struct {
+	name     endpoint.JobID
+	fsfilter zfs.DatasetFilter
+	snapper  snapper.Snapper
+
+	prunerFactory *pruner.LocalPrunerFactory
+
+	promPruneSecs *prometheus.HistogramVec // labels: prune_side
+
+	prunerMtx sync.Mutex
+	pruner    *pruner.Pruner
+}
+
+var _ Job = (*SnapJob)(nil)
+
+func (j *SnapJob) Name() string { return j.name.String() }
+
+func (j *SnapJob) Type() Type { return TypeSnap }
+
+func (j *SnapJob) Cron() string { return j.snapper.Cron() }
+
+func (j *SnapJob) Runnable() bool { return j.snapper.Runnable() }
 
 func (j *SnapJob) RegisterMetrics(registerer prometheus.Registerer) {
 	registerer.MustRegister(j.promPruneSecs)
@@ -184,60 +186,25 @@ func (self *SnapJobStatus) Progress() (uint64, uint64) {
 	return 0, 0
 }
 
-func (j *SnapJob) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
+func (j *SnapJob) OwnedDatasetSubtreeRoot() (*zfs.DatasetPath, bool) {
 	return nil, false
 }
 
 func (j *SnapJob) SenderConfig() *endpoint.SenderConfig { return nil }
 
-func (j *SnapJob) Run(ctx context.Context, cron *cron.Cron) error {
+func (j *SnapJob) Run(ctx context.Context) error {
 	log := GetLogger(ctx)
 	defer log.Info("job exiting")
-	wakeUp := j.goSnap(ctx, cron)
+	ctx = signal.GracefulFrom(ctx)
 
-	ctx, gracefulStop := context.WithCancelCause(ctx)
-	defer gracefulStop(nil)
-	graceful := signal.GracefulFrom(ctx)
-	defer context.AfterFunc(graceful, func() {
-		log.Info("graceful stop received")
-		gracefulStop(context.Cause(graceful))
-	})()
-
-forLoop:
-	for {
-		log.Info("wait for wakeups")
-		select {
-		case <-ctx.Done():
-			log.WithError(context.Cause(ctx)).Info("context")
-			break forLoop
-		case <-wakeUp:
-		}
-		j.prune(ctx)
+	j.snapper.Run(ctx)
+	if ctx.Err() != nil {
+		log.With(slog.String("cause", context.Cause(ctx).Error())).
+			Info("context done")
+		return nil
 	}
-	j.wait(log)
+	j.prune(ctx)
 	return nil
-}
-
-func (j *SnapJob) goSnap(ctx context.Context, cron *cron.Cron) <-chan struct{} {
-	if !j.snapper.Periodic() {
-		return wakeup.Wait(ctx)
-	}
-
-	snapshots := make(chan struct{})
-	j.wg.Add(1)
-	go func() {
-		defer j.wg.Done()
-		j.snapper.Run(ctx, snapshots, cron)
-	}()
-	return snapshots
-}
-
-func (j *SnapJob) wait(l *logger.Logger) {
-	if j.snapper.Periodic() {
-		l.Info("waiting for snapper job exit")
-		defer l.Info("snapper job exited")
-	}
-	j.wg.Wait()
 }
 
 func (j *SnapJob) prune(ctx context.Context) {

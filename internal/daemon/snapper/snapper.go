@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dsh2dsh/cron/v3"
-
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -20,10 +18,11 @@ const (
 )
 
 type Snapper interface {
+	Cron() string
 	Periodic() bool
-	Run(ctx context.Context, snapshotsTaken chan<- struct{}, cron *cron.Cron)
+	Runnable() bool
+	Run(ctx context.Context)
 	Report() Report
-	Shutdown()
 	Running() (time.Duration, bool)
 }
 

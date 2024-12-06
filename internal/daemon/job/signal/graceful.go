@@ -2,10 +2,7 @@ package signal
 
 import (
 	"context"
-	"errors"
 )
-
-var ErrGracefulStop = errors.New("graceful stop")
 
 type ctxKeyGraceful struct{}
 
