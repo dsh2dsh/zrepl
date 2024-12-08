@@ -13,6 +13,7 @@ linters:
     - "perfsprint"
     - "prealloc"
     - "revive"
+    - "sloglint"
     - "testifylint"
     - "unconvert"
     - "usestdlibvars"
@@ -42,6 +43,12 @@ linters-settings:
   revive:
     rules:
       - name: "time-equal"
+
+  sloglint:
+    # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
+    # https://github.com/go-simpler/sloglint?tab=readme-ov-file#attributes-only
+    # Default: false
+    attr-only: true
 
   wrapcheck:
     # An array of glob patterns which, if any match the package of the function
