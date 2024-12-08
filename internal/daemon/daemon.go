@@ -130,6 +130,7 @@ func waitDone(ctx context.Context, jobs *jobs) {
 	log.Info("waiting for jobs to finish")
 	wait := jobs.wait()
 
+	var terminating bool
 	for {
 		select {
 		case <-wait.Done():
@@ -140,7 +141,13 @@ func waitDone(ctx context.Context, jobs *jobs) {
 			jobs.Reload()
 		case <-sigTerm:
 			log.Info("got TERM signal")
-			jobs.Shutdown()
+			if !terminating {
+				jobs.Shutdown()
+				terminating = true
+			} else {
+				log.Info("terminating")
+				jobs.Cancel()
+			}
 		}
 	}
 }
