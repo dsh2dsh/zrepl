@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testBin = "./zfscmd_platform_test.sh"
+
 func TestCmdStderrBehaviorOutput(t *testing.T) {
 	stdout, err := exec.Command(testBin, "0").Output()
 	require.NoError(t, err)
