@@ -164,7 +164,7 @@ type Step struct {
 
 	// byteCounter is nil initially, and set later in Step.doReplication
 	// => concurrent read of that pointer from Step.ReportInfo must be protected
-	byteCounter    bytecounter.ReadCloser
+	byteCounter    *bytecounter.ReadCloser
 	byteCounterMtx chainlock.L
 }
 
@@ -674,7 +674,7 @@ func (s *Step) sendRecv(ctx context.Context, sr *pdu.SendReq) error {
 	return nil
 }
 
-func (s *Step) WithByteCounter(r bytecounter.ReadCloser) *Step {
+func (s *Step) WithByteCounter(r *bytecounter.ReadCloser) *Step {
 	s.byteCounterMtx.Lock()
 	s.byteCounter = r
 	s.byteCounterMtx.Unlock()
