@@ -19,12 +19,16 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/singleflight"
 
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
-var ZfsBin string = "zfs"
+var (
+	ZfsBin string = "zfs"
+	sg     singleflight.Group
+)
 
 type DatasetPath struct {
 	comps []string
@@ -226,92 +230,8 @@ func ZFSListPaths(ctx context.Context) ([]*DatasetPath, error) {
 func ZFSListIter(ctx context.Context, properties []string,
 	notExistHint *DatasetPath, zfsArgs ...string,
 ) iter.Seq2[[]string, error] {
-	cmd := zfscmd.CommandContext(ctx, ZfsBin,
-		zfsListArgs(properties, zfsArgs)...).WithLogError(false)
-	var stderrBuf bytes.Buffer
-	stdout, err := cmd.StdoutPipeWithErrorBuf(&stderrBuf)
-
-	iter := func(yield func([]string, error) bool) {
-		if err != nil {
-			yield(nil, err)
-			return
-		} else if err := cmd.Start(); err != nil {
-			yield(nil, err)
-			return
-		}
-
-		err = scanCmdOutput(cmd, stdout, &stderrBuf,
-			func(s string) (error, bool) {
-				fields := strings.SplitN(s, "\t", len(properties)+1)
-				if len(fields) != len(properties) {
-					return fmt.Errorf("unexpected output from zfs list: %q", s), false
-				} else if ctx.Err() != nil {
-					return nil, false
-				}
-				return nil, yield(fields, nil)
-			})
-		if err != nil {
-			if notExistHint != nil {
-				err = maybeDatasetNotExists(cmd, notExistHint.ToString(), err)
-			} else {
-				cmd.WithStderrOutput(stderrBuf.Bytes()).LogError(err, false)
-			}
-			yield(nil, err)
-		}
-	}
-	return iter
-}
-
-func zfsListArgs(properties []string, zfsArgs []string) []string {
-	args := make([]string, 0, 4+len(zfsArgs))
-	args = append(args, "list", "-H", "-p", "-o", strings.Join(properties, ","))
-	args = append(args, zfsArgs...)
-	return args
-}
-
-func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf *bytes.Buffer,
-	fn func(s string) (error, bool),
-) (err error) {
-	var ok bool
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		if err, ok = fn(s.Text()); err != nil || !ok {
-			break
-		}
-	}
-
-	if err != nil || !ok || s.Err() != nil {
-		_, _ = io.Copy(io.Discard, r)
-	}
-	cmdErr := cmd.Wait()
-
-	switch {
-	case err != nil:
-	case s.Err() != nil:
-		err = s.Err()
-	case cmdErr != nil:
-		err = NewZfsError(cmdErr, stderrBuf.Bytes())
-	}
-	return
-}
-
-func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {
-	var zfsError *ZFSError
-	if !errors.As(err, &zfsError) {
-		return err
-	}
-
-	if len(zfsError.Stderr) != 0 {
-		cmd.WithStderrOutput(zfsError.Stderr)
-		enotexist := tryDatasetDoesNotExist(path, zfsError.Stderr)
-		if enotexist != nil {
-			cmd.LogError(err, true)
-			return enotexist
-		}
-	}
-
-	cmd.LogError(err, false)
-	return err
+	return ListIter(ctx, properties, notExistHint,
+		NewListCmd(ctx, properties, zfsArgs))
 }
 
 // FIXME replace with EntityNamecheck

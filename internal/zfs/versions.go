@@ -143,45 +143,48 @@ func (v FilesystemVersion) ToSendArgVersion() ZFSSendArgVersion {
 }
 
 type ParseFilesystemVersionArgs struct {
-	fullname                            string
-	guid, createtxg, creation, userrefs string
+	fullname  string
+	guid      string
+	createtxg string
+	creation  string
+	userrefs  string
 }
 
-func (self ParseFilesystemVersionArgs) WithFullName(s string,
-) ParseFilesystemVersionArgs {
+func (self *ParseFilesystemVersionArgs) WithFullName(s string,
+) *ParseFilesystemVersionArgs {
 	self.fullname = s
 	return self
 }
 
-func (self ParseFilesystemVersionArgs) WithGuid(s string,
-) ParseFilesystemVersionArgs {
+func (self *ParseFilesystemVersionArgs) WithGuid(s string,
+) *ParseFilesystemVersionArgs {
 	self.guid = s
 	return self
 }
 
-func (self ParseFilesystemVersionArgs) WithCreateTxg(s string,
-) ParseFilesystemVersionArgs {
+func (self *ParseFilesystemVersionArgs) WithCreateTxg(s string,
+) *ParseFilesystemVersionArgs {
 	self.createtxg = s
 	return self
 }
 
-func (self ParseFilesystemVersionArgs) WithCreation(s string,
-) ParseFilesystemVersionArgs {
+func (self *ParseFilesystemVersionArgs) WithCreation(s string,
+) *ParseFilesystemVersionArgs {
 	self.creation = s
 	return self
 }
 
-func (self ParseFilesystemVersionArgs) WithUserRefs(s string,
-) ParseFilesystemVersionArgs {
+func (self *ParseFilesystemVersionArgs) WithUserRefs(s string,
+) *ParseFilesystemVersionArgs {
 	self.userrefs = s
 	return self
 }
 
-func (self ParseFilesystemVersionArgs) Parse() (FilesystemVersion, error) {
+func (self *ParseFilesystemVersionArgs) Parse() (FilesystemVersion, error) {
 	return ParseFilesystemVersion(self)
 }
 
-func ParseFilesystemVersion(args ParseFilesystemVersionArgs,
+func ParseFilesystemVersion(args *ParseFilesystemVersionArgs,
 ) (v FilesystemVersion, err error) {
 	_, v.Type, v.Name, err = DecomposeVersionString(args.fullname)
 	if err != nil {
@@ -245,7 +248,8 @@ func (o *ListFilesystemVersionsOptions) typesFlagArgs() string {
 }
 
 func (o *ListFilesystemVersionsOptions) matches(v FilesystemVersion) bool {
-	return (len(o.Types) == 0 || o.Types[v.Type]) && strings.HasPrefix(v.Name, o.ShortnamePrefix)
+	return (len(o.Types) == 0 || o.Types[v.Type]) &&
+		strings.HasPrefix(v.Name, o.ShortnamePrefix)
 }
 
 // ZFSListFilesystemVersions returns versions are sorted by createtxg.
@@ -258,33 +262,32 @@ func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath,
 		prom.ZFSListFilesystemVersionDuration.WithLabelValues(fs.ToString()))
 	defer promTimer.ObserveDuration()
 
-	listResults := ZFSListIter(ctx,
-		[]string{"name", "guid", "createtxg", "creation", "userrefs"},
-		fs,
+	props := []string{"name", "guid", "createtxg", "creation", "userrefs"}
+	cmd := NewListCmd(ctx, props, []string{
 		"-r", "-d", "1",
 		"-t", options.typesFlagArgs(),
-		"-s", "createtxg", fs.ToString())
+		"-s", "createtxg", fs.ToString(),
+	})
 
-	res := []FilesystemVersion{}
-	for fields, err := range listResults {
+	v, err, _ := sg.Do(cmd.String(), func() (any, error) {
+		snaps, err := listVersions(ctx, props, fs, cmd)
 		if err != nil {
 			return nil, err
 		}
-		line := fields
-		var args ParseFilesystemVersionArgs
-		args = args.
-			WithFullName(line[0]).
-			WithGuid(line[1]).
-			WithCreateTxg(line[2]).
-			WithCreation(line[3]).
-			WithUserRefs(line[4])
-		if v, err := args.Parse(); err != nil {
-			return nil, err
-		} else if options.matches(v) {
-			res = append(res, v)
+		return &snaps, nil
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // already wrapped
+	}
+	allSnaps := v.(*[]FilesystemVersion)
+
+	snaps := []FilesystemVersion{}
+	for _, s := range *allSnaps {
+		if options.matches(s) {
+			snaps = append(snaps, s)
 		}
 	}
-	return res, nil
+	return snaps, nil
 }
 
 func ZFSGetFilesystemVersion(ctx context.Context, ds string,

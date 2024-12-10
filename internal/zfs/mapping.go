@@ -3,7 +3,6 @@ package zfs
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -39,57 +38,32 @@ func (noFilter) Empty() bool { return true }
 
 func (noFilter) SingleRecursiveDataset() *DatasetPath { return nil }
 
+// --------------------------------------------------
+
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 ) ([]*DatasetPath, error) {
-	res, err := ZFSListMappingProperties(ctx, filter, nil)
+	props := []string{"name"}
+	cmd := NewListCmd(ctx, props, []string{"-r", "-t", "filesystem,volume"})
+	v, err, _ := sg.Do(cmd.String(), func() (any, error) {
+		datasets, err := listDatasets(ctx, props, nil, cmd)
+		if err != nil {
+			return nil, err
+		}
+		return &datasets, nil
+	})
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // already wrapped
 	}
-	datasets := make([]*DatasetPath, len(res))
-	for i, r := range res {
-		datasets[i] = r.Path
-	}
-	return datasets, nil
-}
-
-type ZFSListMappingPropertiesResult struct {
-	Path *DatasetPath
-	// Guaranteed to have the same length as properties in the originating call
-	Fields []string
-}
-
-// properties must not contain 'name'
-func ZFSListMappingProperties(ctx context.Context, filter DatasetFilter,
-	properties []string,
-) ([]ZFSListMappingPropertiesResult, error) {
-	if filter == nil {
-		panic("filter must not be nil")
-	} else if slices.Contains(properties, "name") {
-		panic("properties must not contain 'name'")
-	}
-
-	properties = slices.Concat([]string{"name"}, properties)
-	zfsList := ZFSListIter(ctx, properties, nil, "-r", "-t",
-		"filesystem,volume")
+	allDatasets := v.(*[]*DatasetPath)
 
 	unmatchedUserSpecifiedDatasets := filter.UserSpecifiedDatasets()
-	datasets := []ZFSListMappingPropertiesResult{}
-	for fields, err := range zfsList {
-		if err != nil {
-			return nil, err
-		}
-		path, err := NewDatasetPath(fields[0])
-		if err != nil {
-			return nil, err
-		}
+	datasets := []*DatasetPath{}
+	for _, path := range *allDatasets {
 		delete(unmatchedUserSpecifiedDatasets, path.ToString())
-		if pass, err := filter.Filter(path); err != nil {
+		if ok, err := filter.Filter(path); err != nil {
 			return nil, fmt.Errorf("error calling filter: %w", err)
-		} else if pass {
-			datasets = append(datasets, ZFSListMappingPropertiesResult{
-				Path:   path,
-				Fields: fields[1:],
-			})
+		} else if ok {
+			datasets = append(datasets, path)
 		}
 	}
 
