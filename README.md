@@ -26,6 +26,8 @@ pkg install zrepl-dsh2dsh
     # Include file with keys for accessing remote jobs and authenticate remote
     # clients. The filename is relative to filename of this configuration file.
     include_keys: "keys.yaml"
+    # Include multiple files with keys from directory.
+    #include_keys "keys.d/*.yaml"
 
     listen:
       # Serve "sink" and "source" jobs for network access.
@@ -554,6 +556,22 @@ pkg install zrepl-dsh2dsh
       - name: "zroot-to-zdisk"
         pruning:
           concurrency: 1
+    ```
+
+  * Job configurations can be included from multiple files:
+
+    ```yaml
+    include_jobs: "jobs.d/*.yaml"
+    ```
+
+    Like `include_keys`, the directory is relative to main configuration file.
+
+    `include_jobs` can be combined with `jobs`:
+
+    ```yaml
+    jobs:
+      - name: "zroot-to-zdisk"
+    include_jobs: "jobs.d/*.yaml"
     ```
 
 ## Upstream user documentation

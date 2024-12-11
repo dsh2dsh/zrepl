@@ -26,7 +26,7 @@ var ConfigcheckCmd = &cli.Subcommand{
 	Use:   "configcheck",
 	Short: "check if config can be parsed without errors",
 
-	ConfigWithKeys: true,
+	ConfigWithIncludes: true,
 
 	SetupFlags: func(f *pflag.FlagSet) {
 		f.StringVar(&configcheckArgs.format, "format", "", "dump parsed config object [yaml|json]")

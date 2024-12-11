@@ -14,8 +14,8 @@ import (
 
 type Option func(self *Config)
 
-func WithSkipKeys() Option {
-	return func(self *Config) { self.skipKeys = true }
+func WithoutIncludes() Option {
+	return func(self *Config) { self.skipIncludes = true }
 }
 
 func New(opts ...Option) *Config {
@@ -24,14 +24,16 @@ func New(opts ...Option) *Config {
 }
 
 type Config struct {
-	Jobs   []JobEnum `yaml:"jobs" validate:"min=1,dive"`
-	Global Global    `yaml:"global"`
-	Listen []Listen  `yaml:"listen" validate:"dive"`
+	Global Global   `yaml:"global"`
+	Listen []Listen `yaml:"listen" validate:"dive"`
 
 	Keys        []AuthKey `yaml:"keys" validate:"dive"`
 	IncludeKeys string    `yaml:"include_keys" validate:"omitempty,filepath"`
 
-	skipKeys bool
+	Jobs        []JobEnum `yaml:"jobs" validate:"min=1,dive"`
+	IncludeJobs string    `yaml:"include_jobs" validate:"omitempty,filepath"`
+
+	skipIncludes bool
 }
 
 func (c *Config) init(opts ...Option) *Config {
@@ -44,11 +46,22 @@ func (c *Config) init(opts ...Option) *Config {
 func (c *Config) lateInit(path string) error {
 	if len(c.Global.Logging) == 0 {
 		c.Global.Logging.SetDefaults()
-	}
-	if c.skipKeys {
+	} else if c.skipIncludes {
 		return nil
 	}
-	return includeYAML(path, c.IncludeKeys, &c.Keys)
+
+	if keys, err := appendYAML(path, c.IncludeKeys, c.Keys); err != nil {
+		return err
+	} else if keys != nil {
+		c.Keys = keys
+	}
+
+	if jobs, err := appendYAML(path, c.IncludeJobs, c.Jobs); err != nil {
+		return err
+	} else if jobs != nil {
+		c.Jobs = jobs
+	}
+	return nil
 }
 
 func (c *Config) Job(name string) (*JobEnum, error) {
