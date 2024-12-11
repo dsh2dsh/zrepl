@@ -1,6 +1,7 @@
 package pruning
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -11,6 +12,8 @@ type KeepLastN struct {
 	n  int
 	re *regexp.Regexp
 }
+
+var _ KeepRule = (*KeepLastN)(nil)
 
 func MustKeepLastN(n int, regex string) *KeepLastN {
 	k, err := NewKeepLastN(n, regex)
@@ -31,10 +34,12 @@ func NewKeepLastN(n int, regex string) (*KeepLastN, error) {
 	return &KeepLastN{n, re}, nil
 }
 
-func (k KeepLastN) KeepRule(snaps []Snapshot) (destroyList []Snapshot) {
-	matching, notMatching := partitionSnapList(snaps, func(snapshot Snapshot) bool {
-		return k.re.MatchString(snapshot.Name())
-	})
+func (k KeepLastN) KeepRule(_ context.Context, snaps []Snapshot,
+) (destroyList []Snapshot) {
+	matching, notMatching := partitionSnapList(snaps,
+		func(snapshot Snapshot) bool {
+			return k.re.MatchString(snapshot.Name())
+		})
 	// snaps that don't match the regex are not kept by this rule
 	destroyList = append(destroyList, notMatching...)
 

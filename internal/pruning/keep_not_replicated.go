@@ -1,8 +1,13 @@
 package pruning
 
+import "context"
+
 type KeepNotReplicated struct{}
 
-func (*KeepNotReplicated) KeepRule(snaps []Snapshot) (destroyList []Snapshot) {
+var _ KeepRule = (*KeepNotReplicated)(nil)
+
+func (*KeepNotReplicated) KeepRule(_ context.Context, snaps []Snapshot,
+) (destroyList []Snapshot) {
 	return filterSnapList(snaps, func(snapshot Snapshot) bool {
 		return snapshot.Replicated()
 	})

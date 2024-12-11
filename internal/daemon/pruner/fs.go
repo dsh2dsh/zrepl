@@ -156,5 +156,5 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	}
 
 	// Apply prune rules
-	self.destroyList = pruning.PruneSnapshots(self.snaps, a.rules)
+	self.destroyList = pruning.PruneSnapshots(ctx, self.snaps, a.rules)
 }

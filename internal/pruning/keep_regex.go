@@ -1,6 +1,7 @@
 package pruning
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 )
@@ -10,7 +11,7 @@ type KeepRegex struct {
 	negate bool
 }
 
-var _ KeepRule = &KeepRegex{}
+var _ KeepRule = (*KeepRegex)(nil)
 
 func NewKeepRegex(expr string, negate bool) (*KeepRegex, error) {
 	re, err := regexp.Compile(expr)
@@ -28,7 +29,7 @@ func MustKeepRegex(expr string, negate bool) *KeepRegex {
 	return k
 }
 
-func (k *KeepRegex) KeepRule(snaps []Snapshot) []Snapshot {
+func (k *KeepRegex) KeepRule(_ context.Context, snaps []Snapshot) []Snapshot {
 	return filterSnapList(snaps, func(s Snapshot) bool {
 		if k.negate {
 			return k.expr.FindStringIndex(s.Name()) != nil

@@ -1,6 +1,7 @@
 package pruning
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 )
 
 type KeepRule interface {
-	KeepRule(snaps []Snapshot) (destroyList []Snapshot)
+	KeepRule(ctx context.Context, snaps []Snapshot) (destroyList []Snapshot)
 }
 
 type Snapshot interface {
@@ -17,15 +18,17 @@ type Snapshot interface {
 	Date() time.Time
 }
 
-// The returned snapshot list is guaranteed to only contains elements of input parameter snaps
-func PruneSnapshots(snaps []Snapshot, keepRules []KeepRule) []Snapshot {
+// The returned snapshot list is guaranteed to only contains elements of input
+// parameter snaps
+func PruneSnapshots(ctx context.Context, snaps []Snapshot, keepRules []KeepRule,
+) []Snapshot {
 	if len(keepRules) == 0 {
 		return []Snapshot{}
 	}
 
 	remCount := make(map[Snapshot]int, len(snaps))
 	for _, r := range keepRules {
-		ruleRems := r.KeepRule(snaps)
+		ruleRems := r.KeepRule(ctx, snaps)
 		for _, ruleRem := range ruleRems {
 			remCount[ruleRem]++
 		}

@@ -1,12 +1,15 @@
 package pruning
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/pruning/retentiongrid"
 )
 
@@ -17,6 +20,8 @@ type KeepGrid struct {
 	retentionGrid *retentiongrid.Grid
 	re            *regexp.Regexp
 }
+
+var _ KeepRule = (*KeepGrid)(nil)
 
 func NewKeepGrid(in *config.PruneGrid) (p *KeepGrid, err error) {
 	if in.Regex == "" {
@@ -84,11 +89,20 @@ func newKeepGrid(re *regexp.Regexp, configIntervals []config.RetentionInterval) 
 	}, nil
 }
 
+var gridDeprecated sync.Once
+
 // Prune filters snapshots with the retention grid.
-func (p *KeepGrid) KeepRule(snaps []Snapshot) (destroyList []Snapshot) {
-	matching, notMatching := partitionSnapList(snaps, func(snapshot Snapshot) bool {
-		return p.re.MatchString(snapshot.Name())
+func (p *KeepGrid) KeepRule(ctx context.Context, snaps []Snapshot,
+) (destroyList []Snapshot) {
+	gridDeprecated.Do(func() {
+		log := logging.GetLogger(ctx, logging.SubsysPruning)
+		log.Warn("'grid' pruning depricated. Consider using of multiple 'snap' jobs with different 'prefix' + 'last_n' pruning.")
 	})
+
+	matching, notMatching := partitionSnapList(snaps,
+		func(snapshot Snapshot) bool {
+			return p.re.MatchString(snapshot.Name())
+		})
 
 	// snaps that don't match the regex are not kept by this rule
 	destroyList = append(destroyList, notMatching...)

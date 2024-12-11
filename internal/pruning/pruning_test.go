@@ -1,6 +1,7 @@
 package pruning
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -46,10 +47,11 @@ func (l snapshotList) NameList() []string {
 }
 
 func testTable(tcs map[string]testCase, t *testing.T) {
+	ctx := context.Background()
 	for name := range tcs {
 		t.Run(name, func(t *testing.T) {
 			tc := tcs[name]
-			destroyList := PruneSnapshots(tc.inputs, tc.rules)
+			destroyList := PruneSnapshots(ctx, tc.inputs, tc.rules)
 			destroySet := make(map[string]bool, len(destroyList))
 			for _, s := range destroyList {
 				destroySet[s.Name()] = true

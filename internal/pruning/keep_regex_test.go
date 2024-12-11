@@ -1,6 +1,7 @@
 package pruning
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,13 +17,14 @@ func TestKeepRegexNegation(t *testing.T) {
 		stubSnap{name: "barfoo"},
 	}
 
-	destroyNonNeg := snapshotList(noneg.KeepRule(snaps))
+	ctx := context.Background()
+	destroyNonNeg := snapshotList(noneg.KeepRule(ctx, snaps))
 	t.Logf("non-negated rule destroys: %#v", destroyNonNeg.NameList())
 	assert.True(t, destroyNonNeg.ContainsName("zrepl"))
 	assert.True(t, destroyNonNeg.ContainsName("barfoo"))
 	assert.False(t, destroyNonNeg.ContainsName("zrepl_foobar"))
 
-	destroyNeg := snapshotList(neg.KeepRule(snaps))
+	destroyNeg := snapshotList(neg.KeepRule(ctx, snaps))
 	t.Logf("negated rule destroys: %#v", destroyNeg.NameList())
 	assert.False(t, destroyNeg.ContainsName("zrepl"))
 	assert.False(t, destroyNeg.ContainsName("barfoo"))
