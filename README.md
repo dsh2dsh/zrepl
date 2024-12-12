@@ -117,6 +117,21 @@ pkg install zrepl-dsh2dsh
   * ~~`last_n` keep rule fixed. See
     [#691](https://github.com/zrepl/zrepl/pull/750)~~ Merged.
 
+  * Some of resolved upstream issues:
+
+    * zrepl/zrepl#86
+    * zrepl/zrepl#170
+    * zrepl/zrepl#287
+    * zrepl/zrepl#324
+    * zrepl/zrepl#394
+    * zrepl/zrepl#422
+    * zrepl/zrepl#498
+    * zrepl/zrepl#507
+    * zrepl/zrepl#708
+    * zrepl/zrepl#717
+    * zrepl/zrepl#745
+    * zrepl/zrepl#748
+
   * New dataset filter syntax instead of `filesystems`:
 
     New field `datasets` is a list of patterns. By default a pattern includes
@@ -502,6 +517,8 @@ pkg install zrepl-dsh2dsh
     of `control` or `metrics` is required or both of them can be configured too.
     Everything else is optional. For backward compatibility old style
     configuration works too.
+
+    See also zrepl/zrepl#780
 
   * New optional `pre` and `post` hooks for `push` and `pull` jobs. Example:
 
