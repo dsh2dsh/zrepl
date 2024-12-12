@@ -953,7 +953,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		})
 	}()
 
-	getLogger(ctx).With(slog.String("visitErr", visitErr.Error())).
+	getLogger(ctx).With(slog.Any("visitErr", visitErr)).
 		Debug("complete tree-walk")
 	if visitErr != nil {
 		return visitErr
