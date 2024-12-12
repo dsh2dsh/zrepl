@@ -21,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -302,7 +303,7 @@ func (s *SendStream) Read(p []byte) (int, error) {
 		// properly.
 		return n, err
 	} else if !s.testMode {
-		s.cmd.Log().WithError(err).Info("failed read from pipe")
+		logger.WithError(s.cmd.Log(), err, "").Info("failed read from pipe")
 	}
 
 	// Assume that the error is not retryable. Try to kill now so that we can

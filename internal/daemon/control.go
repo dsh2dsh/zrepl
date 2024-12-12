@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -65,9 +66,9 @@ type signalRequest struct {
 
 func (j *controlJob) signal(ctx context.Context, req *signalRequest,
 ) (*struct{}, error) {
-	log := logging.FromContext(ctx).WithField("op", req.Op)
+	log := logging.FromContext(ctx).With(slog.String("op", req.Op))
 	if req.Name != "" {
-		log = log.WithField("name", req.Name)
+		log = log.With(slog.String("name", req.Name))
 	}
 	log.Info("got signal")
 

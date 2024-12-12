@@ -4,9 +4,11 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/pruning"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 )
@@ -81,15 +83,15 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	sender Sender, needsReplicated bool,
 ) {
 	ctx := a.ctx
-	l := GetLogger(ctx).WithField("fs", tfs.Path)
+	l := GetLogger(ctx).With(slog.String("fs", tfs.Path))
 	l.Debug("plan filesystem")
 
 	pfsPlanErrAndLog := func(err error, message string) {
 		t := fmt.Sprintf("%T", err)
 		self.planErr = err
 		self.planErrContext = message
-		l.WithField("orig_err_type", t).WithError(err).
-			Error(message + ": plan error, skipping filesystem")
+		logger.WithError(l.With(slog.String("orig_err_type", t)), err,
+			message+": plan error, skipping filesystem")
 	}
 
 	req := pdu.ListFilesystemVersionsReq{Filesystem: tfs.Path}

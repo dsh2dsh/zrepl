@@ -10,13 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 func CommandContext(ctx context.Context, name string, args ...string) *Cmd {
@@ -38,7 +37,7 @@ type Cmd struct {
 	stderrOutput []byte
 	logError     bool
 
-	cmdLogger *logger.Logger
+	cmdLogger *slog.Logger
 }
 
 func (c *Cmd) WithCommand(name string, args []string) *Cmd {
@@ -112,16 +111,16 @@ func (c *Cmd) String() string {
 	return s.String()
 }
 
-func (c *Cmd) Log() *logger.Logger { return c.logWithCmd() }
+func (c *Cmd) Log() *slog.Logger { return c.logWithCmd() }
 
-func (c *Cmd) logWithCmd() *logger.Logger {
+func (c *Cmd) logWithCmd() *slog.Logger {
 	if c.cmdLogger == nil {
-		c.cmdLogger = c.log().WithField("cmd", c.String())
+		c.cmdLogger = c.log().With(slog.String("cmd", c.String()))
 	}
 	return c.cmdLogger
 }
 
-func (c *Cmd) log() *logger.Logger {
+func (c *Cmd) log() *slog.Logger {
 	return getLogger(c.ctx)
 }
 

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -119,9 +121,10 @@ func (g ReplicationGuaranteeIncremental) SenderPreSend(ctx context.Context, jid 
 		from, err := CreateTentativeReplicationCursor(ctx, sendArgs.FS, *sendArgs.FromVersion, jid)
 		if err != nil {
 			if errors.Is(err, zfs.ErrBookmarkCloningNotSupported) {
-				getLogger(ctx).WithField("replication_guarantee", g).
-					WithField("bookmark", sendArgs.From.FullPath(sendArgs.FS)).
-					Info("bookmark cloning is not supported, speculating that `from` will not be destroyed until step is done")
+				getLogger(ctx).With(
+					slog.String("replication_guarantee", g.String()),
+					slog.String("bookmark", sendArgs.From.FullPath(sendArgs.FS)),
+				).Info("bookmark cloning is not supported, speculating that `from` will not be destroyed until step is done")
 			} else {
 				return nil, err
 			}
@@ -157,8 +160,10 @@ func (g ReplicationGuaranteeResumability) SenderPreSend(ctx context.Context, jid
 	// try to hold the FromVersion
 	if sendArgs.FromVersion != nil {
 		if sendArgs.FromVersion.Type == zfs.Bookmark {
-			getLogger(ctx).WithField("replication_guarantee", g).WithField("fromVersion", sendArgs.FromVersion.FullPath(sendArgs.FS)).
-				Debug("cannot hold a bookmark, speculating that `from` will not be destroyed until step is done")
+			getLogger(ctx).With(
+				slog.String("replication_guarantee", g.String()),
+				slog.String("fromVersion", sendArgs.FromVersion.FullPath(sendArgs.FS)),
+			).Debug("cannot hold a bookmark, speculating that `from` will not be destroyed until step is done")
 		} else {
 			from, err := HoldStep(ctx, sendArgs.FS, *sendArgs.FromVersion, jid)
 			if err != nil {
@@ -188,7 +193,7 @@ func (g ReplicationGuaranteeResumability) SenderPostRecvConfirmed(ctx context.Co
 
 // helper function used by multiple strategies
 func senderPostRecvConfirmedCommon(ctx context.Context, jid JobID, fs string, to zfs.FilesystemVersion) (keep []Abstraction, err error) {
-	log := getLogger(ctx).WithField("toVersion", to.FullPath(fs))
+	log := getLogger(ctx).With(slog.String("toVersion", to.FullPath(fs)))
 
 	toReplicationCursor, err := CreateReplicationCursor(ctx, fs, to, jid)
 	if err != nil {
@@ -196,12 +201,14 @@ func senderPostRecvConfirmedCommon(ctx context.Context, jid JobID, fs string, to
 			log.Debug("not setting replication cursor, bookmark cloning not supported")
 		} else {
 			msg := "cannot move replication cursor, keeping hold on `to` until successful"
-			log.WithError(err).Error(msg)
+			logger.WithError(log, err, msg)
 			err = fmt.Errorf("%s: %w", msg, err)
 			return nil, err
 		}
 	} else {
-		log.WithField("to_cursor", toReplicationCursor.String()).Info("successfully created `to` replication cursor")
+		log.With(
+			slog.String("to_cursor", toReplicationCursor.String()),
+		).Info("successfully created `to` replication cursor")
 	}
 
 	return []Abstraction{toReplicationCursor}, nil

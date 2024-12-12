@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"sync/atomic"
@@ -24,7 +25,8 @@ func RequestId(next http.Handler) http.Handler {
 		requestId := genRequestId()
 		ctx := context.WithValue(r.Context(),
 			RequestIdKey, strconv.FormatUint(requestId, 10))
-		ctx = logging.WithLogger(ctx, getLogger(r).WithField("rid", requestId))
+		ctx = logging.WithLogger(ctx, getLogger(r).With(
+			slog.Uint64("rid", requestId)))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 	return http.HandlerFunc(fn)

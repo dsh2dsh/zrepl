@@ -3,6 +3,7 @@ package pruner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -48,10 +49,10 @@ const (
 	contextKeyPruneSide contextKey = 1 + iota
 )
 
-func GetLogger(ctx context.Context) *logger.Logger {
+func GetLogger(ctx context.Context) *slog.Logger {
 	pruneSide := ctx.Value(contextKeyPruneSide).(string)
 	return logging.GetLogger(ctx, logging.SubsysPruning).
-		WithField("prune_side", pruneSide)
+		With(slog.String("prune_side", pruneSide))
 }
 
 type args struct {
@@ -152,7 +153,7 @@ func doOneAttempt(a *args, u updater) {
 		if ctx.Err() != nil {
 			break
 		}
-		l := GetLogger(ctx).WithField("fs", tfs.Path)
+		l := GetLogger(ctx).With(slog.String("fs", tfs.Path))
 		l.Debug("plan filesystem")
 
 		pfs := &fs{path: tfs.Path}
@@ -160,12 +161,15 @@ func doOneAttempt(a *args, u updater) {
 
 		if tfs.GetIsPlaceholder() {
 			pfs.skipReason = SkipPlaceholder
-			l.WithField("skip_reason", pfs.skipReason).Debug("skipping filesystem")
+			l.With(slog.String("skip_reason", string(pfs.skipReason))).
+				Debug("skipping filesystem")
 			continue
 		} else if sfs := sfss[tfs.GetPath()]; sfs == nil {
 			pfs.skipReason = SkipNoCorrespondenceOnSender
-			l.WithField("skip_reason", pfs.skipReason).
-				WithField("sfs", sfs.GetPath()).Debug("skipping filesystem")
+			l.With(
+				slog.String("skip_reason", string(pfs.skipReason)),
+				slog.String("sfs", sfs.GetPath()),
+			).Debug("skipping filesystem")
 			continue
 		}
 
@@ -285,17 +289,18 @@ func doOneAttemptExec(a *args, u updater, pfs *fs) {
 	destroyList := make([]*pdu.FilesystemVersion, len(pfs.destroyList))
 	for i := range destroyList {
 		destroyList[i] = pfs.destroyList[i].(*snapshot).fsv
-		GetLogger(a.ctx).
-			WithField("fs", pfs.path).
-			WithField("destroy_snap", destroyList[i].Name).
-			Debug("policy destroys snapshot")
+		GetLogger(a.ctx).With(
+			slog.String("fs", pfs.path),
+			slog.String("destroy_snap", destroyList[i].Name),
+		).Debug("policy destroys snapshot")
 	}
 
 	req := pdu.DestroySnapshotsReq{
 		Filesystem: pfs.path,
 		Snapshots:  destroyList,
 	}
-	GetLogger(a.ctx).WithField("fs", pfs.path).Debug("destroying snapshots")
+	GetLogger(a.ctx).With(slog.String("fs", pfs.path)).
+		Debug("destroying snapshots")
 	res, err := a.target.DestroySnapshots(a.ctx, &req)
 	if err != nil {
 		u(func(pruner *Pruner) {
@@ -343,7 +348,7 @@ func doOneAttemptExec(a *args, u updater, pfs *fs) {
 
 	u(func(pruner *Pruner) { pruner.execQueue.Put(pfs, err, err == nil) })
 	if err != nil {
-		GetLogger(a.ctx).WithError(err).
-			Error("target could not destroy snapshots")
+		logger.WithError(GetLogger(a.ctx), err,
+			"target could not destroy snapshots")
 	}
 }

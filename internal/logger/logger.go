@@ -4,38 +4,17 @@ import (
 	"log/slog"
 )
 
-const (
-	// The field set by WithError function
-	FieldError = "err"
-)
+// The field set by WithError function
+const fieldError = "err"
+
+func NewLogger(outlets *Outlets) *slog.Logger { return slog.New(outlets) }
 
 func WithError(l *slog.Logger, err error, msg string) *slog.Logger {
 	if err != nil {
-		l = l.With(slog.String(FieldError, err.Error()))
+		l = l.With(slog.String(fieldError, err.Error()))
 	}
 	if msg != "" {
 		l.Error(msg)
 	}
 	return l
-}
-
-func Wrap(l *slog.Logger) *Logger { return &Logger{l} }
-
-type Logger struct {
-	*slog.Logger
-}
-
-func NewLogger(outlets *Outlets) *Logger {
-	return &Logger{slog.New(outlets)}
-}
-
-func (self *Logger) WithField(field string, val any) *Logger {
-	return &Logger{self.With(slog.Any(field, val))}
-}
-
-func (self *Logger) WithError(err error) *Logger {
-	if err == nil {
-		return self
-	}
-	return &Logger{self.With(slog.String(FieldError, err.Error()))}
 }

@@ -730,16 +730,16 @@ func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,
 	// present filesystem without the root_fs prefix
 	fss := make([]*pdu.Filesystem, 0, len(items))
 	for _, props := range items {
-		l := getLogger(ctx).WithField("fs", props.Fs())
+		l := getLogger(ctx).With(slog.String("fs", props.Fs()))
 		p, err := props.DatasetPath()
 		if err != nil {
-			l.WithError(err).Error("error getting placeholder state")
+			logger.WithError(l, err, "error getting placeholder state")
 			return nil, fmt.Errorf(
 				"cannot get placeholder state for fs %q: %w", props.Fs(), err)
 		}
 
 		state := zfs.NewPlaceholderState(p, props)
-		l.WithField("placeholder_state", fmt.Sprintf("%#v", state)).
+		l.With(slog.String("placeholder_state", fmt.Sprintf("%#v", state))).
 			Debug("placeholder state")
 		if !state.FSExists {
 			l.Error("inconsistent placeholder state: filesystem must exists")
@@ -753,7 +753,8 @@ func makeFilesystems(ctx context.Context, root *zfs.DatasetPath,
 		if tokenProp.Source != zfs.SourceLocal {
 			token = ""
 		}
-		l.WithField("receive_resume_token", token).Debug("receive resume token")
+		l.With(slog.String("receive_resume_token", token)).
+			Debug("receive resume token")
 
 		if !includingRoot {
 			p.TrimPrefix(root)
@@ -886,15 +887,16 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 				return false
 			}
 
-			l := getLogger(ctx).
-				WithField("placeholder_fs", v.Path.ToString()).
-				WithField("receive_fs", lp.ToString())
+			l := getLogger(ctx).With(
+				slog.String("placeholder_fs", v.Path.ToString()),
+				slog.String("receive_fs", lp.ToString()))
 
 			ph, err := zfs.ZFSGetFilesystemPlaceholderState(ctx, v.Path)
-			l.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).
-				WithField("err", fmt.Sprintf("%s", err)).
-				WithField("errType", fmt.Sprintf("%T", err)).
-				Debug("get placeholder state for filesystem")
+			l.With(
+				slog.String("placeholder_state", fmt.Sprintf("%#v", ph)),
+				slog.String("err", fmt.Sprintf("%s", err)),
+				slog.String("errType", fmt.Sprintf("%T", err)),
+			).Debug("get placeholder state for filesystem")
 			if err != nil {
 				visitErr = fmt.Errorf(
 					"cannot get placeholder state of %s: %w",
@@ -911,7 +913,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 						visitErr = fmt.Errorf("root_fs %q does not exist",
 							s.conf.RootWithoutClientComponent.ToString())
 					}
-					l.WithError(visitErr).Error(
+					logger.WithError(l, visitErr,
 						"placeholders are only created automatically below root_fs")
 					return false
 				}
@@ -922,21 +924,21 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 				placeholderEncryption, err := s.receive_GetPlaceholderCreationEncryptionValue(root, v.Path)
 				if err != nil {
 					// logger already contains path
-					l.WithError(err).Error("cannot create placeholder filesystem")
+					logger.WithError(l, err, "cannot create placeholder filesystem")
 					visitErr = fmt.Errorf(
 						"cannot create placeholder filesystem %s: %w",
 						v.Path.ToString(), err)
 					return false
 				}
 
-				l := l.WithField("encryption", placeholderEncryption)
+				l := l.With(slog.Int("encryption", int(placeholderEncryption)))
 
 				l.Debug("creating placeholder filesystem")
 				err = zfs.ZFSCreatePlaceholderFilesystem(ctx,
 					v.Path, v.Parent.Path, placeholderEncryption)
 				if err != nil {
 					// logger already contains path
-					l.WithError(err).Error("cannot create placeholder filesystem")
+					logger.WithError(l, err, "cannot create placeholder filesystem")
 					visitErr = fmt.Errorf(
 						"cannot create placeholder filesystem %s: %w",
 						v.Path.ToString(), err)
@@ -951,14 +953,15 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		})
 	}()
 
-	getLogger(ctx).WithField("visitErr", visitErr).Debug("complete tree-walk")
+	getLogger(ctx).With(slog.String("visitErr", visitErr.Error())).
+		Debug("complete tree-walk")
 	if visitErr != nil {
 		return visitErr
 	}
 
-	log := getLogger(ctx).
-		WithField("proto_fs", req.GetFilesystem()).
-		WithField("local_fs", lp.ToString())
+	log := getLogger(ctx).With(
+		slog.String("proto_fs", req.GetFilesystem()),
+		slog.String("local_fs", lp.ToString()))
 
 	// determine whether we need to rollback the filesystem / change its
 	// placeholder state
@@ -966,7 +969,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	if err != nil {
 		return fmt.Errorf("cannot get placeholder state: %w", err)
 	}
-	log.WithField("placeholder_state", fmt.Sprintf("%#v", ph)).
+	log.With(slog.String("placeholder_state", fmt.Sprintf("%#v", ph))).
 		Debug("placeholder state")
 
 	recvOpts := zfs.RecvOptions{
@@ -996,15 +999,16 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		}
 	}
 
-	log.WithField("opts", fmt.Sprintf("%#v", recvOpts)).
+	log.With(slog.String("opts", fmt.Sprintf("%#v", recvOpts))).
 		Debug("start receive command")
 
 	snapFullPath := to.FullPath(lp.ToString())
 	err = zfs.ZFSRecv(ctx, lp.ToString(), to, receive, recvOpts,
 		s.conf.ExecPipe...)
 	if err != nil {
-		log.WithError(err).WithField("opts", fmt.Sprintf("%#v", recvOpts)).
-			Error("zfs receive failed")
+		logger.WithError(
+			log.With(slog.String("opts", fmt.Sprintf("%#v", recvOpts))),
+			err, "zfs receive failed")
 		return err
 	}
 	receive.Close()
@@ -1013,7 +1017,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	toRecvd, err := to.ValidateExistsAndGetVersion(ctx, lp.ToString())
 	if err != nil {
 		msg := "receive request's `To` version does not match what we received in the stream"
-		log.WithError(err).WithField("snap", snapFullPath).Error(msg)
+		logger.WithError(log.With(slog.String("snap", snapFullPath)), err, msg)
 		log.Error(
 			"aborting recv request, but keeping received snapshot for inspection")
 		return fmt.Errorf("%s: %w", msg, err)

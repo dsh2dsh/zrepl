@@ -30,7 +30,7 @@ func Run(ctx context.Context, conf *config.Config) error {
 	}
 
 	log := logger.NewLogger(outlets)
-	slog.SetDefault(log.Logger)
+	slog.SetDefault(log)
 	log.Info(version.NewZreplVersionInformation().String())
 	ctx = logging.WithLogger(ctx, log)
 

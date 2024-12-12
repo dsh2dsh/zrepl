@@ -3,6 +3,7 @@ package snapper
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
@@ -105,8 +107,8 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 			plan.args.timestampLocal)
 		snapname := fmt.Sprintf("%s%s", plan.args.prefix, suffix)
 
-		ctx := logging.WithLogger(ctx, logging.FromContext(ctx).
-			WithField("fs", fs.ToString()).WithField("snap", snapname))
+		ctx := logging.With(ctx, slog.String("fs", fs.ToString()),
+			slog.String("snap", snapname))
 
 		hookEnvExtra := map[string]string{
 			hooks.EnvFS:       fs.ToString(),
@@ -118,7 +120,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 			l.Debug("create snapshot")
 			err = zfs.ZFSSnapshot(ctx, fs, snapname, false) // TODO propagate context to ZFSSnapshot
 			if err != nil {
-				l.WithError(err).Error("cannot create snapshot")
+				logger.WithError(l, err, "cannot create snapshot")
 			}
 			return
 		})
@@ -129,7 +131,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 		{
 			filteredHooks, err := plan.args.hooks.CopyFilteredForFilesystem(fs)
 			if err != nil {
-				getLogger(ctx).WithError(err).Error("unexpected filter error")
+				logger.WithError(getLogger(ctx), err, "unexpected filter error")
 				fsHadErr = true
 				goto updateFSState
 			}
@@ -142,7 +144,7 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 			hookPlan, planErr = hooks.NewPlan(filteredHooks, hooks.PhaseSnapshot, jobCallback, hookEnvExtra)
 			if planErr != nil {
 				fsHadErr = true
-				getLogger(ctx).WithError(planErr).Error("cannot create job hook plan")
+				logger.WithError(getLogger(ctx), planErr, "cannot create job hook plan")
 				goto updateFSState
 			}
 		}
@@ -155,14 +157,20 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 		})
 
 		{
-			getLogger(ctx).WithField("report", hookPlan.Report().String()).Debug("begin run job plan")
+			getLogger(ctx).
+				With(slog.String("report", hookPlan.Report().String())).
+				Debug("begin run job plan")
 			hookPlan.Run(ctx, dryRun)
 			hookPlanReport = hookPlan.Report()
 			fsHadErr = hookPlanReport.HadError() // not just fatal errors
 			if fsHadErr {
-				getLogger(ctx).WithField("report", hookPlanReport.String()).Error("end run job plan with error")
+				getLogger(ctx).
+					With(slog.String("report", hookPlanReport.String())).
+					Error("end run job plan with error")
 			} else {
-				getLogger(ctx).WithField("report", hookPlanReport.String()).Info("end run job plan successful")
+				getLogger(ctx).
+					With(slog.String("report", hookPlanReport.String())).
+					Info("end run job plan successful")
 			}
 		}
 
@@ -187,7 +195,10 @@ func (plan *plan) execute(ctx context.Context, dryRun bool) (ok bool) {
 					break
 				}
 			}
-			getLogger(ctx).WithField("hook", h.String()).WithField("hook_number", hookIdx+1).Warn("hook did not match any snapshotted filesystems")
+			getLogger(ctx).
+				With(slog.String("hook", h.String()),
+					slog.Int("hook_number", hookIdx+1)).
+				Warn("hook did not match any snapshotted filesystems")
 		}
 	}
 

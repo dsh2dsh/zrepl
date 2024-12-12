@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"slices"
 	"time"
-
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 func NewCommand(name string, arg ...string) *Cmd {
@@ -74,7 +72,7 @@ func (self *Cmd) Run(ctx context.Context) error {
 	return nil
 }
 
-func (self *Cmd) wrapError(ctx context.Context, l *logger.Logger, err error,
+func (self *Cmd) wrapError(ctx context.Context, l *slog.Logger, err error,
 ) error {
 	if err == nil {
 		return nil

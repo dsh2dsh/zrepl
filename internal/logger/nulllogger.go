@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-func NewNullLogger() *Logger {
+func NewNullLogger() *slog.Logger {
 	return NewLogger(NewOutlets().Add(NewNullOutlet()))
 }
 

@@ -2,9 +2,9 @@ package zfscmd
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 type contextKey int
@@ -29,6 +29,6 @@ func getJobIDOrDefault(ctx context.Context, def string) string {
 	return ret
 }
 
-func getLogger(ctx context.Context) *logger.Logger {
+func getLogger(ctx context.Context) *slog.Logger {
 	return logging.GetLogger(ctx, logging.SubsysZFSCmd)
 }

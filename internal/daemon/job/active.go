@@ -16,6 +16,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication"
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic"
@@ -706,8 +707,9 @@ func (j *ActiveSide) before(ctx context.Context) error {
 	log.Info("run pre hook")
 
 	if err := h.Run(ctx, j); err != nil {
-		log.WithField("err_is_fatal", h.ErrIsFatal()).
-			WithError(err).Error("pre hook exited with error")
+		logger.WithError(
+			log.With(slog.Bool("err_is_fatal", h.ErrIsFatal())), err,
+			"pre hook exited with error")
 		err = fmt.Errorf("pre hook exited with error: %w", err)
 		j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
 		if h.ErrIsFatal() {
@@ -756,7 +758,7 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 
 func (j *ActiveSide) pruneSender(ctx context.Context) error {
 	log := GetLogger(ctx)
-	log.WithField("concurrency", j.prunerFactory.Concurrency()).
+	log.With(slog.Int("concurrency", j.prunerFactory.Concurrency())).
 		Info("start pruning sender")
 
 	sender, _ := j.mode.SenderReceiver()
@@ -769,14 +771,14 @@ func (j *ActiveSide) pruneSender(ctx context.Context) error {
 
 	begin := time.Now()
 	tasks.prunerSender.Prune()
-	log.WithField("duration", time.Since(begin)).
+	log.With(slog.Duration("duration", time.Since(begin))).
 		Info("finished pruning sender")
 	return nil
 }
 
 func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
 	log := GetLogger(ctx)
-	log.WithField("concurrency", j.prunerFactory.Concurrency()).
+	log.With(slog.Int("concurrency", j.prunerFactory.Concurrency())).
 		Info("start pruning receiver")
 
 	sender, receiver := j.mode.SenderReceiver()
@@ -788,7 +790,7 @@ func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
 
 	begin := time.Now()
 	tasks.prunerReceiver.Prune()
-	log.WithField("duration", time.Since(begin)).
+	log.With(slog.Duration("duration", time.Since(begin))).
 		Info("finished pruning receiver")
 	return nil
 }
@@ -798,7 +800,7 @@ func (j *ActiveSide) afterPruning(ctx context.Context) error {
 		log := GetLogger(ctx)
 		log.Info("run post hook")
 		if err := j.postHook.Run(ctx, j); err != nil {
-			log.WithError(err).Error("post hook exited with error")
+			logger.WithError(log, err, "post hook exited with error")
 			j.updateTasks(func(tasks *activeSideTasks) {
 				tasks.err = fmt.Errorf("post hook exited with error: %w", err)
 			})

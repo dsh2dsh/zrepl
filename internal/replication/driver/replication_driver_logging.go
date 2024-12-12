@@ -2,11 +2,11 @@ package driver
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
-func getLog(ctx context.Context) *logger.Logger {
+func getLog(ctx context.Context) *slog.Logger {
 	return logging.GetLogger(ctx, logging.SubsysReplication)
 }

@@ -1,13 +1,13 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"slices"
 
 	"github.com/klauspost/compress/gzhttp"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 type Middleware func(next http.Handler) http.Handler
@@ -30,7 +30,7 @@ func AppendHandler(m []Middleware, h http.Handler) http.Handler {
 	return Append(m, func(http.Handler) http.Handler { return h })
 }
 
-func getLogger(r *http.Request) *logger.Logger {
+func getLogger(r *http.Request) *slog.Logger {
 	return logging.FromContext(r.Context())
 }
 

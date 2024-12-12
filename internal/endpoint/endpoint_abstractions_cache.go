@@ -3,10 +3,12 @@ package endpoint
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 )
 
@@ -136,11 +138,15 @@ func (s *abstractionsCache) tryLoadOnDiskAbstractions(ctx context.Context, fs st
 
 		if err != nil {
 			s.didLoadFS[fs] = abstractionsCacheDidLoadFSStateNo
-			getLogger(ctx).WithField("fs", fs).WithError(err).Error("cannot list abstractions for filesystem")
+			logger.WithError(getLogger(ctx).With(slog.String("fs", fs)), err,
+				"cannot list abstractions for filesystem")
 		} else {
 			s.didLoadFS[fs] = abstractionsCacheDidLoadFSStateDone
 			s.abstractions = append(s.abstractions, onDiskAbs...)
-			getLogger(ctx).WithField("fs", fs).WithField("abstractions", onDiskAbs).Debug("loaded step abstractions for filesystem")
+			getLogger(ctx).With(
+				slog.String("fs", fs),
+				slog.Any("abstractions", onDiskAbs),
+			).Debug("loaded step abstractions for filesystem")
 		}
 		return
 	}
@@ -185,13 +191,13 @@ func (s *abstractionsCache) TryBatchDestroy(ctx context.Context, jobId JobID, fs
 	for res := range BatchDestroy(ctx, obsoleteAbs) {
 		if res.DestroyErr != nil {
 			hadErr = true
-			getLogger(ctx).
-				WithField("abstraction", res.Abstraction).
-				WithError(res.DestroyErr).
-				Error("cannot destroy abstraction")
+			logger.WithError(
+				getLogger(ctx).With(
+					slog.String("abstraction", res.Abstraction.String())),
+				res.DestroyErr, "cannot destroy abstraction")
 		} else {
 			getLogger(ctx).
-				WithField("abstraction", res.Abstraction).
+				With(slog.String("abstraction", res.Abstraction.String())).
 				Info("destroyed abstraction")
 		}
 	}

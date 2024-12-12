@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func NewTestLogger(t *testing.T) *Logger {
+func NewTestLogger(t *testing.T) *slog.Logger {
 	h := slog.NewTextHandler(&testingWriter{t}, nil)
 	return NewLogger(NewOutlets().Add(h))
 }

@@ -19,7 +19,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
-func newServerJob(log *logger.Logger, controlJob *controlJob, zfsJob *zfsJob,
+func newServerJob(log *slog.Logger, controlJob *controlJob, zfsJob *zfsJob,
 ) *serverJob {
 	j := &serverJob{
 		reqBegin: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -56,7 +56,7 @@ type serverJob struct {
 	middlewares []middleware.Middleware
 	prometheus  middleware.Middleware
 
-	log     *logger.Logger
+	log     *slog.Logger
 	servers []*server
 
 	controlJob *controlJob
@@ -152,7 +152,7 @@ func (self *serverJob) Run(ctx context.Context) error {
 	for _, s := range self.servers {
 		s.BaseContext = baseContext
 		g.Go(func() error {
-			self.log.WithField("addr", s.Addr).Info("listen on")
+			self.log.With(slog.String("addr", s.Addr)).Info("listen on")
 			return s.Serve()
 		})
 	}
@@ -164,7 +164,7 @@ func (self *serverJob) Run(ctx context.Context) error {
 	self.shutdownServers()
 
 	if err := g.Wait(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		self.log.WithError(err).Error("error serving")
+		logger.WithError(self.log, err, "error serving")
 		return fmt.Errorf("daemon server: %w", err)
 	}
 	return nil
@@ -172,9 +172,9 @@ func (self *serverJob) Run(ctx context.Context) error {
 
 func (self *serverJob) shutdownServers() {
 	for _, s := range self.servers {
-		self.log.WithField("addr", s.Addr).Info("graceful stop listener")
+		self.log.With(slog.String("addr", s.Addr)).Info("graceful stop listener")
 		if err := s.Shutdown(context.Background()); err != nil {
-			self.log.WithError(err).Error("can't shutdown server")
+			logger.WithError(self.log, err, "can't shutdown server")
 		}
 	}
 }
@@ -184,10 +184,10 @@ func (self *serverJob) OnReload() { _ = self.Reload(false) }
 func (self *serverJob) Reload(breakOnError bool) error {
 	self.log.Info("reload all listeners")
 	for _, s := range self.servers {
-		l := self.log.WithField("addr", s.Addr)
+		l := self.log.With(slog.String("addr", s.Addr))
 		l.Info("reload listener")
 		if err := s.Reload(l); err != nil {
-			l.WithError(err).Error("failed reload listener")
+			logger.WithError(l, err, "failed reload listener")
 			if breakOnError {
 				return err
 			}

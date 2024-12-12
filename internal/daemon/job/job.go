@@ -4,17 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-func GetLogger(ctx context.Context) *logger.Logger {
+func GetLogger(ctx context.Context) *slog.Logger {
 	return logging.GetLogger(ctx, logging.SubsysJob)
 }
 

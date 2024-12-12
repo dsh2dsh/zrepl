@@ -3,9 +3,12 @@ package hooks
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 type Hook interface {
@@ -216,10 +219,10 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	next := 0
 	for ; next < len(p.pre); next++ {
 		e := p.pre[next]
-		l := l.WithField("hook", e.Hook)
+		l := l.With(slog.String("hook", e.Hook.String()))
 		r := runHook(e, ctx, Pre)
 		if r.HadError() {
-			l.WithError(r).Error("hook invocation failed for pre-edge")
+			logger.WithError(l, r, "hook invocation failed for pre-edge")
 			if e.Hook.ErrIsFatal() {
 				l.Error("the hook run was aborted due to a fatal error in this hook")
 				break
@@ -244,7 +247,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 
 	l.Info("running callback")
 	if cbR := runHook(p.cb, ctx, Callback); cbR.HadError() {
-		l.WithError(cbR).Error("callback failed")
+		logger.WithError(l, cbR, "callback failed")
 	}
 
 	l.Info("run post-edges for successful pre-edges in reverse configuration order")
@@ -253,7 +256,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 	next-- // now at index of last executed pre-edge
 	for ; next >= 0; next-- {
 		e := p.post[next]
-		l := l.WithField("hook", e.Hook)
+		l := l.With(slog.String("hook", e.Hook.String()))
 		if p.pre[next].Status != StepOk {
 			if p.pre[next].Status != StepErr {
 				panic(fmt.Sprintf(
@@ -269,7 +272,7 @@ func (p *Plan) Run(ctx context.Context, dryRun bool) {
 
 		report := runHook(e, ctx, Post)
 		if report.HadError() {
-			l.WithError(report).Error("hook invocation failed for post-edge")
+			logger.WithError(l, report, "hook invocation failed for post-edge")
 			l.Error("subsequent post-edges run regardless of this post-edge failure")
 		}
 		// ErrIsFatal is only relevant for Pre

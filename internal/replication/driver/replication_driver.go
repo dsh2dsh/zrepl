@@ -13,6 +13,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
@@ -224,7 +225,7 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 		var prev *attempt
 		mainLog := log
 		for ano := 0; ano < config.MaxAttempts; ano++ {
-			log := mainLog.WithField("attempt_number", ano)
+			log := mainLog.With(slog.Int("attempt_number", ano))
 			log.Debug("start attempt")
 
 			run.waitReconnect.SetZero()
@@ -250,7 +251,8 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 
 			// error classification, bail out if done / permanent error
 			rep := cur.report()
-			log.WithField("attempt_state", rep.State).Debug("attempt state")
+			log.With(slog.String("attempt_state", string(rep.State))).
+				Debug("attempt state")
 			errRep := cur.errorReport()
 
 			if rep.State == report.AttemptDone {
@@ -262,24 +264,25 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 			}
 
 			mostRecentErr, mostRecentErrClass := errRep.MostRecent()
-			log.WithField("most_recent_err", mostRecentErr).
-				WithField("most_recent_err_class", mostRecentErrClass).
-				Debug("most recent error used for re-connect decision")
+			log.With(
+				slog.Any("most_recent_err", mostRecentErr),
+				slog.Int("most_recent_err_class", int(mostRecentErrClass)),
+			).Debug("most recent error used for re-connect decision")
 			if mostRecentErr == nil {
 				// inconsistent reporting, let's bail out
-				log.WithField("attempt_state", rep.State).Warn(
-					"attempt does not report done but error report does not report errors, aborting run")
+				log.With(slog.String("attempt_state", string(rep.State))).
+					Warn("attempt does not report done but error report does not report errors, aborting run")
 				break
 			}
-			log.WithError(mostRecentErr.Err).Error(
+			logger.WithError(log, mostRecentErr.Err,
 				"most recent error in this attempt")
 			shouldReconnect := mostRecentErrClass == errorClassTemporaryConnectivityRelated
-			log.WithField("reconnect_decision", shouldReconnect).Debug(
-				"reconnect decision made")
+			log.With(slog.Bool("reconnect_decision", shouldReconnect)).
+				Debug("reconnect decision made")
 			if shouldReconnect {
 				run.waitReconnect.Set(time.Now(), config.ReconnectHardFailTimeout)
-				log.WithField("deadline", run.waitReconnect.End()).Error(
-					"temporary connectivity-related error identified, start waiting for reconnect")
+				log.With(slog.Time("deadline", run.waitReconnect.End())).
+					Error("temporary connectivity-related error identified, start waiting for reconnect")
 				var connectErr error
 				var connectErrTime time.Time
 				run.l.DropWhile(func() {
@@ -294,7 +297,8 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 					continue
 				} else {
 					run.waitReconnectError = newTimedError(connectErr, connectErrTime)
-					log.WithError(connectErr).Error("reconnecting failed, aborting run")
+					logger.WithError(log, connectErr,
+						"reconnecting failed, aborting run")
 					break
 				}
 			} else {

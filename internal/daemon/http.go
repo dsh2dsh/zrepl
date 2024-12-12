@@ -3,12 +3,11 @@ package daemon
 import (
 	"crypto/tls"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"sync"
-
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 type server struct {
@@ -83,16 +82,18 @@ func (self *server) certificate(*tls.ClientHelloInfo) (*tls.Certificate,
 	return cert, nil
 }
 
-func (self *server) Reload(log *logger.Logger) error {
+func (self *server) Reload(log *slog.Logger) error {
 	return self.LoadCert(log)
 }
 
-func (self *server) LoadCert(log *logger.Logger) error {
+func (self *server) LoadCert(log *slog.Logger) error {
 	if self.certFile == "" {
 		return nil
 	}
-	log.WithField("cert", self.certFile).WithField("key", self.keyFile).
-		Info("load certificate")
+	log.With(
+		slog.String("cert", self.certFile),
+		slog.String("key", self.keyFile),
+	).Info("load certificate")
 
 	cert, err := tls.LoadX509KeyPair(self.certFile, self.keyFile)
 	if err != nil {

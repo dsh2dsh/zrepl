@@ -26,7 +26,7 @@ func startPostLogging(c *Cmd, err error, _ time.Time) {
 	if err == nil {
 		c.log().Info("\"" + c.String() + "\"")
 	} else {
-		c.logWithCmd().WithError(err).Error("cannot start command")
+		logger.WithError(c.logWithCmd(), err, "cannot start command")
 	}
 }
 

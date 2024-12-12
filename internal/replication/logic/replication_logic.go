@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -285,8 +286,9 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	g.Go(func() error {
 		slfssres, err := p.sender.ListFilesystems(ctx)
 		if err != nil {
-			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
-				Error("error listing sender filesystems")
+			logger.WithError(
+				log.With(slog.String("errType", fmt.Sprintf("%T", err))),
+				err, "error listing sender filesystems")
 			return err
 		}
 		sfss = slfssres.GetFilesystems()
@@ -296,8 +298,9 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	g.Go(func() error {
 		rlfssres, err := p.receiver.ListFilesystems(ctx)
 		if err != nil {
-			log.WithError(err).WithField("errType", fmt.Sprintf("%T", err)).
-				Error("error listing receiver filesystems")
+			logger.WithError(
+				log.With(slog.String("errType", fmt.Sprintf("%T", err))),
+				err, "error listing receiver filesystems")
 			return err
 		}
 		rfss = rlfssres.GetFilesystems()
@@ -337,8 +340,8 @@ func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 
 func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 ) ([]*Step, error) {
-	log := func(ctx context.Context) *logger.Logger {
-		return getLogger(ctx).WithField("filesystem", fs.Path)
+	log := func(ctx context.Context) *slog.Logger {
+		return getLogger(ctx).With(slog.String("filesystem", fs.Path))
 	}
 	log(ctx).Debug("assessing filesystem")
 
@@ -360,8 +363,8 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 
 	fsvsResps, err := fs.listBothVersions(ctx)
 	if err != nil {
-		log(ctx).WithError(err).
-			Error("cannot get sender/receiver filesystem versions")
+		logger.WithError(log(ctx), err,
+			"cannot get sender/receiver filesystem versions")
 		return nil, err
 	}
 	sfsvs := fsvsResps[0].GetVersions()
@@ -382,17 +385,18 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 	var resumeTokenRaw string
 	if fs.receiverFS != nil && fs.receiverFS.ResumeToken != "" {
 		resumeTokenRaw = fs.receiverFS.ResumeToken // shadow
-		log(ctx).WithField("receiverFS.ResumeToken", resumeTokenRaw).Debug("decode receiver fs resume token")
+		log(ctx).With(slog.String("receiverFS.ResumeToken", resumeTokenRaw)).
+			Debug("decode receiver fs resume token")
 		resumeToken, err = zfs.ParseResumeToken(ctx, resumeTokenRaw) // shadow
 		if err != nil {
 			// TODO in theory, we could do replication without resume token, but that would mean that
 			// we need to discard the resumable state on the receiver's side.
 			// Would be easy by setting UsedResumeToken=false in the RecvReq ...
 			// FIXME / CHECK semantics UsedResumeToken if SendReq.ResumeToken == ""
-			log(ctx).WithError(err).Error("cannot decode resume token, aborting")
+			logger.WithError(log(ctx), err, "cannot decode resume token, aborting")
 			return nil, err
 		}
-		log(ctx).WithField("token", resumeToken).Debug("decode resume token")
+		log(ctx).With(slog.Any("token", resumeToken)).Debug("decode resume token")
 	}
 
 	var steps []*Step
@@ -484,11 +488,11 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 			updPath, updConflict := tryAutoresolveConflict(conflict,
 				*fs.policy.ConflictResolution)
 			if updConflict == nil {
-				log(ctx).WithField("conflict", conflict).Info(
-					"conflict automatically resolved")
+				log(ctx).With(slog.String("conflict", conflict.Error())).
+					Info("conflict automatically resolved")
 			} else {
-				log(ctx).WithField("conflict", conflict).Error(
-					"cannot resolve conflict")
+				log(ctx).With(slog.String("conflict", conflict.Error())).
+					Error("cannot resolve conflict")
 			}
 			path, conflict = updPath, updConflict
 		}
@@ -533,7 +537,7 @@ func (fs *Filesystem) doPlanning(ctx context.Context, oneStep bool,
 
 	log(ctx).Debug("compute send size estimate")
 	if err := fs.updateSizeEstimates(ctx, steps); err != nil {
-		log(ctx).WithError(err).Error("error computing size estimate")
+		logger.WithError(log(ctx), err, "error computing size estimate")
 	}
 	log(ctx).Debug("filesystem planning finished")
 	return steps, nil
@@ -584,7 +588,7 @@ func (fs *Filesystem) updateSizeEstimates(ctx context.Context, steps []*Step,
 	log.Debug("initiate dry run send request")
 	resp, err := fs.sender.SendDry(ctx, &req)
 	if err != nil {
-		log.WithError(err).Error("dry run send request failed")
+		logger.WithError(log, err, "dry run send request failed")
 		return err
 	}
 
@@ -610,11 +614,11 @@ func (s *Step) doReplication(ctx context.Context) error {
 		return err
 	}
 
-	log := getLogger(ctx).WithField("filesystem", s.parent.Path)
+	log := getLogger(ctx).With(slog.String("filesystem", s.parent.Path))
 	log.Debug("tell sender replication completed")
 	err := s.sender.SendCompleted(ctx, &pdu.SendCompletedReq{OriginalReq: &sr})
 	if err != nil {
-		log.WithError(err).Error(
+		logger.WithError(log, err,
 			"error telling sender that replication completed successfully")
 		return err
 	}
@@ -622,13 +626,13 @@ func (s *Step) doReplication(ctx context.Context) error {
 }
 
 func (s *Step) sendRecv(ctx context.Context, sr *pdu.SendReq) error {
-	log := getLogger(ctx).WithField("filesystem", s.parent.Path)
+	log := getLogger(ctx).With(slog.String("filesystem", s.parent.Path))
 	log.Debug("initiate send request")
 
 	sres, stream, err := s.sender.Send(ctx, sr)
 	switch {
 	case err != nil:
-		log.WithError(err).Error("send request failed")
+		logger.WithError(log, err, "send request failed")
 		return err
 	case sres == nil:
 		err := errors.New("send request returned nil send result")
@@ -660,10 +664,11 @@ func (s *Step) sendRecv(ctx context.Context, sr *pdu.SendReq) error {
 
 	log.Debug("initiate receive request")
 	if err := s.receiver.Receive(ctx, &rr, byteCountingStream); err != nil {
-		log.WithError(err).
-			WithField("errType", fmt.Sprintf("%T", err)).
-			WithField("rr", fmt.Sprintf("%v", rr)).
-			Error("receive request failed (might also be error on sender)")
+		logger.WithError(
+			log.With(slog.String("errType", fmt.Sprintf("%T", err)),
+				slog.String("rr", fmt.Sprintf("%v", rr))),
+			err, "receive request failed (might also be error on sender)",
+		)
 		// This failure could be due to
 		// 	- an unexpected exit of ZFS on the sending side
 		//  - an unexpected exit of ZFS on the receiving side

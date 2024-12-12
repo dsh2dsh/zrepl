@@ -54,29 +54,21 @@ func OutletsFromConfig(in config.LoggingOutletEnumList,
 	return outlets, nil
 }
 
-func WithField(ctx context.Context, field string, value any,
-) context.Context {
-	return WithLogger(ctx, FromContext(ctx).WithField(field, value))
+func With(ctx context.Context, args ...any) context.Context {
+	return WithLogger(ctx, FromContext(ctx).With(args...))
 }
 
-func WithLogger(ctx context.Context, l *logger.Logger) context.Context {
+func WithLogger(ctx context.Context, l *slog.Logger) context.Context {
 	return context.WithValue(ctx, ctxKeyLogger, l)
 }
 
-func WithLoggerWrap(ctx context.Context, l *slog.Logger) context.Context {
-	return context.WithValue(ctx, ctxKeyLogger, logger.Wrap(l))
+func GetLogger(ctx context.Context, subsys Subsystem) *slog.Logger {
+	return FromContext(ctx).With(slog.String(SubsysField, string(subsys)))
 }
 
-func GetLogger(ctx context.Context, subsys Subsystem) *logger.Logger {
-	return FromContext(ctx).WithField(SubsysField, subsys)
-}
-
-func FromContext(ctx context.Context) *logger.Logger {
-	switch l := ctx.Value(ctxKeyLogger).(type) {
-	case *logger.Logger:
+func FromContext(ctx context.Context) *slog.Logger {
+	if l, ok := ctx.Value(ctxKeyLogger).(*slog.Logger); ok {
 		return l
-	case *slog.Logger:
-		return logger.Wrap(l)
 	}
 	return logger.NewNullLogger()
 }

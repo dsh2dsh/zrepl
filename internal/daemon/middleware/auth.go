@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -61,13 +62,14 @@ func (self *IdentityChecker) keyNameFrom(r *http.Request) string {
 
 	token, foundToken := strings.CutPrefix(auth, "Bearer ")
 	if !foundToken || token == "" {
-		log.WithField("authorization", auth).Error("bearer token not found")
+		log.With(slog.String("authorization", auth)).
+			Error("bearer token not found")
 		return ""
 	}
 
 	keyName, ok := self.keys[token]
 	if !ok {
-		log.WithField("token", token).Error("client identity not found")
+		log.With(slog.String("token", token)).Error("client identity not found")
 		return ""
 	}
 	return keyName
@@ -76,6 +78,6 @@ func (self *IdentityChecker) keyNameFrom(r *http.Request) string {
 func (self *IdentityChecker) context(r *http.Request, clientIdentity string,
 ) context.Context {
 	ctx := context.WithValue(r.Context(), clientIdentityKey, clientIdentity)
-	return logging.WithLogger(ctx,
-		getLogger(r).WithField("client_identity", clientIdentity))
+	return logging.WithLogger(ctx, getLogger(r).With(
+		slog.String("client_identity", clientIdentity)))
 }

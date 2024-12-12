@@ -49,7 +49,7 @@ type jobs struct {
 	gracefulStop context.CancelCauseFunc
 
 	cron *cron.Cron
-	log  *logger.Logger
+	log  *slog.Logger
 
 	jobs         map[string]*props
 	internalJobs []job.Internal
@@ -119,7 +119,7 @@ func (self *jobs) wait() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		if err := self.g.Wait(); err != nil {
-			self.log.WithError(err).Error("some jobs finished with error")
+			logger.WithError(self.log, err, "some jobs finished with error")
 		}
 		self.log.Info("all jobs finished")
 		self.log.Info("waiting for cron exit")
@@ -268,7 +268,7 @@ func (self *jobs) gracefulContext(ctx context.Context, log *slog.Logger,
 
 func (self *jobs) context(p *props) context.Context {
 	name := p.job.Name()
-	ctx := logging.WithField(self.ctx, logging.JobField, name)
+	ctx := logging.With(self.ctx, slog.String(logging.JobField, name))
 	ctx = zfscmd.WithJobID(ctx, name)
 	return p.Context(ctx)
 }

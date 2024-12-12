@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
@@ -48,14 +49,15 @@ func (self *JobNameEx) middleware(next http.Handler) http.Handler {
 func (self *JobNameEx) jobNameFrom(r *http.Request) string {
 	jobName := r.PathValue(self.pathSegment)
 	if jobName == "" {
-		getLogger(r).
-			WithField("path", r.URL.String()).
-			WithField("path_segment", self.pathSegment).
-			Error("job name not found in path")
+		getLogger(r).With(
+			slog.String("path", r.URL.String()),
+			slog.String("path_segment", self.pathSegment),
+		).Error("job name not found in path")
 		return ""
 	}
 	if !self.getter(jobName) {
-		getLogger(r).WithField(logging.JobField, jobName).Error("job not found")
+		getLogger(r).With(slog.String(logging.JobField, jobName)).
+			Error("job not found")
 		return ""
 	}
 	return jobName
@@ -63,7 +65,7 @@ func (self *JobNameEx) jobNameFrom(r *http.Request) string {
 
 func (self *JobNameEx) context(r *http.Request, name string) context.Context {
 	ctx := context.WithValue(r.Context(), jobNameKey, name)
-	ctx = logging.WithLogger(ctx,
-		getLogger(r).WithField(logging.JobField, name))
+	ctx = logging.WithLogger(ctx, getLogger(r).With(
+		slog.String(logging.JobField, name)))
 	return zfscmd.WithJobID(ctx, name)
 }

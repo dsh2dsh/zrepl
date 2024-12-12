@@ -53,7 +53,7 @@ func (self *Outlets) logInternalError(outlet slog.Handler, err string) {
 		}
 		r.AddAttrs(slog.String("outlet_type", fmt.Sprintf("%T", outlet)))
 	}
-	r.AddAttrs(slog.String(FieldError, err))
+	r.AddAttrs(slog.String(fieldError, err))
 	if o := self.GetLoggerErrorOutlet(); o != nil {
 		// ignore errors at this point (still better than panicking if the error is
 		// temporary)

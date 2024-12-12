@@ -1,6 +1,8 @@
 package zfscmd
 
 import (
+	"log/slog"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -47,7 +49,7 @@ func RegisterMetrics(r prometheus.Registerer) {
 
 func waitPostPrometheus(c *Cmd, u usage) {
 	if len(c.cmd.Args) < 2 {
-		getLogger(c.ctx).WithField("args", c.cmd.Args).
+		getLogger(c.ctx).With(slog.Any("args", c.cmd.Args)).
 			Warn("prometheus: cannot turn zfs command into metric")
 		return
 	}

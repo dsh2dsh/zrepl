@@ -4,10 +4,7 @@ import (
 	"context"
 
 	"github.com/dsh2dsh/zrepl/internal/cli"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 )
-
-type Logger = logger.Logger
 
 var DaemonCmd = &cli.Subcommand{
 	Use:   "daemon",

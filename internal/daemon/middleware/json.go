@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/dsh2dsh/zrepl/internal/client/jsonclient"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
 func JsonResponder[T any](h func(context.Context) (*T, error)) Middleware {
@@ -38,7 +39,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error, msg string,
 func writeErrorCode(w http.ResponseWriter, r *http.Request, statusCode int,
 	err error, msg string,
 ) {
-	getLogger(r).WithError(err).Error(msg)
+	logger.WithError(getLogger(r), err, msg)
 	http.Error(w, err.Error(), statusCode)
 }
 
