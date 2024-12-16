@@ -65,6 +65,7 @@ type props struct {
 	reset  context.CancelCauseFunc
 
 	wakeupBusy int
+	err        error
 }
 
 func (self *props) Context(ctx context.Context) context.Context {
@@ -93,6 +94,8 @@ func (self *props) Wakeup(cause error, wakeupBusy bool) bool {
 		return false
 	} else if wakeupBusy {
 		self.wakeupBusy++
+		self.err = fmt.Errorf("job frequency is too high; was skipped %d times",
+			self.wakeupBusy)
 	}
 	self.wakeup(cause)
 	return true
@@ -108,6 +111,13 @@ func (self *props) Reset(cause error) bool {
 	}
 	self.reset(cause)
 	return true
+}
+
+func (self *props) PreRun() job.Job {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+	self.err = nil
+	return self.job
 }
 
 func (self *jobs) Cancel() {
@@ -147,10 +157,8 @@ func (self *jobs) status() map[string]*job.Status {
 }
 
 func (self *jobs) updateStatus(j *props, s *job.Status) *job.Status {
-	if errStr := s.Error(); j.wakeupBusy > 0 && errStr == "" {
-		s.Err = fmt.Sprintf(
-			"job frequency is too high; was skipped %d times",
-			j.wakeupBusy)
+	if errStr := s.Error(); errStr == "" && j.err != nil {
+		s.Err = j.err.Error()
 	}
 	if j.cronId > 0 {
 		entry := self.cron.Entry(j.cronId)
@@ -226,7 +234,7 @@ func (self *jobs) mustCheckJobName(s string) {
 }
 
 func (self *jobs) runJob(p *props, log *slog.Logger) {
-	fn := self.makeStartFunc(self.context(p), p.job, log)
+	fn := self.makeStartFunc(self.context(p), p.PreRun(), log)
 	self.g.Go(func() error {
 		defer p.Stop()
 		return fn()
