@@ -13,6 +13,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
@@ -325,6 +326,10 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 		return run.report()
 	}
 	return report, wait
+}
+
+func getLog(ctx context.Context) *slog.Logger {
+	return logging.GetLogger(ctx, logging.SubsysReplication)
 }
 
 func (a *attempt) do(ctx context.Context, prev *attempt) {
@@ -828,13 +833,22 @@ func (s *step) report() *report.StepReport {
 	return r
 }
 
-//go:generate enumer -type=errorClass
 type errorClass int
 
 const (
 	errorClassPermanent errorClass = iota
 	errorClassTemporaryConnectivityRelated
 )
+
+func (self errorClass) String() string {
+	switch self {
+	case errorClassPermanent:
+		return "errorClassPermanent"
+	case errorClassTemporaryConnectivityRelated:
+		return "errorClassTemporaryConnectivityRelated"
+	}
+	return fmt.Sprintf("errorClass(%d)", self)
+}
 
 type errorReport struct {
 	flattened []*timedError

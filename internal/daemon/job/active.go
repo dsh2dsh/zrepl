@@ -17,7 +17,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/replication"
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
@@ -739,7 +738,7 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 	sender, receiver := j.mode.SenderReceiver()
 	j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.state = ActiveSideReplicating
-		tasks.replicationReport, repWait = replication.Do(
+		tasks.replicationReport, repWait = driver.Do(
 			ctx, j.replicationDriverConfig, logic.NewPlanner(
 				j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
 				j.mode.PlannerPolicy()))
