@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -32,20 +33,56 @@ func (self *server) Clone() *server {
 }
 
 func (self *server) WithUnix(path string, mode uint32) error {
+	if err := unlinkStaleUnix(path); err != nil {
+		return err
+	}
+
 	self.Addr = path
 	laddr, err := net.ResolveUnixAddr("unix", path)
 	if err != nil {
 		return fmt.Errorf("resolve unix address %q: %w", path, err)
 	}
 
-	if self.listener, err = net.ListenUnix("unix", laddr); err != nil {
+	l, err := net.ListenUnix("unix", laddr)
+	if err != nil {
 		return fmt.Errorf("listen unix on %q: %w", path, err)
-	} else if mode == 0 {
+	}
+
+	l.SetUnlinkOnClose(true)
+	self.listener = l
+	if mode == 0 {
 		return nil
 	}
 
 	if err := os.Chmod(path, os.FileMode(mode)); err != nil {
 		return fmt.Errorf("change socket mode to %O: %w", mode, err)
+	}
+	return nil
+}
+
+func unlinkStaleUnix(path string) error {
+	sockdir := filepath.Dir(path)
+	stat, err := os.Stat(sockdir)
+	switch {
+	case err != nil && os.IsNotExist(err):
+		if err := os.MkdirAll(sockdir, 0o755); err != nil {
+			return fmt.Errorf("cannot mkdir %q: %w", sockdir, err)
+		}
+		return nil
+	case err != nil:
+		return fmt.Errorf("cannot stat(2) %q: %w", sockdir, err)
+	case !stat.IsDir():
+		return fmt.Errorf("not a directory: %q", sockdir)
+	}
+
+	_, err = os.Stat(path)
+	switch {
+	case err == nil:
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("cannot remove stale socket %q: %w", path, err)
+		}
+	case !os.IsNotExist(err):
+		return fmt.Errorf("cannot stat(2) %q: %w", path, err)
 	}
 	return nil
 }

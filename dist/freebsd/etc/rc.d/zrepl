@@ -49,7 +49,7 @@ load_rc_config "$name"
 : "${zrepl_gracefully:=NO}"
 
 : "${zrepl_control_group:=$zrepl_group}"
-: "${zrepl_control_mode:=0700}"
+: "${zrepl_control_mode:=0750}"
 
 pidfile="/var/run/zrepl.pid"
 command="/usr/sbin/daemon"
@@ -71,10 +71,8 @@ zrepl_checkconfig() {
 }
 
 zrepl_precmd() {
-    if [ ! -d "/var/run/zrepl" ]; then
-        install -d -g "$zrepl_control_group" -o "$zrepl_user" \
-                -m "$zrepl_control_mode"   "/var/run/zrepl"
-    fi
+    install -d -g "$zrepl_control_group" -o "$zrepl_user" \
+            -m "$zrepl_control_mode" "/var/run/zrepl"
     zrepl_checkconfig
 }
 
