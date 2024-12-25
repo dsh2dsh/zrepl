@@ -220,6 +220,7 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 			Compressed:       s.config.SendCompressed,
 			EmbeddedData:     s.config.SendEmbeddedData,
 			Saved:            s.config.SendSaved,
+			Multi:            r.Multi,
 		},
 	}
 

@@ -339,7 +339,7 @@ func replicationDriverConfigFromConfig(in *config.Replication) (driver.Config,
 	c := driver.Config{
 		StepQueueConcurrency: in.Concurrency.Steps,
 		MaxAttempts:          envconst.Int("ZREPL_REPLICATION_MAX_ATTEMPTS", 3),
-		OneStep:              in.OneStep,
+		Prefix:               in.Prefix,
 		ReconnectHardFailTimeout: envconst.Duration(
 			"ZREPL_REPLICATION_RECONNECT_HARD_FAIL_TIMEOUT", 10*time.Minute),
 	}

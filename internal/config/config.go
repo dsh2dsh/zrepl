@@ -228,7 +228,7 @@ type RecvOptions struct {
 type Replication struct {
 	Protection  ReplicationOptionsProtection  `yaml:"protection"`
 	Concurrency ReplicationOptionsConcurrency `yaml:"concurrency"`
-	OneStep     bool                          `yaml:"one_step" default:"true"`
+	Prefix      string                        `yaml:"prefix"`
 }
 
 type ReplicationOptionsProtection struct {

@@ -440,23 +440,10 @@ pkg install zrepl-dsh2dsh
 
     sets zfs binary path to "/sbin/zfs".
 
-  * Replication by default generates a stream package that sends all
-    intermediary snapshots (`zfs send -I`), instead of every intermediary
-    snapshot one by one (`zfs send -i`). If you want change it back to original
-    slow mode:
-
-    ``` yaml
-    jobs:
-      - name: "zroot-to-zdisk"
-        type: "push"
-        replication:
-          # Send all intermediary snapshots as a stream package, instead of
-          # sending them one by one. Default: true.
-          one_step: false
-    ```
-
-    Replication with `one_step: true` is much faster. For instance a job on my
-    desktop configured like:
+  * Replication now generates a stream package that sends all intermediary
+    snapshots (`zfs send -I`), instead of every intermediary snapshot one by one
+    (`zfs send -i`). Such replication is much faster. For instance a replication
+    job on my desktop configured like:
 
     ``` yaml
     replication:
@@ -465,15 +452,7 @@ pkg install zrepl-dsh2dsh
         size_estimates: 8
     ```
 
-    replicates over WLAN for 1m32s, instead of 8m with configuration like
-
-    ``` yaml
-    replication:
-      one_step: false
-      concurrency:
-        steps: 4
-        size_estimates: 4
-    ```
+    replicates over WLAN for 1m32s, instead of 8m.
 
   * New command `zrepl signal stop`
 
@@ -590,6 +569,22 @@ pkg install zrepl-dsh2dsh
       - name: "zroot-to-zdisk"
     include_jobs: "jobs.d/*.yaml"
     ```
+
+  * The replication can be configured to replicate subset of snapshots, instead
+    of all of them. Example:
+
+    ``` yaml
+    jobs:
+      - name: "zroot-to-zdisk"
+        type: "push"
+        replication:
+          prefix: "zrepl_"
+    ```
+
+    This configuration will replicate snapshots with names beginning with
+    "zrepl_".
+
+    See also zrepl/zrepl#403
 
 ## Upstream user documentation
 

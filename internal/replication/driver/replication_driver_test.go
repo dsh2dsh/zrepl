@@ -53,7 +53,7 @@ func (f *mockFS) EqualToPreviousAttempt(other FS) bool {
 	return f.name == other.(*mockFS).name
 }
 
-func (f *mockFS) PlanFS(ctx context.Context, oneStep bool) ([]Step, error) {
+func (f *mockFS) PlanFS(ctx context.Context, prefix string) ([]Step, error) {
 	if f.steps != nil {
 		panic("PlanFS used twice")
 	}

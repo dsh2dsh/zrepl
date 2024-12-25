@@ -121,10 +121,10 @@ jobs:
 	require.NotEmpty(t, c.Jobs)
 	pushJob := c.Jobs[0].Ret.(*PushJob)
 	require.NotNil(t, pushJob)
-	assert.True(t, pushJob.Replication.OneStep)
+	assert.Empty(t, pushJob.Replication.Prefix)
 }
 
-func TestPushJob_withOneStep(t *testing.T) {
+func TestPushJob_withPrefix(t *testing.T) {
 	c := testValidConfig(t, `
 jobs:
   - name: "foo"
@@ -138,7 +138,7 @@ jobs:
     snapshotting:
       type: "manual"
     replication:
-      one_step: false
+      prefix: "zrepl_"
     pruning:
       keep_sender:
         - type: "not_replicated"
@@ -147,7 +147,7 @@ jobs:
 	require.NotEmpty(t, c.Jobs)
 	pushJob := c.Jobs[0].Ret.(*PushJob)
 	require.NotNil(t, pushJob)
-	assert.False(t, pushJob.Replication.OneStep)
+	assert.Equal(t, "zrepl_", pushJob.Replication.Prefix)
 }
 
 func TestPullJob(t *testing.T) {
@@ -169,10 +169,10 @@ jobs:
 	require.NotEmpty(t, c.Jobs)
 	pullJob := c.Jobs[0].Ret.(*PullJob)
 	require.NotNil(t, pullJob)
-	assert.True(t, pullJob.Replication.OneStep)
+	assert.Empty(t, pullJob.Replication.Prefix)
 }
 
-func TestPullJob_withOneStep(t *testing.T) {
+func TestPullJob_withPrefix(t *testing.T) {
 	c := testValidConfig(t, `
 jobs:
   - name: "foo"
@@ -184,7 +184,7 @@ jobs:
       client_identity: "client_name"
     root_fs: "pool2/backup_servers"
     replication:
-      one_step: false
+      prefix: "zrepl_"
     pruning:
       keep_sender:
         - type: "not_replicated"
@@ -193,7 +193,7 @@ jobs:
 	require.NotEmpty(t, c.Jobs)
 	pullJob := c.Jobs[0].Ret.(*PullJob)
 	require.NotNil(t, pullJob)
-	assert.False(t, pullJob.Replication.OneStep)
+	assert.Equal(t, "zrepl_", pullJob.Replication.Prefix)
 }
 
 func TestSnapshottingPeriodic_TimestampLocal_defaultTrue(t *testing.T) {
@@ -210,8 +210,6 @@ jobs:
     snapshotting:
       type: "periodic"
       prefix: "zrepl_"
-    replication:
-      one_step: false
     pruning:
       keep_sender:
         - type: "not_replicated"

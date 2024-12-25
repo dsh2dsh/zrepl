@@ -465,9 +465,11 @@ type ZFSSendFlags struct {
 	Compressed       bool
 	EmbeddedData     bool
 	Saved            bool
+	Multi            bool
 
-	// Preferred if not empty
-	ResumeToken string // if not nil, must match what is specified in From, To (covered by ValidateCorrespondsToResumeToken)
+	// Preferred if not empty. If not nil, must match what is specified in From,
+	// To (covered by ValidateCorrespondsToResumeToken)
+	ResumeToken string
 }
 
 type zfsSendArgsValidationContext struct {
@@ -593,7 +595,7 @@ func (f ZFSSendFlags) Validate() error { return nil }
 // SECURITY SENSITIVE it is the caller's responsibility to ensure that a.Encrypted semantics
 // hold for the file system that will be sent with the send flags returned by this function
 func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
-	args := make([]string, 0)
+	args := make([]string, 0, 10)
 
 	// ResumeToken takes precedence, we assume that it has been validated
 	// to reflect what is described by the other fields.
@@ -656,7 +658,7 @@ func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 	switch {
 	case fromV == "": // Initial
 		flags = append(flags, toV)
-	case a.From.RelName[0] == '@': // snapshot
+	case a.ZFSSendFlags.Multi:
 		flags = append(flags, "-I", fromV, toV)
 	default:
 		flags = append(flags, "-i", fromV, toV)

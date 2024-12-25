@@ -122,7 +122,7 @@ type FS interface {
 	EqualToPreviousAttempt(fs FS) bool
 	// The returned steps are assumed to be dependent on exactly
 	// their direct predecessors in the returned list.
-	PlanFS(context.Context, bool) ([]Step, error)
+	PlanFS(ctx context.Context, prefix string) ([]Step, error)
 	ReportInfo() *report.FilesystemInfo
 }
 
@@ -145,7 +145,8 @@ type Step interface {
 }
 
 type fs struct {
-	fs FS
+	fs     FS
+	prefix string
 
 	l *chainlock.L
 
@@ -189,7 +190,7 @@ type Config struct {
 	StepQueueConcurrency     int           `validate:"gte=1"`
 	MaxAttempts              int           `validate:"eq=-1|gt=0"`
 	ReconnectHardFailTimeout time.Duration `validate:"gt=0"`
-	OneStep                  bool
+	Prefix                   string
 }
 
 func (c Config) Validate() error {
@@ -240,9 +241,7 @@ func Do(ctx context.Context, config Config, planner Planner) (ReportFunc,
 				config:    config,
 			}
 			run.attempts = append(run.attempts, cur)
-			run.l.DropWhile(func() {
-				cur.do(ctx, prev)
-			})
+			run.l.DropWhile(func() { cur.do(ctx, prev) })
 			prev = cur
 			if graceful.Err() != nil {
 				log.With(slog.String("cause", context.Cause(graceful).Error())).
@@ -365,6 +364,7 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
 	for _, pfs := range pfss {
 		fs := &fs{
 			fs:        pfs,
+			prefix:    a.config.Prefix,
 			l:         a.l,
 			blockedOn: report.FsBlockedOnNothing,
 		}
@@ -472,7 +472,7 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs) {
 		go func(f *fs) {
 			defer fssesDone.Done()
 			// avoid explosion of tasks with name f.report().Info.Name
-			f.do(ctx, stepQueue, prevs[f], a.config.OneStep)
+			f.do(ctx, stepQueue, prevs[f])
 			f.l.HoldWhile(func() {
 				// every return from f means it's unblocked...
 				f.blockedOn = report.FsBlockedOnNothing
@@ -505,7 +505,7 @@ func (f *fs) initialRepOrdWakeupChildren() {
 	}
 }
 
-func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
+func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
 	defer f.l.Lock().Unlock()
 	defer f.initialRepOrdWakeupChildren()
 	graceful := signal.GracefulFrom(ctx)
@@ -526,7 +526,7 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs, oneStep bool) {
 			f.blockedOn = report.FsBlockedOnNothing
 		})
 		if graceful.Err() == nil {
-			psteps, err = f.fs.PlanFS(graceful, oneStep) // no shadow
+			psteps, err = f.fs.PlanFS(graceful, f.prefix) // no shadow
 		}
 		errTime = time.Now() // no shadow
 	})

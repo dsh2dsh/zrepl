@@ -78,12 +78,10 @@ jobs:
     # client_keys:
     #   - "key1"
     #   # and nobody else.
-    recv:
+    # recv:
       # execpipe:
       #   # mbuffer |zfs receive
       #   - [ "/usr/local/bin/mbuffer", "-q", "-s", "128k", "-m", "1G" ]
-      placeholder:
-        encryption: "inherit"
     monitor: &monitor-snapshots
       count:
         - prefix: "zrepl_frequently_"
@@ -130,14 +128,8 @@ jobs:
       listener_name: "zdisk"
       client_identity: "localhost"
     datasets: *datasets
-    replication: &replication
-      # Send all intermediary snapshots as a stream package, instead of sending
-      # them one by one.
-      #one_step: true
-      concurrency:
-        size_estimates: 8
-    conflict_resolution: &conflict_resolution
-      initial_replication: "all"
+    replication:
+      prefix: "zrepl_"
     snapshotting:
       type: "periodic"
       cron: "*/15 * * * *"

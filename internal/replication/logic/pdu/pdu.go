@@ -113,8 +113,9 @@ func (x *FilesystemVersion) GetCreation() string {
 type SendReq struct {
 	Filesystem string `json:"Filesystem,omitempty"`
 	// May be empty / null to request a full transfer of To
-	From *FilesystemVersion `json:"From,omitempty"`
-	To   *FilesystemVersion `json:"To,omitempty"`
+	From  *FilesystemVersion `json:"From,omitempty"`
+	To    *FilesystemVersion `json:"To,omitempty"`
+	Multi bool               `json:"Multi,omitempty"`
 	// If ResumeToken is not empty, the resume token that CAN be used for 'zfs
 	// send' by the sender. The sender MUST indicate use of ResumeToken in the
 	// reply message SendRes.UsedResumeToken If it does not work, the sender
