@@ -1614,19 +1614,17 @@ func tryParseDestroySnapshotsError(arg string, stderr []byte) *DestroySnapshotsE
 func ZFSDestroy(ctx context.Context, arg string) error {
 	var dstype, filesystem string
 	idx := strings.IndexAny(arg, "@#")
-	if idx == -1 {
+	switch {
+	case idx == -1:
 		dstype = "filesystem"
 		filesystem = arg
-	} else {
-		switch arg[idx] {
-		case '@':
-			dstype = "snapshot"
-		case '#':
-			dstype = "bookmark"
-		}
+	case arg[idx] == '@':
+		dstype = "snapshot"
+		filesystem = arg[:idx]
+	case arg[idx] == '#':
+		dstype = "bookmark"
 		filesystem = arg[:idx]
 	}
-
 	defer prometheus.NewTimer(
 		prom.ZFSDestroyDuration.WithLabelValues(dstype, filesystem))
 
@@ -1634,11 +1632,19 @@ func ZFSDestroy(ctx context.Context, arg string) error {
 	if stdio, err := cmd.CombinedOutput(); err != nil {
 		if destroyOneOrMoreSnapshotsNoneExistedErrorRegexp.Match(stdio) {
 			return &DatasetDoesNotExist{arg}
-		} else if match := destroyBookmarkDoesNotExist.FindStringSubmatch(string(stdio)); match != nil && match[1] == arg {
+		}
+
+		match := destroyBookmarkDoesNotExist.FindStringSubmatch(string(stdio))
+		if match != nil && match[1] == arg {
 			return &DatasetDoesNotExist{arg}
-		} else if dsNotExistErr := tryDatasetDoesNotExist(filesystem, stdio); dsNotExistErr != nil {
+		}
+
+		dsNotExistErr := tryDatasetDoesNotExist(filesystem, stdio)
+		if dsNotExistErr != nil {
 			return dsNotExistErr
-		} else if dserr := tryParseDestroySnapshotsError(arg, stdio); dserr != nil {
+		}
+
+		if dserr := tryParseDestroySnapshotsError(arg, stdio); dserr != nil {
 			return dserr
 		}
 		return NewZfsError(err, stdio)
@@ -1647,12 +1653,13 @@ func ZFSDestroy(ctx context.Context, arg string) error {
 }
 
 func ZFSDestroyIdempotent(ctx context.Context, path string) error {
-	err := ZFSDestroy(ctx, path)
-	var errNotExist *DatasetDoesNotExist
-	if errors.As(err, &errNotExist) {
-		return nil
+	if err := ZFSDestroy(ctx, path); err != nil {
+		var errNotExist *DatasetDoesNotExist
+		if !errors.As(err, &errNotExist) {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string,

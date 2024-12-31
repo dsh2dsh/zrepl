@@ -85,7 +85,8 @@ func (v *FilesystemVersion) ZFSFilesystemVersion() (*zfs.FilesystemVersion, erro
 	}, nil
 }
 
-func ReplicationConfigProtectionWithKind(both ReplicationGuaranteeKind) *ReplicationConfigProtection {
+func ReplicationConfigProtectionWithKind(both ReplicationGuaranteeKind,
+) *ReplicationConfigProtection {
 	return &ReplicationConfigProtection{
 		Initial:     both,
 		Incremental: both,

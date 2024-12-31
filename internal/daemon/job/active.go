@@ -756,10 +756,6 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 }
 
 func (j *ActiveSide) pruneSender(ctx context.Context) error {
-	log := GetLogger(ctx)
-	log.With(slog.Int("concurrency", j.prunerFactory.Concurrency())).
-		Info("start pruning sender")
-
 	sender, _ := j.mode.SenderReceiver()
 	senderOnce := NewSenderOnce(ctx, sender)
 	tasks := j.updateTasks(func(tasks *activeSideTasks) {
@@ -767,6 +763,10 @@ func (j *ActiveSide) pruneSender(ctx context.Context) error {
 		tasks.prunerSender = j.prunerFactory.BuildSenderPruner(
 			ctx, senderOnce, senderOnce)
 	})
+
+	log := GetLogger(ctx)
+	log.With(slog.Int("concurrency", tasks.prunerSender.Concurrency())).
+		Info("start pruning sender")
 
 	begin := time.Now()
 	tasks.prunerSender.Prune()
@@ -776,16 +776,16 @@ func (j *ActiveSide) pruneSender(ctx context.Context) error {
 }
 
 func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
-	log := GetLogger(ctx)
-	log.With(slog.Int("concurrency", j.prunerFactory.Concurrency())).
-		Info("start pruning receiver")
-
 	sender, receiver := j.mode.SenderReceiver()
 	tasks := j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.prunerReceiver = j.prunerFactory.BuildReceiverPruner(
 			ctx, receiver, sender)
 		tasks.state = ActiveSidePruneReceiver
 	})
+
+	log := GetLogger(ctx)
+	log.With(slog.Int("concurrency", tasks.prunerReceiver.Concurrency())).
+		Info("start pruning receiver")
 
 	begin := time.Now()
 	tasks.prunerReceiver.Prune()

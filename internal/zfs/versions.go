@@ -1,7 +1,6 @@
 package zfs
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -111,28 +110,26 @@ func (v FilesystemVersion) GetGuid() uint64      { return v.Guid }
 func (v FilesystemVersion) GetName() string      { return v.Name }
 func (v FilesystemVersion) IsSnapshot() bool     { return v.Type == Snapshot }
 func (v FilesystemVersion) IsBookmark() bool     { return v.Type == Bookmark }
+func (v FilesystemVersion) String() string       { return v.RelName() }
+
 func (v FilesystemVersion) RelName() string {
-	return fmt.Sprintf("%s%s", v.Type.DelimiterChar(), v.Name)
+	return v.Type.DelimiterChar() + v.Name
 }
-func (v FilesystemVersion) String() string { return v.RelName() }
 
 // Only takes into account those attributes of FilesystemVersion that
 // are immutable over time in ZFS.
 func FilesystemVersionEqualIdentity(a, b FilesystemVersion) bool {
 	// .Name is mutable
-	return a.Guid == b.Guid && a.CreateTXG == b.CreateTXG && a.Creation.Equal(b.Creation)
+	return a.Guid == b.Guid && a.CreateTXG == b.CreateTXG &&
+		a.Creation.Equal(b.Creation)
 }
 
 func (v FilesystemVersion) ToAbsPath(p *DatasetPath) string {
-	var b bytes.Buffer
-	b.WriteString(p.ToString())
-	b.WriteString(v.Type.DelimiterChar())
-	b.WriteString(v.Name)
-	return b.String()
+	return p.ToString() + v.Type.DelimiterChar() + v.Name
 }
 
 func (v FilesystemVersion) FullPath(fs string) string {
-	return fmt.Sprintf("%s%s", fs, v.RelName())
+	return fs + v.RelName()
 }
 
 func (v FilesystemVersion) ToSendArgVersion() ZFSSendArgVersion {

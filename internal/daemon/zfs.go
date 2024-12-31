@@ -160,7 +160,7 @@ func (self *zfsJob) destroySnapshots(ctx context.Context,
 
 	resp, err := ep.DestroySnapshots(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("destroy snapshots %q: %w", req.Filesystem, err)
+		return nil, fmt.Errorf("destroy snapshots: %w", err)
 	}
 	return resp, nil
 }

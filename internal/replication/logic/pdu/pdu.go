@@ -248,18 +248,37 @@ func (x *SendCompletedReq) GetOriginalReq() *SendReq {
 }
 
 type DestroySnapshotsReq struct {
-	Filesystem string `json:"Filesystem,omitempty"`
-	// Path to filesystem, snapshot or bookmark to be destroyed
-	Snapshots []*FilesystemVersion `json:"Snapshots,omitempty"`
+	Concurrency int                `json:"Concurrency,omitempty"`
+	Filesystems []DestroySnapshots `json:"Filesystems,omitempty"`
+}
+
+type DestroySnapshots struct {
+	Filesystem string   `json:"Filesystem,omitempty"`
+	Snapshots  []string `json:"Snapshots,omitempty"`
 }
 
 type DestroySnapshotsRes struct {
-	Results []*DestroySnapshotRes `json:"Results,omitempty"`
+	Filesystems []DestroyedSnapshots `json:"Filesystems,omitempty"`
+}
+
+func (self *DestroySnapshotsRes) Map() map[string]*DestroyedSnapshots {
+	m := make(map[string]*DestroyedSnapshots, len(self.Filesystems))
+	for i := range self.Filesystems {
+		item := &self.Filesystems[i]
+		m[item.Filesystem] = item
+	}
+	return m
+}
+
+type DestroyedSnapshots struct {
+	Filesystem string               `json:"Filesystem,omitempty"`
+	Error      string               `json:"Error,omitempty"`
+	Results    []DestroySnapshotRes `json:"Results,omitempty"`
 }
 
 type DestroySnapshotRes struct {
-	Snapshot *FilesystemVersion `json:"Snapshot,omitempty"`
-	Error    string             `json:"Error,omitempty"`
+	Name  string `json:"Name,omitempty"`
+	Error string `json:"Error,omitempty"`
 }
 
 type ReplicationCursorReq struct {
@@ -274,12 +293,12 @@ func (x *ReplicationCursorReq) GetFilesystem() string {
 }
 
 type ReplicationCursorRes struct {
-	Result *ReplicationCursorRes_Result `json:"Result"`
+	Result *ReplicationCursorRes_Result `json:"Result,omitempty"`
 }
 
 type ReplicationCursorRes_Result struct {
-	Notexist bool   `json:"Notexist"`
-	Guid     uint64 `json:"Guid"`
+	Notexist bool   `json:"Notexist,omitempty"`
+	Guid     uint64 `json:"Guid,omitempty"`
 }
 
 func (m *ReplicationCursorRes) GetResult() *ReplicationCursorRes_Result {
@@ -335,10 +354,10 @@ func (x *ReceiveReq) GetReplicationConfig() *ReplicationConfig {
 }
 
 type SendDryReq struct {
-	Items       []SendReq `json:"Items"`
-	Concurrency int       `json:"Concurrency"`
+	Items       []SendReq `json:"Items,omitempty"`
+	Concurrency int       `json:"Concurrency,omitempty"`
 }
 
 type SendDryRes struct {
-	Items []SendRes `json:"Items"`
+	Items []SendRes `json:"Items,omitempty"`
 }

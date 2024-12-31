@@ -2,8 +2,10 @@ package pruner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -66,6 +68,13 @@ type args struct {
 	promPruneSecs                  prometheus.Observer
 }
 
+func (self *args) Concurrency() int {
+	if self.concurrency < 1 {
+		return runtime.GOMAXPROCS(0)
+	}
+	return self.concurrency
+}
+
 type Pruner struct {
 	args args
 
@@ -82,6 +91,8 @@ type Pruner struct {
 }
 
 type updater func(func(*Pruner))
+
+func (p *Pruner) Concurrency() int { return p.args.Concurrency() }
 
 func (p *Pruner) Prune() {
 	if len(p.args.rules) == 0 {
@@ -134,20 +145,16 @@ func (p *Pruner) State() State {
 
 func doOneAttempt(a *args, u updater) {
 	ctx, target, sender := a.ctx, a.target, a.sender
-
 	sfss, tfss, err := listFilesystems(ctx, sender, target)
 	if err != nil {
-		u(func(p *Pruner) {
-			p.state = PlanErr
-			p.err = err
-		})
+		u(func(p *Pruner) { p.state, p.err = PlanErr, err })
 		return
 	}
 
 	pfss := make([]*fs, len(tfss))
 	needsReplicated := containsNotReplicated(a.rules)
 	g := new(errgroup.Group)
-	g.SetLimit(a.concurrency)
+	g.SetLimit(a.Concurrency())
 
 	for i, tfs := range tfss {
 		if ctx.Err() != nil {
@@ -174,51 +181,50 @@ func doOneAttempt(a *args, u updater) {
 		}
 
 		g.Go(func() error {
-			pfs.Build(a, tfs, target, sender, needsReplicated)
-			return nil
+			return pfs.Build(a, tfs, target, sender, needsReplicated)
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		u(func(p *Pruner) {
-			p.state = PlanErr
-			p.err = err
-		})
+		u(func(p *Pruner) { p.state, p.err = PlanErr, err })
 		return
 	} else if ctx.Err() != nil {
-		u(func(p *Pruner) {
-			p.state = PlanErr
-			p.err = context.Cause(ctx)
-		})
+		u(func(p *Pruner) { p.state, p.err = PlanErr, context.Cause(ctx) })
 		return
 	}
 
-	u(func(pruner *Pruner) {
-		pruner.execQueue = newExecQueue(len(pfss))
-		for _, pfs := range pfss {
-			pruner.execQueue.Put(pfs, nil, false)
-		}
-		pruner.state = Exec
+	req := pdu.DestroySnapshotsReq{Concurrency: a.concurrency}
+	u(func(p *Pruner) {
+		makeExecQueue(a.ctx, p, pfss, &req)
+		p.state = Exec
 	})
+
+	if len(req.Filesystems) == 0 {
+		u(func(p *Pruner) { p.state = Done })
+		return
+	}
+
+	resp, err := target.DestroySnapshots(a.ctx, &req)
+	if err != nil {
+		u(func(p *Pruner) { p.state, p.err = ExecErr, err })
+		return
+	}
+	byFS := resp.Map()
 
 	for {
 		var pfs *fs
-		u(func(pruner *Pruner) {
-			pfs = pruner.execQueue.Pop()
-		})
+		u(func(pruner *Pruner) { pfs = pruner.execQueue.Pop() })
 		if pfs == nil {
 			break
 		}
-		doOneAttemptExec(a, u, pfs)
+		checkOneAttemptExec(a, u, pfs, byFS[pfs.path])
 	}
 
 	var rep *Report
 	{
 		// must not hold lock for report
 		var pruner *Pruner
-		u(func(p *Pruner) {
-			pruner = p
-		})
+		u(func(p *Pruner) { pruner = p })
 		rep = pruner.Report()
 	}
 
@@ -226,9 +232,10 @@ func doOneAttempt(a *args, u updater) {
 		if len(rep.Pending) > 0 {
 			panic("queue should not have pending items at this point")
 		}
-		hadErr := false
+		var hadErr bool
 		for _, fsr := range rep.Completed {
-			hadErr = hadErr || fsr.SkipReason.NotSkipped() && fsr.LastError != ""
+			hadErr = hadErr ||
+				(fsr.SkipReason.NotSkipped() && fsr.LastError != "")
 		}
 		if hadErr {
 			p.state = ExecErr
@@ -284,59 +291,59 @@ func containsGuid(snapshots []*pdu.FilesystemVersion, guid uint64) bool {
 	return i >= 0
 }
 
-// attempts to exec pfs, puts it back into the queue with the result
-func doOneAttemptExec(a *args, u updater, pfs *fs) {
-	destroyList := make([]*pdu.FilesystemVersion, len(pfs.destroyList))
-	for i := range destroyList {
-		destroyList[i] = pfs.destroyList[i].(*snapshot).fsv
-		GetLogger(a.ctx).With(
-			slog.String("fs", pfs.path),
-			slog.String("destroy_snap", destroyList[i].Name),
-		).Debug("policy destroys snapshot")
-	}
+func makeExecQueue(ctx context.Context, p *Pruner, pfss []*fs,
+	req *pdu.DestroySnapshotsReq,
+) {
+	p.execQueue = newExecQueue(len(pfss))
+	l := GetLogger(ctx)
 
-	req := pdu.DestroySnapshotsReq{
-		Filesystem: pfs.path,
-		Snapshots:  destroyList,
+	for _, pfs := range pfss {
+		if !pfs.skipReason.NotSkipped() || len(pfs.destroyList) == 0 {
+			continue
+		}
+		destroyList := make([]string, len(pfs.destroyList))
+		for i := range pfs.destroyList {
+			s := pfs.destroyList[i].(*snapshot).fsv
+			if s.Type != pdu.FilesystemVersion_Snapshot {
+				err := fmt.Errorf("version %q is not a snapshot", s.Name)
+				p.execQueue.Put(pfs, err, false)
+				continue
+			}
+			destroyList[i] = s.Name
+			l.With(
+				slog.String("fs", pfs.path),
+				slog.String("destroy_snap", s.Name),
+			).Debug("policy destroys snapshot")
+		}
+		req.Filesystems = append(req.Filesystems, pdu.DestroySnapshots{
+			Filesystem: pfs.path,
+			Snapshots:  destroyList,
+		})
+		p.execQueue.Put(pfs, nil, false)
 	}
-	GetLogger(a.ctx).With(slog.String("fs", pfs.path)).
-		Debug("destroying snapshots")
-	res, err := a.target.DestroySnapshots(a.ctx, &req)
-	if err != nil {
-		u(func(pruner *Pruner) {
-			pruner.execQueue.Put(pfs, err, false)
+}
+
+// attempts to exec pfs, puts it back into the queue with the result
+func checkOneAttemptExec(a *args, u updater, pfs *fs,
+	destroyed *pdu.DestroyedSnapshots,
+) {
+	if destroyed.Error != "" {
+		u(func(p *Pruner) {
+			p.execQueue.Put(pfs, errors.New(destroyed.Error), false)
 		})
 		return
 	}
 
-	// check if all snapshots were destroyed
-	destroyResults := make(map[string]*pdu.DestroySnapshotRes)
-	for _, fsres := range res.Results {
-		destroyResults[fsres.Snapshot.Name] = fsres
-	}
-
-	err = nil
-	destroyFails := make([]*pdu.DestroySnapshotRes, 0)
-	for _, reqDestroy := range destroyList {
-		res, ok := destroyResults[reqDestroy.Name]
-		if !ok {
-			err = fmt.Errorf("missing destroy-result for %s", reqDestroy.RelName())
-			break
-		} else if res.Error != "" {
-			destroyFails = append(destroyFails, res)
-		}
-	}
-
-	if err == nil && len(destroyFails) > 0 {
-		names := make([]string, len(destroyFails))
-		pairs := make([]string, len(destroyFails))
-		allSame := true
-		lastMsg := destroyFails[0].Error
-		for i := 0; i < len(destroyFails); i++ {
-			allSame = allSame && destroyFails[i].Error == lastMsg
-			relname := destroyFails[i].Snapshot.RelName()
-			names[i] = relname
-			pairs[i] = fmt.Sprintf("(%s: %s)", relname, destroyFails[i].Error)
+	var err error
+	if len(destroyed.Results) > 0 {
+		names := make([]string, len(destroyed.Results))
+		pairs := make([]string, len(destroyed.Results))
+		lastMsg, allSame := destroyed.Results[0].Error, true
+		for i := range destroyed.Results {
+			failed := &destroyed.Results[i]
+			allSame = allSame && failed.Error == lastMsg
+			names[i] = "@" + failed.Name
+			pairs[i] = fmt.Sprintf("(%s: %s)", names[i], failed.Error)
 		}
 		if allSame {
 			err = fmt.Errorf("destroys failed %s: %s",
@@ -346,7 +353,7 @@ func doOneAttemptExec(a *args, u updater, pfs *fs) {
 		}
 	}
 
-	u(func(pruner *Pruner) { pruner.execQueue.Put(pfs, err, err == nil) })
+	u(func(p *Pruner) { p.execQueue.Put(pfs, err, err == nil) })
 	if err != nil {
 		logger.WithError(GetLogger(a.ctx), err,
 			"target could not destroy snapshots")

@@ -494,12 +494,19 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
 	return nil
 }
 
-func (p *Sender) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
-	dp, err := p.filterCheckFS(req.Filesystem)
-	if err != nil {
-		return nil, err
+func (p *Sender) DestroySnapshots(ctx context.Context,
+	req *pdu.DestroySnapshotsReq,
+) (*pdu.DestroySnapshotsRes, error) {
+	iter := func(yield func(*pdu.DestroySnapshots, error) bool) {
+		for i := range req.Filesystems {
+			r := &req.Filesystems[i]
+			_, err := p.filterCheckFS(r.Filesystem)
+			if !yield(r, err) {
+				return
+			}
+		}
 	}
-	return doDestroySnapshots(ctx, dp, req.Snapshots)
+	return destroySnapshots(ctx, req.Concurrency, len(req.Filesystems), iter)
 }
 
 func (p *Sender) WaitForConnectivity(ctx context.Context) error {
@@ -1065,49 +1072,23 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 	return nil
 }
 
-func (s *Receiver) DestroySnapshots(ctx context.Context, req *pdu.DestroySnapshotsReq) (*pdu.DestroySnapshotsRes, error) {
-	lp, err := mapToLocal(s.clientRootFromCtx(ctx), req.Filesystem)
-	if err != nil {
-		return nil, err
+func (s *Receiver) DestroySnapshots(ctx context.Context,
+	req *pdu.DestroySnapshotsReq,
+) (*pdu.DestroySnapshotsRes, error) {
+	clientRoot := s.clientRootFromCtx(ctx)
+	iter := func(yield func(*pdu.DestroySnapshots, error) bool) {
+		for i := range req.Filesystems {
+			r := &req.Filesystems[i]
+			_, err := mapToLocal(clientRoot, r.Filesystem)
+			if !yield(r, err) {
+				return
+			}
+		}
 	}
-	return doDestroySnapshots(ctx, lp, req.Snapshots)
+	return destroySnapshots(ctx, req.Concurrency, len(req.Filesystems), iter)
 }
 
 func (p *Receiver) SendCompleted(ctx context.Context, _ *pdu.SendCompletedReq,
 ) error {
 	return nil
-}
-
-func doDestroySnapshots(ctx context.Context, lp *zfs.DatasetPath, snaps []*pdu.FilesystemVersion) (*pdu.DestroySnapshotsRes, error) {
-	reqs := make([]*zfs.DestroySnapOp, len(snaps))
-	ress := make([]*pdu.DestroySnapshotRes, len(snaps))
-	errs := make([]error, len(snaps))
-	for i, fsv := range snaps {
-		if fsv.Type != pdu.FilesystemVersion_Snapshot {
-			return nil, fmt.Errorf("version %q is not a snapshot", fsv.Name)
-		}
-		ress[i] = &pdu.DestroySnapshotRes{
-			Snapshot: fsv,
-			// Error set after batch operation
-		}
-		reqs[i] = &zfs.DestroySnapOp{
-			Filesystem: lp.ToString(),
-			Name:       fsv.Name,
-			ErrOut:     &errs[i],
-		}
-	}
-	zfs.ZFSDestroyFilesystemVersions(ctx, reqs)
-	for i := range reqs {
-		if errs[i] != nil {
-			var de *zfs.DestroySnapshotsError
-			if errors.As(errs[i], &de) && len(de.Reason) == 1 {
-				ress[i].Error = de.Reason[0]
-			} else {
-				ress[i].Error = errs[i].Error()
-			}
-		}
-	}
-	return &pdu.DestroySnapshotsRes{
-		Results: ress,
-	}, nil
 }

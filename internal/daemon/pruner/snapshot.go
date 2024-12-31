@@ -15,16 +15,14 @@ type snapshot struct {
 
 var _ pruning.Snapshot = (*snapshot)(nil)
 
-func (s snapshot) Report() SnapshotReport {
+func (self *snapshot) Report() SnapshotReport {
 	return SnapshotReport{
-		Name:       s.Name(),
-		Replicated: s.Replicated(),
-		Date:       s.Date(),
+		Name:       self.Name(),
+		Replicated: self.Replicated(),
+		Date:       self.Date(),
 	}
 }
 
-func (s *snapshot) Name() string { return s.fsv.Name }
-
-func (s *snapshot) Replicated() bool { return s.replicated }
-
-func (s *snapshot) Date() time.Time { return s.date }
+func (self *snapshot) Name() string     { return self.fsv.Name }
+func (sels *snapshot) Replicated() bool { return sels.replicated }
+func (self *snapshot) Date() time.Time  { return self.date }

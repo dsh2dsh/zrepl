@@ -81,7 +81,7 @@ func (f *fs) Report() FSReport {
 
 func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	sender Sender, needsReplicated bool,
-) {
+) error {
 	ctx := a.ctx
 	l := GetLogger(ctx).With(slog.String("fs", tfs.Path))
 	l.Debug("plan filesystem")
@@ -98,7 +98,7 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	tfsvsres, err := target.ListFilesystemVersions(ctx, &req)
 	if err != nil {
 		pfsPlanErrAndLog(err, "cannot list filesystem versions")
-		return
+		return nil
 	}
 	tfsvs := tfsvsres.GetVersions()
 	// no progress here since we could run in a live-lock (must have used target
@@ -118,12 +118,12 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 		resp, err := sender.ReplicationCursor(ctx, &req)
 		if err != nil {
 			pfsPlanErrAndLog(err, "cannot get replication cursor bookmark")
-			return
+			return nil
 		} else if resp.GetNotexist() {
 			err := errors.New(
 				"replication cursor bookmark does not exist (one successful replication is required before pruning works)")
 			pfsPlanErrAndLog(err, "")
-			return
+			return nil
 		}
 		cursorGuid = resp.GetGuid()
 		beforeCursor = containsGuid(tfsvs, cursorGuid)
@@ -137,7 +137,7 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 		if err != nil {
 			err := fmt.Errorf("%s: %w", tfsv.RelName(), err)
 			pfsPlanErrAndLog(err, "fs version with invalid creation date")
-			return
+			return nil
 		}
 		s := &snapshot{date: creation, fsv: tfsv}
 		// note that we cannot use CreateTXG because target and receiver could be
@@ -154,9 +154,10 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	if needsReplicated && beforeCursor {
 		err := errors.New("prune target has no snapshot that corresponds to sender replication cursor bookmark")
 		pfsPlanErrAndLog(err, "")
-		return
+		return nil
 	}
 
 	// Apply prune rules
 	self.destroyList = pruning.PruneSnapshots(ctx, self.snaps, a.rules)
+	return nil
 }

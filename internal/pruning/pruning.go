@@ -40,7 +40,6 @@ func PruneSnapshots(ctx context.Context, snaps []Snapshot, keepRules []KeepRule,
 			remove = append(remove, snap)
 		}
 	}
-
 	return remove
 }
 
