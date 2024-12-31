@@ -29,8 +29,7 @@ func destroySnapshots(ctx context.Context, concurrency, fsCount int,
 
 	fsRes := make([]pdu.DestroyedSnapshots, 0, fsCount)
 	for r, err := range reqs {
-		fs, snaps := r.Filesystem, r.Snapshots
-		fsRes = append(fsRes, pdu.DestroyedSnapshots{Filesystem: fs})
+		fsRes = append(fsRes, pdu.DestroyedSnapshots{Filesystem: r.Filesystem})
 		destroyed := &fsRes[len(fsRes)-1]
 		if ctx.Err() != nil {
 			destroyed.Error = context.Cause(ctx).Error()
@@ -40,7 +39,7 @@ func destroySnapshots(ctx context.Context, concurrency, fsCount int,
 			continue
 		}
 		g.Go(func() error {
-			failed, err := destroyOneSnapshots(ctx, fs, snaps)
+			failed, err := destroyOneSnapshots(ctx, r.LocalPath(), r.Snapshots)
 			if err != nil {
 				destroyed.Error = err.Error()
 			} else if len(failed) != 0 {

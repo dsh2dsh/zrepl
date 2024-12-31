@@ -255,6 +255,19 @@ type DestroySnapshotsReq struct {
 type DestroySnapshots struct {
 	Filesystem string   `json:"Filesystem,omitempty"`
 	Snapshots  []string `json:"Snapshots,omitempty"`
+
+	localPath string
+}
+
+func (self *DestroySnapshots) LocalPath() string {
+	if self.localPath != "" {
+		return self.localPath
+	}
+	return self.Filesystem
+}
+
+func (self *DestroySnapshots) SetLocalPath(lp string) {
+	self.localPath = lp
 }
 
 type DestroySnapshotsRes struct {

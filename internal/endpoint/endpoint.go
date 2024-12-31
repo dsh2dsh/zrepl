@@ -1079,7 +1079,10 @@ func (s *Receiver) DestroySnapshots(ctx context.Context,
 	iter := func(yield func(*pdu.DestroySnapshots, error) bool) {
 		for i := range req.Filesystems {
 			r := &req.Filesystems[i]
-			_, err := mapToLocal(clientRoot, r.Filesystem)
+			lp, err := mapToLocal(clientRoot, r.Filesystem)
+			if err == nil {
+				r.SetLocalPath(lp.ToString())
+			}
 			if !yield(r, err) {
 				return
 			}
