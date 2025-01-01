@@ -66,16 +66,11 @@ func (f *fs) Report() FSReport {
 		r.LastError = f.execErrLast.Error()
 	}
 
-	r.SnapshotList = make([]SnapshotReport, len(f.snaps))
-	for i, snap := range f.snaps {
-		r.SnapshotList[i] = snap.(*snapshot).Report()
+	r.SnapshotsCount = len(f.snaps)
+	r.DestroysCount = len(f.destroyList)
+	if len(f.destroyList) != 0 {
+		r.PendingDestroy = f.destroyList[0].(*snapshot).Report()
 	}
-
-	r.DestroyList = make([]SnapshotReport, len(f.destroyList))
-	for i, snap := range f.destroyList {
-		r.DestroyList[i] = snap.(*snapshot).Report()
-	}
-
 	return r
 }
 

@@ -149,13 +149,14 @@ func (self *JobRender) viewPrunerFsStatus(fs *pruner.FSReport, completed bool,
 
 	if completed {
 		return fmt.Sprintf("%s (destroy %d of %d snapshots)",
-			checkMarkDone, len(fs.DestroyList), len(fs.SnapshotList))
+			checkMarkDone, fs.DestroysCount, fs.SnapshotsCount)
 	}
 
-	if len(fs.DestroyList) == 1 {
+	if fs.DestroysCount == 1 {
 		return fmt.Sprintf("%sPending %s", hourglassNotDone,
-			fs.DestroyList[0].Name)
+			fs.PendingDestroy.Name)
 	}
+
 	return fmt.Sprintf("%sPending (destroy %d of %d snapshots)",
-		hourglassNotDone, len(fs.DestroyList), len(fs.SnapshotList))
+		hourglassNotDone, fs.DestroysCount, fs.SnapshotsCount)
 }

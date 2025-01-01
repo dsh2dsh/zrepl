@@ -10,10 +10,12 @@ type Report struct {
 }
 
 type FSReport struct {
-	Filesystem                string
-	SnapshotList, DestroyList []SnapshotReport
-	SkipReason                FSSkipReason
-	LastError                 string
+	Filesystem     string
+	SnapshotsCount int
+	DestroysCount  int
+	PendingDestroy SnapshotReport
+	SkipReason     FSSkipReason
+	LastError      string
 }
 
 type SnapshotReport struct {
@@ -44,12 +46,12 @@ func (self *Report) Running() (d time.Duration, ok bool) {
 func (self *Report) Progress() (expected, completed uint64) {
 	for i := range self.Pending {
 		fs := &self.Pending[i]
-		expected += uint64(len(fs.DestroyList))
+		expected += uint64(fs.DestroysCount)
 	}
 	for i := range self.Completed {
 		fs := &self.Completed[i]
-		expected += uint64(len(fs.DestroyList))
-		completed += uint64(len(fs.DestroyList))
+		expected += uint64(fs.DestroysCount)
+		completed += uint64(fs.DestroysCount)
 	}
 	return
 }
