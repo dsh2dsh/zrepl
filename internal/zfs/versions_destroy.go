@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"syscall"
 )
@@ -82,7 +83,7 @@ func tryBatch(ctx context.Context, fs string, batch []*DestroySnapOp) error {
 // fsbatch must be on same filesystem
 func doDestroyBatched(ctx context.Context, fs string, fsbatch []*DestroySnapOp,
 ) {
-	if len(fsbatch) <= 1 {
+	if len(fsbatch) < 2 {
 		doDestroySeq(ctx, fs, fsbatch)
 		return
 	}
@@ -94,9 +95,9 @@ func doDestroyBatched(ctx context.Context, fs string, fsbatch []*DestroySnapOp,
 			// See TestExcessiveArgumentsResultInE2BIG. Try halving batch size,
 			// assuming snapshots names are roughly the same length.
 			debug("batch destroy: E2BIG encountered: %s", err)
-			middle := len(fsbatch) / 2
-			doDestroyBatched(ctx, fs, fsbatch[:middle])
-			doDestroyBatched(ctx, fs, fsbatch[middle:])
+			for chunk := range slices.Chunk(fsbatch, len(fsbatch)/2) {
+				doDestroyBatched(ctx, fs, chunk)
+			}
 			return
 		}
 	} else {
