@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 )
 
 func TestCreateTXGRange(t *testing.T) {
@@ -202,10 +204,10 @@ func TestCreateTXGRange(t *testing.T) {
 			require.NotEmpty(t, tc.expectString)
 			assert.Equal(t, tc.expectString, tc.config.String())
 
-			save := createTXGRangeBoundAllowCreateTXG0
-			createTXGRangeBoundAllowCreateTXG0 = tc.configAllowZeroCreateTXG
+			save := env.Values.CreatetxgRangeBoundAllow
+			env.Values.CreatetxgRangeBoundAllow = tc.configAllowZeroCreateTXG
 			defer func() {
-				createTXGRangeBoundAllowCreateTXG0 = save
+				env.Values.CreatetxgRangeBoundAllow = save
 			}()
 
 			if tc.expectInvalid {

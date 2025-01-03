@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
@@ -23,9 +23,9 @@ func validateNotEmpty(field, s string) error {
 
 // returned err != nil is guaranteed to represent invalid hold tag
 func ValidHoldTag(tag string) error {
-	maxlen := envconst.Int("ZREPL_ZFS_MAX_HOLD_TAG_LEN", 256-1) // 256 include NULL byte, from module/zfs/dsl_userhold.c
-	if len(tag) > maxlen {
-		return fmt.Errorf("hold tag %q exceeds max length of %d", tag, maxlen)
+	maxLen := env.Values.ZFSMaxHoldTagLen
+	if len(tag) > maxLen {
+		return fmt.Errorf("hold tag %q exceeds max length of %d", tag, maxLen)
 	}
 	return nil
 }

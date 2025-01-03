@@ -3,6 +3,7 @@ module github.com/dsh2dsh/zrepl
 go 1.23
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.2.4
 	github.com/charmbracelet/lipgloss v1.0.0

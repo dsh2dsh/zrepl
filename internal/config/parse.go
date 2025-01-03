@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/creasty/defaults"
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )
@@ -56,6 +57,8 @@ func ParseConfigBytes(path string, bytes []byte, opts ...Option,
 		return nil, fmt.Errorf("config: %w", err)
 	} else if err := Validator().Struct(c); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
+	} else if err := env.Parse(); err != nil {
+		return nil, err
 	}
 	return c, nil
 }

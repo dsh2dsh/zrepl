@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/dsh2dsh/zrepl/internal/pruning"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 )
 
 func NewLocalPrunerFactory(in config.PruningLocal,
@@ -35,8 +35,7 @@ func NewLocalPrunerFactory(in config.PruningLocal,
 		keepRules:     rules,
 		promPruneSecs: promPruneSecs,
 
-		retryWait: envconst.Duration(
-			"ZREPL_PRUNER_RETRY_INTERVAL", 10*time.Second),
+		retryWait: env.Values.PrunerRetryInterval,
 	}
 	return f, nil
 }
@@ -97,8 +96,7 @@ func NewPrunerFactory(in config.PruningSenderReceiver,
 		receiverRules: keepRulesReceiver,
 		promPruneSecs: promPruneSecs,
 
-		retryWait: envconst.Duration(
-			"ZREPL_PRUNER_RETRY_INTERVAL", 10*time.Second),
+		retryWait: env.Values.PrunerRetryInterval,
 
 		considerSnapAtCursorReplicated: considerSnapAtCursorReplicated,
 	}

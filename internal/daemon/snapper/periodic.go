@@ -14,12 +14,12 @@ import (
 	"github.com/dsh2dsh/cron/v3"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
 	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -253,9 +253,6 @@ func periodicStateSnapshot(a periodicArgs, u updater) state {
 	}).sf()
 }
 
-var syncUpWarnNoSnapshotUntilSyncupMinDuration = envconst.Duration(
-	"ZREPL_SNAPPER_SYNCUP_WARN_MIN_DURATION", 1*time.Second)
-
 // see docs/snapshotting.rst
 func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 	interval time.Duration,
@@ -327,7 +324,7 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 	winnerSyncPoint := snaptimes[0].time
 	l := getLogger(ctx).With(slog.String("syncPoint", winnerSyncPoint.String()))
 	l.Info("determined sync point")
-	if winnerSyncPoint.Sub(now) > syncUpWarnNoSnapshotUntilSyncupMinDuration {
+	if winnerSyncPoint.Sub(now) > env.Values.SnapperSyncUpWarnMin {
 		for _, st := range snaptimes {
 			if st.prio == prioNoVersions {
 				l.With(slog.String("fs", st.ds.ToString())).Warn(

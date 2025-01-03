@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
@@ -13,7 +12,6 @@ type Status struct {
 
 type GlobalStatus struct {
 	ZFSCmds   *zfscmd.Report
-	Envconst  *envconst.Report
 	OsEnviron []string
 }
 

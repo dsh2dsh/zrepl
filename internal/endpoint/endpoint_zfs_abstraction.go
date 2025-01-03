@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -345,10 +345,8 @@ func (q *ListZFSHoldsAndBookmarksQuery) Validate() error {
 	return nil
 }
 
-var createTXGRangeBoundAllowCreateTXG0 = envconst.Bool("ZREPL_ENDPOINT_LIST_ABSTRACTIONS_QUERY_CREATETXG_RANGE_BOUND_ALLOW_0", false)
-
 func (i *CreateTXGRangeBound) Validate() error {
-	if i.CreateTXG == 0 && !createTXGRangeBoundAllowCreateTXG0 {
+	if i.CreateTXG == 0 && !env.Values.CreatetxgRangeBoundAllow {
 		return errors.New("CreateTXG must be non-zero")
 	}
 	return nil

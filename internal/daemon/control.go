@@ -9,7 +9,6 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/middleware"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/version"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -52,7 +51,6 @@ func (j *controlJob) status(_ context.Context) (*Status, error) {
 		Jobs: j.jobs.status(),
 		Global: GlobalStatus{
 			ZFSCmds:   zfscmd.GetReport(),
-			Envconst:  envconst.GetReport(),
 			OsEnviron: os.Environ(),
 		},
 	}

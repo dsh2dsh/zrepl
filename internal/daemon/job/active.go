@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
@@ -20,7 +21,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
-	"github.com/dsh2dsh/zrepl/internal/util/envconst"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -337,11 +337,10 @@ func replicationDriverConfigFromConfig(in *config.Replication) (driver.Config,
 	error,
 ) {
 	c := driver.Config{
-		StepQueueConcurrency: in.Concurrency.Steps,
-		MaxAttempts:          envconst.Int("ZREPL_REPLICATION_MAX_ATTEMPTS", 3),
-		Prefix:               in.Prefix,
-		ReconnectHardFailTimeout: envconst.Duration(
-			"ZREPL_REPLICATION_RECONNECT_HARD_FAIL_TIMEOUT", 10*time.Minute),
+		StepQueueConcurrency:     in.Concurrency.Steps,
+		MaxAttempts:              env.Values.ReplicationMaxAttempts,
+		Prefix:                   in.Prefix,
+		ReconnectHardFailTimeout: env.Values.ReplicationReconnectHardTimeout,
 	}
 	return c, c.Validate()
 }
