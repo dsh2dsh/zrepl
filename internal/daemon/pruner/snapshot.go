@@ -24,5 +24,5 @@ func (self *snapshot) Report() SnapshotReport {
 }
 
 func (self *snapshot) Name() string     { return self.fsv.Name }
-func (sels *snapshot) Replicated() bool { return sels.replicated }
+func (self *snapshot) Replicated() bool { return self.replicated }
 func (self *snapshot) Date() time.Time  { return self.date }

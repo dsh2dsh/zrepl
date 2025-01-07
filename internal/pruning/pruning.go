@@ -18,31 +18,6 @@ type Snapshot interface {
 	Date() time.Time
 }
 
-// The returned snapshot list is guaranteed to only contains elements of input
-// parameter snaps
-func PruneSnapshots(ctx context.Context, snaps []Snapshot, keepRules []KeepRule,
-) []Snapshot {
-	if len(keepRules) == 0 {
-		return []Snapshot{}
-	}
-
-	remCount := make(map[Snapshot]int, len(snaps))
-	for _, r := range keepRules {
-		ruleRems := r.KeepRule(ctx, snaps)
-		for _, ruleRem := range ruleRems {
-			remCount[ruleRem]++
-		}
-	}
-
-	remove := make([]Snapshot, 0, len(snaps))
-	for snap, rc := range remCount {
-		if rc == len(keepRules) {
-			remove = append(remove, snap)
-		}
-	}
-	return remove
-}
-
 func RulesFromConfig(in []config.PruningEnum) (rules []KeepRule, err error) {
 	rules = make([]KeepRule, len(in))
 	for i := range in {
@@ -67,4 +42,28 @@ func RuleFromConfig(in config.PruningEnum) (KeepRule, error) {
 	default:
 		return nil, fmt.Errorf("unknown keep rule type %T", v)
 	}
+}
+
+// The returned snapshot list is guaranteed to only contains elements of input
+// parameter snaps
+func PruneSnapshots(ctx context.Context, snaps []Snapshot, keepRules []KeepRule,
+) []Snapshot {
+	if len(keepRules) == 0 {
+		return []Snapshot{}
+	}
+
+	remCount := make(map[Snapshot]int, len(snaps))
+	for _, r := range keepRules {
+		for _, s := range r.KeepRule(ctx, snaps) {
+			remCount[s]++
+		}
+	}
+
+	destroy := make([]Snapshot, 0, len(snaps))
+	for _, s := range snaps {
+		if cnt, ok := remCount[s]; ok && cnt == len(keepRules) {
+			destroy = append(destroy, s)
+		}
+	}
+	return destroy
 }

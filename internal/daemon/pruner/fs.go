@@ -29,7 +29,8 @@ type fs struct {
 	snaps []pruning.Snapshot
 	// destroy list returned by pruning.PruneSnapshots(snaps)
 	// (type snapshot)
-	destroyList []pruning.Snapshot
+	destroyList  []string
+	destroyCount int
 
 	mtx sync.RWMutex
 
@@ -67,9 +68,9 @@ func (f *fs) Report() FSReport {
 	}
 
 	r.SnapshotsCount = len(f.snaps)
-	r.DestroysCount = len(f.destroyList)
+	r.DestroysCount = f.destroyCount
 	if len(f.destroyList) != 0 {
-		r.PendingDestroy = f.destroyList[0].(*snapshot).Report()
+		r.PendingDestroy = f.destroyList[0]
 	}
 	return r
 }
@@ -153,6 +154,49 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	}
 
 	// Apply prune rules
-	self.destroyList = pruning.PruneSnapshots(ctx, self.snaps, a.rules)
+	destroy := pruning.PruneSnapshots(ctx, self.snaps, a.rules)
+	self.destroyCount = len(destroy)
+	self.destroyList = snapshotRanges(self.snaps, destroy)
 	return nil
+}
+
+func snapshotRanges(snapshots []pruning.Snapshot, destroy []pruning.Snapshot,
+) []string {
+	names := make([]string, 0, len(destroy))
+	var lastIdx int
+	var r [2]int
+
+	commitRange := func() {
+		s1, s2 := snapshots[r[0]], snapshots[r[1]]
+		switch {
+		case r[1] == r[0]+1:
+			names = append(names, s1.Name(), s2.Name())
+		case r[1] > r[0]:
+			names = append(names, s1.Name()+"%"+s2.Name())
+		default:
+			names = append(names, s1.Name())
+		}
+	}
+
+	for _, s := range destroy {
+		i := slices.IndexFunc(snapshots[lastIdx:],
+			func(s2 pruning.Snapshot) bool { return s2.Name() == s.Name() })
+		if lastIdx == 0 {
+			r[0] = lastIdx + i
+			lastIdx = r[0] + 1
+			continue
+		} else if i == 0 {
+			r[1] = lastIdx
+			lastIdx++
+			continue
+		}
+		commitRange()
+		r = [2]int{lastIdx + i, 0}
+		lastIdx = r[0] + 1
+	}
+
+	if lastIdx > 0 {
+		commitRange()
+	}
+	return names
 }

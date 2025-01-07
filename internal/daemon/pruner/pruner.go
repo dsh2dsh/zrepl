@@ -303,16 +303,11 @@ func makeExecQueue(ctx context.Context, p *Pruner, pfss []*fs,
 		}
 		destroyList := make([]string, len(pfs.destroyList))
 		for i := range pfs.destroyList {
-			s := pfs.destroyList[i].(*snapshot).fsv
-			if s.Type != pdu.FilesystemVersion_Snapshot {
-				err := fmt.Errorf("version %q is not a snapshot", s.Name)
-				p.execQueue.Put(pfs, err, false)
-				continue
-			}
-			destroyList[i] = s.Name
+			destroyName := pfs.destroyList[i]
+			destroyList[i] = destroyName
 			l.With(
 				slog.String("fs", pfs.path),
-				slog.String("destroy_snap", s.Name),
+				slog.String("destroy_snap", destroyName),
 			).Debug("policy destroys snapshot")
 		}
 		req.Filesystems = append(req.Filesystems, pdu.DestroySnapshots{

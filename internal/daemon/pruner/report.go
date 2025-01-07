@@ -13,7 +13,7 @@ type FSReport struct {
 	Filesystem     string
 	SnapshotsCount int
 	DestroysCount  int
-	PendingDestroy SnapshotReport
+	PendingDestroy string
 	SkipReason     FSSkipReason
 	LastError      string
 }
