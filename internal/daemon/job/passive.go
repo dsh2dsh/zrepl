@@ -75,7 +75,10 @@ func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 	jobID endpoint.JobID,
 ) (m *modeSource, err error) {
 	// FIXME exact dedup of modePush
-	m = &modeSource{pruneConcurrency: int(in.Pruning.Concurrency)}
+	m = &modeSource{
+		drySendConcurrency: int(in.Replication.Concurrency.SizeEstimates),
+		pruneConcurrency:   int(in.Pruning.Concurrency),
+	}
 	if m.senderConfig, err = buildSenderConfig(in, jobID); err != nil {
 		return nil, fmt.Errorf("send options: %w", err)
 	}
@@ -91,7 +94,8 @@ type modeSource struct {
 	senderConfig *endpoint.SenderConfig
 	snapper      snapper.Snapper
 
-	pruneConcurrency int
+	drySendConcurrency int
+	pruneConcurrency   int
 }
 
 var _ passiveMode = (*modeSource)(nil)
@@ -100,6 +104,7 @@ func (m *modeSource) Type() Type { return TypeSource }
 
 func (m *modeSource) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewSender(*m.senderConfig).
+		WithDrySendConcurrency(m.drySendConcurrency).
 		WithPruneConcurrency(m.pruneConcurrency)
 }
 

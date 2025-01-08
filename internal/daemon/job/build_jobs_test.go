@@ -265,7 +265,9 @@ jobs:
     concurrency:
       size_estimates: 0
 `,
-			expectError: true,
+			expectOk: func(t *testing.T, a *ActiveSide, m *modePush) {
+				assert.Zero(t, m.drySendConcurrency)
+			},
 		},
 		{
 			name: "custom_values",
@@ -277,7 +279,7 @@ jobs:
 `,
 			expectOk: func(t *testing.T, a *ActiveSide, m *modePush) {
 				assert.Equal(t, 23, a.replicationDriverConfig.StepQueueConcurrency)
-				assert.Equal(t, 42, m.plannerPolicy.SizeEstimationConcurrency)
+				assert.Equal(t, 42, m.drySendConcurrency)
 			},
 		},
 		{

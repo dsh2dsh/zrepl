@@ -57,7 +57,8 @@ type Sender struct {
 	jobId    JobID
 	config   SenderConfig
 
-	pruneConcurrency int
+	drySendConcurrency int
+	pruneConcurrency   int
 }
 
 func NewSender(conf SenderConfig) *Sender {
@@ -70,6 +71,11 @@ func NewSender(conf SenderConfig) *Sender {
 		jobId:    conf.JobID,
 		config:   conf,
 	}
+	return s
+}
+
+func (s *Sender) WithDrySendConcurrency(n int) *Sender {
+	s.drySendConcurrency = n
 	return s
 }
 
@@ -406,7 +412,11 @@ func (s *Sender) SendDry(ctx context.Context, req *pdu.SendDryReq,
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(min(len(req.Items), req.Concurrency))
+	concurrency := s.drySendConcurrency
+	if concurrency < 1 {
+		concurrency = runtime.GOMAXPROCS(0)
+	}
+	g.SetLimit(concurrency)
 
 	resp := &pdu.SendDryRes{Items: make([]pdu.SendRes, len(req.Items))}
 	for i := range req.Items {

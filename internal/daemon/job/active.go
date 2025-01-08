@@ -117,7 +117,10 @@ type activeMode interface {
 func modePushFromConfig(g *config.Global, in *config.PushJob,
 	jobID endpoint.JobID,
 ) (*modePush, error) {
-	m := &modePush{pruneConcurrency: int(in.Pruning.Concurrency)}
+	m := &modePush{
+		drySendConcurrency: int(in.Replication.Concurrency.SizeEstimates),
+		pruneConcurrency:   int(in.Pruning.Concurrency),
+	}
 	var err error
 	m.senderConfig, err = buildSenderConfig(in, jobID)
 	if err != nil {
@@ -137,9 +140,8 @@ func modePushFromConfig(g *config.Global, in *config.PushJob,
 	}
 
 	m.plannerPolicy = &logic.PlannerPolicy{
-		ConflictResolution:        conflictResolution,
-		ReplicationConfig:         replicationConfig,
-		SizeEstimationConcurrency: in.Replication.Concurrency.SizeEstimates,
+		ConflictResolution: conflictResolution,
+		ReplicationConfig:  replicationConfig,
 	}
 	if err := m.plannerPolicy.Validate(); err != nil {
 		return nil, fmt.Errorf("cannot build planner policy: %w", err)
@@ -174,7 +176,8 @@ type modePush struct {
 	snapper       snapper.Snapper
 	cronSpec      string
 
-	pruneConcurrency int
+	drySendConcurrency int
+	pruneConcurrency   int
 }
 
 var _ activeMode = (*modePush)(nil)
@@ -194,6 +197,7 @@ func (m *modePush) ConnectEndpoints(ctx context.Context, cn Connected) {
 
 	m.receiver = cn.Endpoint()
 	m.sender = endpoint.NewSender(*m.senderConfig).
+		WithDrySendConcurrency(m.drySendConcurrency).
 		WithPruneConcurrency(m.pruneConcurrency)
 }
 
@@ -324,9 +328,8 @@ func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 	}
 
 	m.plannerPolicy = &logic.PlannerPolicy{
-		ConflictResolution:        conflictResolution,
-		ReplicationConfig:         replicationConfig,
-		SizeEstimationConcurrency: in.Replication.Concurrency.SizeEstimates,
+		ConflictResolution: conflictResolution,
+		ReplicationConfig:  replicationConfig,
 	}
 	if err := m.plannerPolicy.Validate(); err != nil {
 		return nil, fmt.Errorf("cannot build planner policy: %w", err)

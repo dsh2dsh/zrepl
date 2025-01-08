@@ -238,8 +238,8 @@ type ReplicationOptionsProtection struct {
 }
 
 type ReplicationOptionsConcurrency struct {
-	Steps         int `yaml:"steps" default:"1" validate:"min=1"`
-	SizeEstimates int `yaml:"size_estimates" default:"4" validate:"min=1"`
+	Steps         int  `yaml:"steps" default:"1" validate:"min=1"`
+	SizeEstimates uint `yaml:"size_estimates"`
 }
 
 type PropertyRecvOptions struct {
@@ -315,6 +315,7 @@ func (j *SinkJob) GetRecvOptions() *RecvOptions  { return &j.Recv }
 
 type SourceJob struct {
 	PassiveJob   `yaml:",inline"`
+	Replication  Replication       `yaml:"replication"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
 	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
 	Datasets     []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`

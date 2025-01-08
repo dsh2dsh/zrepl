@@ -474,10 +474,7 @@ func (fs *Filesystem) needReceiverVersions() bool {
 
 func (fs *Filesystem) updateSizeEstimates(ctx context.Context, steps []*Step,
 ) error {
-	req := pdu.SendDryReq{
-		Items:       make([]pdu.SendReq, len(steps)),
-		Concurrency: fs.policy.SizeEstimationConcurrency,
-	}
+	req := pdu.SendDryReq{Items: make([]pdu.SendReq, len(steps))}
 	for i, s := range steps {
 		req.Items[i] = s.buildSendRequest()
 	}

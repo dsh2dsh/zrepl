@@ -59,9 +59,8 @@ func ConflictResolutionFromConfig(in *config.ConflictResolution) (*ConflictResol
 }
 
 type PlannerPolicy struct {
-	ConflictResolution        *ConflictResolution    `validate:"required"`
-	ReplicationConfig         *pdu.ReplicationConfig `validate:"required"`
-	SizeEstimationConcurrency int                    `validate:"gte=1"`
+	ConflictResolution *ConflictResolution    `validate:"required"`
+	ReplicationConfig  *pdu.ReplicationConfig `validate:"required"`
 }
 
 func (p PlannerPolicy) Validate() error {
