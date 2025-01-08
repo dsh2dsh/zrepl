@@ -117,7 +117,7 @@ type activeMode interface {
 func modePushFromConfig(g *config.Global, in *config.PushJob,
 	jobID endpoint.JobID,
 ) (*modePush, error) {
-	m := &modePush{}
+	m := &modePush{pruneConcurrency: int(in.Pruning.Concurrency)}
 	var err error
 	m.senderConfig, err = buildSenderConfig(in, jobID)
 	if err != nil {
@@ -173,6 +173,8 @@ type modePush struct {
 	plannerPolicy *logic.PlannerPolicy
 	snapper       snapper.Snapper
 	cronSpec      string
+
+	pruneConcurrency int
 }
 
 var _ activeMode = (*modePush)(nil)
@@ -191,7 +193,8 @@ func (m *modePush) ConnectEndpoints(ctx context.Context, cn Connected) {
 	).Info("connect to receiver")
 
 	m.receiver = cn.Endpoint()
-	m.sender = endpoint.NewSender(*m.senderConfig)
+	m.sender = endpoint.NewSender(*m.senderConfig).
+		WithPruneConcurrency(m.pruneConcurrency)
 }
 
 func (m *modePush) DisconnectEndpoints() {
@@ -240,6 +243,8 @@ type modePull struct {
 	sender         Endpoint
 	plannerPolicy  *logic.PlannerPolicy
 	cronSpec       string
+
+	pruneConcurrency int
 }
 
 var _ activeMode = (*modePull)(nil)
@@ -256,7 +261,8 @@ func (m *modePull) ConnectEndpoints(ctx context.Context, cn Connected) {
 		slog.String("from", cn.Name()),
 	).Info("connect to sender")
 
-	m.receiver = endpoint.NewReceiver(m.receiverConfig)
+	m.receiver = endpoint.NewReceiver(m.receiverConfig).
+		WithPruneConcurrency(m.pruneConcurrency)
 	m.sender = cn.Endpoint()
 }
 
@@ -297,7 +303,7 @@ func modePullFromConfig(in *config.PullJob, jobID endpoint.JobID,
 		return nil, fmt.Errorf("pull job %q cannot use local connect", jobID)
 	}
 
-	m = &modePull{}
+	m = &modePull{pruneConcurrency: int(in.Pruning.Concurrency)}
 	if cronSpec := in.CronSpec(); cronSpec != "" {
 		if _, err := cron.ParseStandard(cronSpec); err != nil {
 			return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)

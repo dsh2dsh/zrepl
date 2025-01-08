@@ -24,7 +24,7 @@ import (
 func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob,
 	err error,
 ) {
-	j = &SnapJob{}
+	j = &SnapJob{pruneConcurrency: int(in.Pruning.Concurrency)}
 	fsf, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
@@ -64,6 +64,8 @@ type SnapJob struct {
 
 	prunerMtx sync.Mutex
 	pruner    *pruner.Pruner
+
+	pruneConcurrency int
 }
 
 var _ Job = (*SnapJob)(nil)
@@ -215,7 +217,7 @@ func (j *SnapJob) prune(ctx context.Context) {
 		// because the endpoint is only used as pruner.Target.
 		// However, the implementation requires them to be set.
 		Encrypt: true,
-	})
+	}).WithPruneConcurrency(j.pruneConcurrency)
 
 	localSender := NewLocalSender(ctx, sender)
 	pruner := j.prunerFactory.BuildLocalPruner(ctx, localSender, localSender)

@@ -554,6 +554,10 @@ pkg install zrepl-dsh2dsh
           concurrency: 1
     ```
 
+    That `concurrency` can be defined on both sides: local and remote. One side
+    uses it to limit concurrent `zfs list` and other side uses `concurrency`
+    from their config to limit concurrent `zfs destroy`.
+
   * Job configurations can be included from multiple files:
 
     ```yaml

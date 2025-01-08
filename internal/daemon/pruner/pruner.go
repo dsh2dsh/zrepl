@@ -193,7 +193,7 @@ func doOneAttempt(a *args, u updater) {
 		return
 	}
 
-	req := pdu.DestroySnapshotsReq{Concurrency: a.concurrency}
+	req := pdu.DestroySnapshotsReq{}
 	u(func(p *Pruner) {
 		makeExecQueue(a.ctx, p, pfss, &req)
 		p.state = Exec

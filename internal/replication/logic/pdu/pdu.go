@@ -248,7 +248,6 @@ func (x *SendCompletedReq) GetOriginalReq() *SendReq {
 }
 
 type DestroySnapshotsReq struct {
-	Concurrency int                `json:"Concurrency,omitempty"`
 	Filesystems []DestroySnapshots `json:"Filesystems,omitempty"`
 }
 

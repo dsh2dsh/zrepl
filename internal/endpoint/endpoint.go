@@ -56,6 +56,8 @@ type Sender struct {
 	FSFilter zfs.DatasetFilter
 	jobId    JobID
 	config   SenderConfig
+
+	pruneConcurrency int
 }
 
 func NewSender(conf SenderConfig) *Sender {
@@ -68,6 +70,11 @@ func NewSender(conf SenderConfig) *Sender {
 		jobId:    conf.JobID,
 		config:   conf,
 	}
+	return s
+}
+
+func (s *Sender) WithPruneConcurrency(n int) *Sender {
+	s.pruneConcurrency = n
 	return s
 }
 
@@ -442,10 +449,10 @@ func (s *Sender) zfsSendDry(ctx context.Context, r *pdu.SendReq,
 	return
 }
 
-func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
+func (s *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
 ) error {
 	orig := r.GetOriginalReq() // may be nil, always use proto getters
-	fsp, err := p.filterCheckFS(orig.GetFilesystem())
+	fsp, err := s.filterCheckFS(orig.GetFilesystem())
 	if err != nil {
 		return err
 	}
@@ -468,7 +475,7 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
 	if err != nil {
 		return err
 	}
-	liveAbs, err := replicationGuaranteeOptions.Strategy(from != nil).SenderPostRecvConfirmed(ctx, p.jobId, fs, to)
+	liveAbs, err := replicationGuaranteeOptions.Strategy(from != nil).SenderPostRecvConfirmed(ctx, s.jobId, fs, to)
 	if err != nil {
 		return err
 	}
@@ -489,37 +496,37 @@ func (p *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
 		AbstractionTentativeReplicationCursorBookmark: true,
 		AbstractionReplicationCursorBookmarkV2:        true,
 	}
-	abstractionsCacheSingleton.TryBatchDestroy(ctx, p.jobId, fs, destroyTypes, keep, nil)
+	abstractionsCacheSingleton.TryBatchDestroy(ctx, s.jobId, fs, destroyTypes, keep, nil)
 
 	return nil
 }
 
-func (p *Sender) DestroySnapshots(ctx context.Context,
+func (s *Sender) DestroySnapshots(ctx context.Context,
 	req *pdu.DestroySnapshotsReq,
 ) (*pdu.DestroySnapshotsRes, error) {
 	iter := func(yield func(*pdu.DestroySnapshots, error) bool) {
 		for i := range req.Filesystems {
 			r := &req.Filesystems[i]
-			_, err := p.filterCheckFS(r.Filesystem)
+			_, err := s.filterCheckFS(r.Filesystem)
 			if !yield(r, err) {
 				return
 			}
 		}
 	}
-	return destroySnapshots(ctx, req.Concurrency, len(req.Filesystems), iter)
+	return destroySnapshots(ctx, s.pruneConcurrency, len(req.Filesystems), iter)
 }
 
-func (p *Sender) WaitForConnectivity(ctx context.Context) error {
-	return nil
-}
+func (*Sender) WaitForConnectivity(ctx context.Context) error { return nil }
 
-func (p *Sender) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCursorReq) (*pdu.ReplicationCursorRes, error) {
-	dp, err := p.filterCheckFS(req.Filesystem)
+func (s *Sender) ReplicationCursor(ctx context.Context,
+	req *pdu.ReplicationCursorReq,
+) (*pdu.ReplicationCursorRes, error) {
+	dp, err := s.filterCheckFS(req.Filesystem)
 	if err != nil {
 		return nil, err
 	}
 
-	cursor, err := GetMostRecentReplicationCursorOfJob(ctx, dp.ToString(), p.jobId)
+	cursor, err := GetMostRecentReplicationCursorOfJob(ctx, dp.ToString(), s.jobId)
 	if err != nil {
 		return nil, err
 	}
@@ -529,8 +536,7 @@ func (p *Sender) ReplicationCursor(ctx context.Context, req *pdu.ReplicationCurs
 	return &pdu.ReplicationCursorRes{Result: &pdu.ReplicationCursorRes_Result{Guid: cursor.Guid}}, nil
 }
 
-func (p *Sender) Receive(ctx context.Context, r *pdu.ReceiveReq,
-	_ io.ReadCloser,
+func (*Sender) Receive(ctx context.Context, r *pdu.ReceiveReq, _ io.ReadCloser,
 ) error {
 	return errors.New("sender does not implement Receive()")
 }
@@ -636,11 +642,16 @@ type Receiver struct {
 	recvParentCreationMtx *chainlock.L
 	clientIdentity        string
 
-	Test_OverrideClientIdentityFunc func() string // for use by platformtest
+	pruneConcurrency int
 }
 
 func (s *Receiver) WithClientIdentity(identity string) *Receiver {
 	s.clientIdentity = identity
+	return s
+}
+
+func (s *Receiver) WithPruneConcurrency(n int) *Receiver {
+	s.pruneConcurrency = n
 	return s
 }
 
@@ -653,8 +664,6 @@ func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
 	switch {
 	case s.clientIdentity != "":
 		clientIdentity = s.clientIdentity
-	case s.Test_OverrideClientIdentityFunc != nil:
-		clientIdentity = s.Test_OverrideClientIdentityFunc()
 	default:
 		identity, ok := ctx.Value(ClientIdentityKey).(string) // no shadow
 		if !ok {
@@ -1088,10 +1097,9 @@ func (s *Receiver) DestroySnapshots(ctx context.Context,
 			}
 		}
 	}
-	return destroySnapshots(ctx, req.Concurrency, len(req.Filesystems), iter)
+	return destroySnapshots(ctx, s.pruneConcurrency, len(req.Filesystems), iter)
 }
 
-func (p *Receiver) SendCompleted(ctx context.Context, _ *pdu.SendCompletedReq,
-) error {
+func (*Receiver) SendCompleted(context.Context, *pdu.SendCompletedReq) error {
 	return nil
 }

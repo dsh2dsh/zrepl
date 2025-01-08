@@ -39,12 +39,16 @@ func modeSinkFromConfig(in *config.SinkJob, jobID endpoint.JobID,
 	if err != nil {
 		return nil, err
 	}
-	m := &modeSink{receiverConfig: c}
+	m := &modeSink{
+		receiverConfig:   c,
+		pruneConcurrency: int(in.Pruning.Concurrency),
+	}
 	return m, nil
 }
 
 type modeSink struct {
-	receiverConfig endpoint.ReceiverConfig
+	receiverConfig   endpoint.ReceiverConfig
+	pruneConcurrency int
 }
 
 var _ passiveMode = (*modeSink)(nil)
@@ -63,14 +67,15 @@ func (m *modeSink) Report() *snapper.Report { return nil }
 
 func (m *modeSink) Endpoint(clientIdentity string) Endpoint {
 	return endpoint.NewReceiver(m.receiverConfig).
-		WithClientIdentity(clientIdentity)
+		WithClientIdentity(clientIdentity).
+		WithPruneConcurrency(m.pruneConcurrency)
 }
 
 func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 	jobID endpoint.JobID,
 ) (m *modeSource, err error) {
 	// FIXME exact dedup of modePush
-	m = &modeSource{}
+	m = &modeSource{pruneConcurrency: int(in.Pruning.Concurrency)}
 	if m.senderConfig, err = buildSenderConfig(in, jobID); err != nil {
 		return nil, fmt.Errorf("send options: %w", err)
 	}
@@ -85,6 +90,8 @@ func modeSourceFromConfig(g *config.Global, in *config.SourceJob,
 type modeSource struct {
 	senderConfig *endpoint.SenderConfig
 	snapper      snapper.Snapper
+
+	pruneConcurrency int
 }
 
 var _ passiveMode = (*modeSource)(nil)
@@ -92,7 +99,8 @@ var _ passiveMode = (*modeSource)(nil)
 func (m *modeSource) Type() Type { return TypeSource }
 
 func (m *modeSource) Endpoint(clientIdentity string) Endpoint {
-	return endpoint.NewSender(*m.senderConfig)
+	return endpoint.NewSender(*m.senderConfig).
+		WithPruneConcurrency(m.pruneConcurrency)
 }
 
 func (m *modeSource) Cron() string { return m.snapper.Cron() }

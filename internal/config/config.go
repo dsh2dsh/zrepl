@@ -177,6 +177,7 @@ type PassiveJob struct {
 	Type             string           `yaml:"type" validate:"required"`
 	Name             string           `yaml:"name" validate:"required"`
 	ClientKeys       []string         `yaml:"client_keys" validate:"dive,required"`
+	Pruning          PruningLocal     `yaml:"pruning"`
 	MonitorSnapshots MonitorSnapshots `yaml:"monitor"`
 }
 
