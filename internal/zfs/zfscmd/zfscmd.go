@@ -62,24 +62,36 @@ func (c *Cmd) WithStderrOutput(b []byte) *Cmd {
 }
 
 // err.(*exec.ExitError).Stderr will NOT be set
-func (c *Cmd) CombinedOutput() (o []byte, err error) {
+func (c *Cmd) CombinedOutput() ([]byte, error) {
 	c.startPre()
 	c.startPost(nil)
 	c.waitPre()
-	o, err = c.cmd.CombinedOutput()
+	o, err := c.cmd.CombinedOutput()
 	c.stderrOutput = o
+	err = c.maybeTimeout(err)
 	c.waitPost(err)
-	return
+	return o, err
+}
+
+func (c *Cmd) maybeTimeout(err error) error {
+	if err != nil {
+		if errors.Is(context.Cause(c.ctx), context.DeadlineExceeded) {
+			err = fmt.Errorf("timed out: %w, %w", context.Cause(c.ctx), err)
+		}
+		return err
+	}
+	return nil
 }
 
 // err.(*exec.ExitError).Stderr will be set
-func (c *Cmd) Output() (o []byte, err error) {
+func (c *Cmd) Output() ([]byte, error) {
 	c.startPre()
 	c.startPost(nil)
 	c.waitPre()
-	o, err = c.cmd.Output()
+	o, err := c.cmd.Output()
+	err = c.maybeTimeout(err)
 	c.waitPost(err)
-	return
+	return o, err
 }
 
 //nolint:wrapcheck // not needed
@@ -319,12 +331,5 @@ func (c *Cmd) WaitPipe() error {
 			pipeErr = fmt.Errorf("wait[%d] %q: %w", i, cmd.String(), err)
 		}
 	}
-
-	if pipeErr != nil {
-		if errors.Is(context.Cause(c.ctx), context.DeadlineExceeded) {
-			return fmt.Errorf("timed out: %w", pipeErr)
-		}
-		return pipeErr
-	}
-	return nil
+	return c.maybeTimeout(pipeErr)
 }
