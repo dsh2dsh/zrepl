@@ -7,8 +7,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-type List []*CommandHook
-
 func ListFromConfig(in []config.HookCommand) (List, error) {
 	hl := make(List, len(in))
 	for i, h := range in {
@@ -20,6 +18,10 @@ func ListFromConfig(in []config.HookCommand) (List, error) {
 	}
 	return hl, nil
 }
+
+type List []*CommandHook
+
+func (self List) Slice() []*CommandHook { return []*CommandHook(self) }
 
 func (self List) WithCombinedOutput() List {
 	for _, h := range self {

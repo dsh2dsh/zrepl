@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"slices"
 	"sort"
 	"sync"
@@ -46,6 +47,11 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
 		return nil, fmt.Errorf("hook config error: %w", err)
 	}
 
+	concurrency := int(in.Concurrency)
+	if concurrency < 1 {
+		concurrency = runtime.GOMAXPROCS(0)
+	}
+
 	s := &Periodic{
 		cronSpec: cronSpec,
 		args: periodicArgs{
@@ -56,6 +62,7 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
 				timestampFormat: in.TimestampFormat,
 				timestampLocal:  in.TimestampLocal,
 				hooks:           hookList,
+				concurrency:     concurrency,
 			},
 			// ctx and log is set in Run()
 		},
@@ -117,7 +124,8 @@ func (self *Periodic) Run(ctx context.Context) {
 			err, "failed start snapper")
 	}
 
-	log.Info("start snapper")
+	log.With(slog.Int("concurrency", self.args.planArgs.concurrency)).
+		Info("start snapper")
 	defer log.Info("exiting snapper")
 
 	u := func(u func(*Periodic)) State {

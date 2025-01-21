@@ -590,6 +590,19 @@ pkg install zrepl-dsh2dsh
 
     See also zrepl/zrepl#403
 
+  * Snapshots now created concurrently.
+
+    By default it uses the number of CPUs as concurrency limit and it can be
+    changed in config:
+
+    ```yaml
+    jobs:
+      - name: "zroot-to-zdisk"
+        snapshotting:
+          type: "periodic"
+          concurrency: 1
+    ```
+
 ## Upstream user documentation
 
 **User Documentation** can be found at
