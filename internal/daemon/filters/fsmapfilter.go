@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -15,6 +14,15 @@ const (
 	MapFilterResultOk   = "ok"
 	MapFilterResultOmit = "!"
 )
+
+func NoFilter() (*DatasetFilter, error) {
+	f := New(1)
+	err := f.AddList([]config.DatasetFilter{{Recursive: true}})
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
 
 func NewFromConfig(compatMap map[string]bool, in []config.DatasetFilter,
 ) (*DatasetFilter, error) {
@@ -135,8 +143,8 @@ func (self *DatasetFilter) Filter(p *zfs.DatasetPath) (bool, error) {
 	return lastMapping, nil
 }
 
-func (self *DatasetFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet {
-	datasets := make(zfs.UserSpecifiedDatasetsSet)
+func (self *DatasetFilter) UserSpecifiedDatasets() map[string]bool {
+	datasets := make(map[string]bool)
 	for i := range self.entries {
 		path := self.entries[i].path
 		if path != nil {
@@ -145,11 +153,6 @@ func (self *DatasetFilter) UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet 
 	}
 	return datasets
 }
-
-// Creates a new DatasetMapFilter in filter mode from a mapping. All accepting
-// mapping results are mapped to accepting filter results. All rejecting mapping
-// results are mapped to rejecting filter results.
-func (self *DatasetFilter) AsFilter() endpoint.FSFilter { return self }
 
 func (self *DatasetFilter) Empty() bool { return len(self.entries) == 0 }
 

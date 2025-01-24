@@ -16,6 +16,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/config/env"
+	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
@@ -24,7 +25,8 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
+func periodicFromConfig(fsf *filters.DatasetFilter,
+	in *config.SnapshottingPeriodic,
 ) (*Periodic, error) {
 	if in.Prefix == "" {
 		return nil, errors.New("prefix must not be empty")
@@ -76,7 +78,7 @@ func periodicFromConfig(fsf zfs.DatasetFilter, in *config.SnapshottingPeriodic,
 type periodicArgs struct {
 	ctx      context.Context
 	interval time.Duration
-	fsf      zfs.DatasetFilter
+	fsf      *filters.DatasetFilter
 	planArgs planArgs
 }
 

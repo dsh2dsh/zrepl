@@ -10,7 +10,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/cli"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 var ZFSAbstractionsCmd = &cli.Subcommand{
@@ -142,7 +141,13 @@ func (flag FilesystemsFilterFlag) String() string {
 func (flag FilesystemsFilterFlag) FlagValue() endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter {
 	var z FilesystemsFilterFlag
 	if flag == z {
-		return endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter{Filter: zfs.NoFilter()}
+		f, err := filters.NoFilter()
+		if err != nil {
+			panic(err)
+		}
+		return endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter{
+			Filter: f,
+		}
 	}
 	return flag.F
 }

@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
@@ -26,7 +27,7 @@ import (
 )
 
 type SenderConfig struct {
-	FSF   zfs.DatasetFilter
+	FSF   *filters.DatasetFilter
 	JobID JobID
 
 	ListPlaceholders bool
@@ -53,7 +54,7 @@ func (c *SenderConfig) Validate() error {
 
 // Sender implements replication.ReplicationEndpoint for a sending side
 type Sender struct {
-	FSFilter zfs.DatasetFilter
+	FSFilter *filters.DatasetFilter
 	jobId    JobID
 	config   SenderConfig
 
@@ -549,20 +550,6 @@ func (s *Sender) ReplicationCursor(ctx context.Context,
 func (*Sender) Receive(ctx context.Context, r *pdu.ReceiveReq, _ io.ReadCloser,
 ) error {
 	return errors.New("sender does not implement Receive()")
-}
-
-type FSFilter interface { // FIXME unused
-	Empty() bool
-	Filter(path *zfs.DatasetPath) (pass bool, err error)
-	UserSpecifiedDatasets() zfs.UserSpecifiedDatasetsSet
-}
-
-// FIXME: can we get away without error types here?
-type FSMap interface { // FIXME unused
-	FSFilter
-	Map(path *zfs.DatasetPath) (*zfs.DatasetPath, error)
-	Invert() (FSMap, error)
-	AsFilter() FSFilter
 }
 
 // NOTE: when adding members to this struct, remember

@@ -55,7 +55,7 @@ func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob,
 
 type SnapJob struct {
 	name     endpoint.JobID
-	fsfilter zfs.DatasetFilter
+	fsfilter *filters.DatasetFilter
 	snapper  snapper.Snapper
 
 	prunerFactory *pruner.LocalPrunerFactory

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/config/env"
+	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -323,7 +324,7 @@ type CreateTXGRange struct {
 // FS == nil XOR Filter == nil
 type ListZFSHoldsAndBookmarksQueryFilesystemFilter struct {
 	FS     *string
-	Filter zfs.DatasetFilter
+	Filter *filters.DatasetFilter
 }
 
 func (q *ListZFSHoldsAndBookmarksQuery) Validate() error {

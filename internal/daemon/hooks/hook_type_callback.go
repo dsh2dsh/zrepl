@@ -13,7 +13,7 @@ type HookJobCallback func(ctx context.Context) error
 
 type CallbackHook struct {
 	cb            HookJobCallback
-	filter        zfs.DatasetFilter
+	filter        *filters.DatasetFilter
 	displayString string
 }
 
@@ -27,7 +27,7 @@ func NewCallbackHookForFilesystem(displayString string, fs *zfs.DatasetPath,
 }
 
 func NewCallbackHook(displayString string, cb HookJobCallback,
-	filter zfs.DatasetFilter,
+	filter *filters.DatasetFilter,
 ) *CallbackHook {
 	return &CallbackHook{
 		cb:            cb,
@@ -35,8 +35,6 @@ func NewCallbackHook(displayString string, cb HookJobCallback,
 		displayString: displayString,
 	}
 }
-
-func (h *CallbackHook) Filesystems() zfs.DatasetFilter { return h.filter }
 
 func (h *CallbackHook) ErrIsFatal() bool {
 	return false // callback is by definition

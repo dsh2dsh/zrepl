@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 )
 
 type Type string
@@ -74,7 +74,9 @@ func (self *Report) Progress() (uint64, uint64) {
 	return 0, 0
 }
 
-func FromConfig(g *config.Global, fsf zfs.DatasetFilter, in config.SnapshottingEnum) (Snapper, error) {
+func FromConfig(g *config.Global, fsf *filters.DatasetFilter,
+	in config.SnapshottingEnum,
+) (Snapper, error) {
 	switch v := in.Ret.(type) {
 	case *config.SnapshottingPeriodic:
 		return periodicFromConfig(fsf, v)

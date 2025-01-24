@@ -10,7 +10,6 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 const (
@@ -40,7 +39,7 @@ func NewCommandHook(in *config.HookCommand) (*CommandHook, error) {
 }
 
 type CommandHook struct {
-	filter     zfs.DatasetFilter
+	filter     *filters.DatasetFilter
 	errIsFatal bool
 	command    string
 	timeout    time.Duration
@@ -56,7 +55,9 @@ func (self *CommandHook) WithCombinedOutput() *CommandHook {
 	return self
 }
 
-func (self *CommandHook) Filesystems() zfs.DatasetFilter { return self.filter }
+func (self *CommandHook) Filesystems() *filters.DatasetFilter {
+	return self.filter
+}
 
 func (self *CommandHook) ErrIsFatal() bool { return self.errIsFatal }
 

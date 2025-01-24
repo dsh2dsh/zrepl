@@ -3,6 +3,9 @@ package filters
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -136,6 +139,31 @@ func TestDatasetMapFilter(t *testing.T) {
 				}
 				t.Logf("%-40q  %5v  (exp=%v act=%v)", p, failstr, checkPass, pass)
 			}
+		})
+	}
+}
+
+func TestNoFilter(t *testing.T) {
+	f, err := NoFilter()
+	require.NoError(t, err)
+	require.NotNil(t, f)
+
+	tests := []string{
+		"test/foo/bar/baz",
+		"test/foo/bar",
+		"test/foo",
+		"test",
+	}
+
+	for _, s := range tests {
+		t.Run(s, func(t *testing.T) {
+			path, err := zfs.NewDatasetPath(s)
+			require.NoError(t, err)
+			require.NotNil(t, path)
+
+			ok, err := f.Filter(path)
+			require.NoError(t, err)
+			assert.True(t, ok)
 		})
 	}
 }

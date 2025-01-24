@@ -145,7 +145,7 @@ pkg install zrepl-dsh2dsh
       - name: "source"
         type: "source"
         datasets:
-          - pattern: ""
+          - recursive: true
     ```
 
     The following configuration will allow access to datasets
