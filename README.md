@@ -603,6 +603,39 @@ pkg install zrepl-dsh2dsh
           concurrency: 1
     ```
 
+  * Recursive snapshots `zfs snaphot -r`
+
+    Where possible, snapshots created using `zfs snaphot -r`. With configuration
+    like this:
+
+    ```yaml
+    jobs:
+      - name: "snap-1h"
+        type: "snap"
+        datasets:
+          - pattern: "zroot"
+            recursive: true
+    ```
+
+    `zfs snapshot -r zroot` recursively create snapshots of all descendent
+    datasets, instead of one by one. But if recursive dataset has any exclusion,
+    like this:
+
+    ```yaml
+    jobs:
+      - name: "snap-1h"
+        type: "snap"
+        datasets:
+          - pattern: "zroot"
+            recursive: true
+          - pattern: "zroot/foo"
+            exclude: true
+    ```
+
+    `-r` not used and it create snapshots of all descendent datasets one by one.
+
+    See also zrepl/zrepl#634
+
 ## Upstream user documentation
 
 **User Documentation** can be found at

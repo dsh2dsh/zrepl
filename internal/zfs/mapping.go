@@ -3,12 +3,13 @@ package zfs
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
 type DatasetFilter interface {
-	Filter(p *DatasetPath) (bool, error)
+	Filter2(path *DatasetPath) (*DatasetPath, bool, error)
 	UserSpecifiedDatasets() map[string]bool
 }
 
@@ -26,22 +27,77 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 	if err != nil {
 		return nil, err //nolint:wrapcheck // already wrapped
 	}
-	allDatasets := v.([]*DatasetPath)
+	return deleteUnmatchedDatasets(ctx, filter, v.([]*DatasetPath))
+}
 
-	unmatchedUserSpecifiedDatasets := filter.UserSpecifiedDatasets()
-	datasets := []*DatasetPath{}
-	for _, path := range allDatasets {
-		delete(unmatchedUserSpecifiedDatasets, path.ToString())
-		if ok, err := filter.Filter(path); err != nil {
-			return nil, fmt.Errorf("error calling filter: %w", err)
-		} else if ok {
-			datasets = append(datasets, path)
+func deleteUnmatchedDatasets(ctx context.Context, filter DatasetFilter,
+	datasets []*DatasetPath,
+) ([]*DatasetPath, error) {
+	var filterErr error
+	roots := newRecursiveDatasets()
+	unmatchedDatasets := filter.UserSpecifiedDatasets()
+
+	datasets = slices.DeleteFunc(datasets, func(path *DatasetPath) bool {
+		delete(unmatchedDatasets, path.ToString())
+		if filterErr != nil {
+			return false
+		}
+
+		root, pass, err := filter.Filter2(path)
+		if err != nil {
+			filterErr = fmt.Errorf("error calling filter: %w", err)
+			return false
+		}
+		roots.Add(root, path, pass)
+		return !pass
+	})
+	roots.UpdateChildren()
+
+	prom.ZFSListUnmatchedUserSpecifiedDatasetCount.
+		WithLabelValues(zfscmd.GetJobID(ctx)).
+		Add(float64(len(unmatchedDatasets)))
+	return datasets, filterErr
+}
+
+// --------------------------------------------------
+
+func newRecursiveDatasets() recursiveDatasets {
+	return recursiveDatasets{
+		children: make(map[*DatasetPath][]*DatasetPath),
+		skip:     make(map[*DatasetPath]struct{}),
+	}
+}
+
+type recursiveDatasets struct {
+	children map[*DatasetPath][]*DatasetPath
+	skip     map[*DatasetPath]struct{}
+}
+
+func (self *recursiveDatasets) Add(root *DatasetPath, path *DatasetPath,
+	included bool,
+) {
+	switch {
+	case self.skipped(root):
+	case included:
+		self.children[root] = append(self.children[root], path)
+	default:
+		delete(self.children, root)
+		self.skip[root] = struct{}{}
+	}
+}
+
+func (self *recursiveDatasets) skipped(root *DatasetPath) bool {
+	if root == nil {
+		return true
+	}
+	_, ok := self.skip[root]
+	return ok
+}
+
+func (self *recursiveDatasets) UpdateChildren() {
+	for root, children := range self.children {
+		for _, p := range children {
+			p.SetRecursiveParent(root)
 		}
 	}
-
-	jobid := zfscmd.GetJobIDOrDefault(ctx, "__nojobid")
-	metric := prom.ZFSListUnmatchedUserSpecifiedDatasetCount.
-		WithLabelValues(jobid)
-	metric.Add(float64(len(unmatchedUserSpecifiedDatasets)))
-	return datasets, nil
 }

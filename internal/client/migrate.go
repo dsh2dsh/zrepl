@@ -198,7 +198,9 @@ func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, f
 			continue
 		}
 		if owningJob != nil {
-			return fmt.Errorf("jobs %q and %q both match %q\ncannot attribute replication cursor to either one", owningJob.Name(), job.Name(), fs)
+			return fmt.Errorf(
+				"jobs %q and %q both match %q\ncannot attribute replication cursor to either one",
+				owningJob.Name(), job.Name(), fs.ToString())
 		}
 		owningJob = job
 	}

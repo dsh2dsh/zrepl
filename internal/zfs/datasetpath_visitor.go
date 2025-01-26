@@ -45,7 +45,7 @@ type DatasetPathsVisitor func(v *DatasetPathVisit) (visitChildTree bool)
 func (f *DatasetPathForest) WalkTopDown(visitor DatasetPathsVisitor) {
 	for _, r := range f.roots {
 		r.WalkTopDown(&DatasetPathVisit{
-			Path:     &DatasetPath{nil},
+			Path:     new(DatasetPath),
 			FilledIn: true,
 			Parent:   nil,
 		}, visitor)
@@ -89,7 +89,7 @@ func (t *datasetPathTree) Add(p []string) bool {
 
 func (t *datasetPathTree) WalkTopDown(parent *DatasetPathVisit, visitor DatasetPathsVisitor) {
 	thisVisitPath := parent.Path.Copy()
-	thisVisitPath.Extend(&DatasetPath{[]string{t.Component}})
+	thisVisitPath.Extend(&DatasetPath{comps: []string{t.Component}})
 
 	thisVisit := &DatasetPathVisit{
 		thisVisitPath,

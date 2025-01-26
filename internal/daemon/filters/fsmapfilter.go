@@ -132,15 +132,26 @@ func (self *DatasetFilter) CompatSort() {
 }
 
 func (self *DatasetFilter) Filter(p *zfs.DatasetPath) (bool, error) {
-	var lastMapping bool
+	_, result, err := self.Filter2(p)
+	return result, err
+}
+
+func (self *DatasetFilter) Filter2(p *zfs.DatasetPath) (*zfs.DatasetPath, bool,
+	error,
+) {
+	var recursiveRoot *zfs.DatasetPath
+	var result bool
 	for _, entry := range self.entries {
 		if matched, err := entry.Match(p); err != nil {
-			return false, err
+			return nil, false, err
 		} else if matched {
-			lastMapping = entry.mapping
+			result = entry.mapping
+			if r := entry.RecursiveDataset(); r != nil {
+				recursiveRoot = r
+			}
 		}
 	}
-	return lastMapping, nil
+	return recursiveRoot, result, nil
 }
 
 func (self *DatasetFilter) UserSpecifiedDatasets() map[string]bool {

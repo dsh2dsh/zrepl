@@ -33,12 +33,8 @@ type plan struct {
 }
 
 func makePlan(args planArgs, fss []*zfs.DatasetPath) *plan {
-	snaps := make(map[*zfs.DatasetPath]*progress, len(fss))
-	for _, fs := range fss {
-		snaps[fs] = NewProgress()
-	}
-	p := &plan{snaps: snaps, args: args}
-	return p.init()
+	p := &plan{args: args}
+	return p.init(fss)
 }
 
 type SnapState uint
@@ -64,12 +60,31 @@ func (self SnapState) String() string {
 	return "SnapState(" + strconv.FormatInt(int64(self), 10) + ")"
 }
 
-func (self *plan) init() *plan {
+func (self *plan) init(paths []*zfs.DatasetPath) *plan {
+	self.makeHooksCount()
+	self.makeSnapsProgress(paths)
+	return self
+}
+
+func (self *plan) makeHooksCount() {
 	self.hookMatchCount = make(map[hooks.Hook]int, len(self.args.hooks))
 	for _, h := range self.args.hooks {
 		self.hookMatchCount[h] = 0
 	}
-	return self
+}
+
+func (self *plan) makeSnapsProgress(paths []*zfs.DatasetPath) {
+	for i, p := range paths {
+		if p.RecursiveParent() != nil {
+			paths[i] = p.RecursiveParent()
+		}
+	}
+	paths = slices.Compact(paths)
+
+	self.snaps = make(map[*zfs.DatasetPath]*progress, len(paths))
+	for _, fs := range paths {
+		self.snaps[fs] = NewProgress()
+	}
 }
 
 func (self *plan) snapName() string {
@@ -105,6 +120,7 @@ func (self *plan) execute(ctx context.Context, dryRun bool) bool {
 	for fs, progress := range self.snaps {
 		snapName := self.snapName()
 		ctx := logging.With(ctx, slog.String("fs", fs.ToString()),
+			slog.Bool("recursive", fs.Recursive()),
 			slog.String("snap", snapName))
 
 		hookPlan := self.hookPlan(ctx, fs, snapName)
@@ -158,7 +174,8 @@ func createSnapshot(ctx context.Context, fs *zfs.DatasetPath, snapName string,
 ) error {
 	l := getLogger(ctx)
 	l.Debug("create snapshot")
-	if err := zfs.ZFSSnapshot(ctx, fs, snapName, false); err != nil {
+	err := zfs.ZFSSnapshot(ctx, fs, snapName, fs.Recursive())
+	if err != nil {
 		logger.WithError(l, err, "cannot create snapshot")
 		return err
 	}

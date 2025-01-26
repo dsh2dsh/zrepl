@@ -8,9 +8,10 @@ import (
 	"strings"
 
 	"github.com/creasty/defaults"
-	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
+
+	"github.com/dsh2dsh/zrepl/internal/config/env"
 )
 
 var configFileDefaultLocations = [...]string{

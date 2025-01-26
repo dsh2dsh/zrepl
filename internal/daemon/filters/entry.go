@@ -28,6 +28,9 @@ func (self *filterItem) Init() error {
 			return fmt.Errorf("pattern %q is not a dataset path: %w",
 				self.pattern, err)
 		}
+		if self.recursive {
+			path.SetRecursive()
+		}
 		self.path = path
 	}
 	return nil

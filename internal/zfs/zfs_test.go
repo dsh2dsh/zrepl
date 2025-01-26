@@ -32,17 +32,6 @@ func TestZFSListHandlesProducesZFSErrorOnNonZeroExit(t *testing.T) {
 	assert.Equal(t, "error: this is a mock\n", string(zfsError.Stderr))
 }
 
-func TestDatasetPathTrimNPrefixComps(t *testing.T) {
-	p, err := NewDatasetPath("foo/bar/a/b")
-	require.NoError(t, err)
-	p.TrimNPrefixComps(2)
-	assert.True(t, p.Equal(toDatasetPath("a/b")))
-	p.TrimNPrefixComps((2))
-	assert.True(t, p.Empty())
-	p.TrimNPrefixComps((1))
-	assert.True(t, p.Empty(), "empty trimming shouldn't do harm")
-}
-
 func TestZFSPropertySource(t *testing.T) {
 	tcs := []struct {
 		in  PropertySource

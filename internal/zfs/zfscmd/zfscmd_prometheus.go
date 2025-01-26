@@ -58,7 +58,7 @@ func waitPostPrometheus(c *Cmd, u usage) {
 	// of the ZFS command line. This is not the suitable layer
 	// for such a task.
 
-	jobid := getJobIDOrDefault(c.ctx, "_nojobid")
+	jobid := GetJobID(c.ctx)
 
 	labelValues := []string{jobid, c.cmd.Args[0], c.cmd.Args[1]}
 
