@@ -3,7 +3,6 @@ package zfs
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -18,39 +17,44 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 	props := []string{"name"}
 	cmd := NewListCmd(ctx, props, []string{"-r", "-t", "filesystem,volume"})
 	v, err, _ := sg.Do(cmd.String(), func() (any, error) {
-		datasets, err := listDatasets(ctx, props, nil, cmd)
-		if err != nil {
-			return nil, err
+		datasets := []*DatasetPath{}
+		for fields, err := range ListIter(ctx, props, nil, cmd) {
+			if err != nil {
+				return nil, err
+			}
+			path, err := NewDatasetPath(fields[0])
+			if err != nil {
+				return nil, err
+			}
+			datasets = append(datasets, path)
 		}
 		return datasets, nil
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // already wrapped
 	}
-	return deleteUnmatchedDatasets(ctx, filter, v.([]*DatasetPath))
+	return filterDatasets(ctx, filter, v.([]*DatasetPath))
 }
 
-func deleteUnmatchedDatasets(ctx context.Context, filter DatasetFilter,
-	datasets []*DatasetPath,
+func filterDatasets(ctx context.Context, filter DatasetFilter,
+	all []*DatasetPath,
 ) ([]*DatasetPath, error) {
 	var filterErr error
 	roots := newRecursiveDatasets()
 	unmatchedDatasets := filter.UserSpecifiedDatasets()
 
-	datasets = slices.DeleteFunc(datasets, func(path *DatasetPath) bool {
-		delete(unmatchedDatasets, path.ToString())
-		if filterErr != nil {
-			return false
-		}
-
+	datasets := []*DatasetPath{}
+	for _, path := range all {
 		root, pass, err := filter.Filter2(path)
 		if err != nil {
-			filterErr = fmt.Errorf("error calling filter: %w", err)
-			return false
+			return nil, fmt.Errorf("error calling filter: %w", err)
 		}
 		roots.Add(root, path, pass)
-		return !pass
-	})
+		if pass {
+			datasets = append(datasets, path)
+		}
+		delete(unmatchedDatasets, path.ToString())
+	}
 	roots.UpdateChildren()
 
 	prom.ZFSListUnmatchedUserSpecifiedDatasetCount.

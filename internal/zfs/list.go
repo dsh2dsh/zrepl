@@ -104,24 +104,6 @@ func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {
 	return err
 }
 
-func listDatasets(ctx context.Context, properties []string,
-	notExistHint *DatasetPath, cmd *zfscmd.Cmd,
-) ([]*DatasetPath, error) {
-	datasets := []*DatasetPath{}
-	zfsList := ListIter(ctx, properties, notExistHint, cmd)
-	for fields, err := range zfsList {
-		if err != nil {
-			return nil, err
-		}
-		path, err := NewDatasetPath(fields[0])
-		if err != nil {
-			return nil, err
-		}
-		datasets = append(datasets, path)
-	}
-	return datasets, nil
-}
-
 func listVersions(ctx context.Context, props []string, fs *DatasetPath,
 	cmd *zfscmd.Cmd,
 ) ([]FilesystemVersion, error) {
