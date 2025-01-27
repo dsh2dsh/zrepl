@@ -545,7 +545,7 @@ func TestSendStream_Close_noRead(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cmd := zfscmd.CommandContext(ctx, "jot", "-b", "x", "1024")
+	cmd := zfscmd.CommandContext(ctx, "seq", "1024")
 	var stderrBuf bytes.Buffer
 	pipeReader, err := cmd.PipeTo(nil, nil, &stderrBuf)
 	require.NoError(t, err)
