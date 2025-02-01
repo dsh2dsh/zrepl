@@ -431,6 +431,8 @@ pkg install zrepl-dsh2dsh
 
     sets RPC timeout to 2 minutes and 30 seconds.
 
+    See also zrepl/zrepl#791
+
   * Configurable path to zfs binary ("zfs" by default). Configuration example:
 
     ``` yaml
