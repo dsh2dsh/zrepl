@@ -11,6 +11,7 @@ fi
 : "${daily_zrepl_crit=1h}"
 zrepl="/usr/local/bin/zrepl"
 
+rc=1
 case "$daily_zrepl_enable" in
     [Yy][Ee][Ss])
 	      if service zrepl enabled; then
@@ -22,6 +23,4 @@ case "$daily_zrepl_enable" in
 	      ;;
 esac
 
-# assigned in periodic.conf
-# shellcheck disable=SC2086,SC2154
-exit $rc
+exit "$rc"
