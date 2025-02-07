@@ -42,8 +42,8 @@ type SnapCheck struct {
 	snapName  string
 	failed    bool
 
-	datasets        map[string][]zfs.FilesystemVersion
-	orderedDatasets []string
+	datasets        map[*zfs.DatasetPath][]zfs.FilesystemVersion
+	orderedDatasets []*zfs.DatasetPath
 	maxProcs        int
 }
 
@@ -124,7 +124,7 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 		return
 	}
 
-	var datasets []string
+	var datasets []*zfs.DatasetPath
 	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
 		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems, j.Datasets)
@@ -143,22 +143,25 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 		return
 	}
 
-	slices.Sort(datasets)
+	slices.SortFunc(datasets, func(a, b *zfs.DatasetPath) int {
+		return strings.Compare(a.ToString(), b.ToString())
+	})
 	self.orderedDatasets = datasets
-	self.datasets = make(map[string][]zfs.FilesystemVersion, len(datasets))
+	self.datasets = make(map[*zfs.DatasetPath][]zfs.FilesystemVersion,
+		len(datasets))
 	return self.preloadSnapshots(ctx)
 }
 
 func (self *SnapCheck) datasetsFromFilter(
 	ctx context.Context, ff config.FilesystemsFilter,
 	df []config.DatasetFilter,
-) ([]string, error) {
+) ([]*zfs.DatasetPath, error) {
 	filesystems, err := filters.NewFromConfig(ff, df)
 	if err != nil {
 		return nil, fmt.Errorf("invalid filesystems: %w", err)
 	}
 
-	filtered := []string{}
+	filtered := []*zfs.DatasetPath{}
 	for fields, err := range zfs.ZFSListIter(ctx, []string{"name"}, nil) {
 		if err != nil {
 			return nil, err
@@ -167,7 +170,7 @@ func (self *SnapCheck) datasetsFromFilter(
 		} else if ok, err := filesystems.Filter(path); err != nil {
 			return nil, err
 		} else if ok {
-			filtered = append(filtered, fields[0])
+			filtered = append(filtered, path)
 		}
 	}
 	return filtered, nil
@@ -175,7 +178,7 @@ func (self *SnapCheck) datasetsFromFilter(
 
 func (self *SnapCheck) datasetsFromRootFs(
 	ctx context.Context, rootFs string, skipN int,
-) ([]string, error) {
+) ([]*zfs.DatasetPath, error) {
 	rootPath, err := zfs.NewDatasetPath(rootFs)
 	if err != nil {
 		return nil, err
@@ -188,7 +191,7 @@ func (self *SnapCheck) datasetsFromRootFs(
 		return nil, fmt.Errorf("properties of %q: %w", rootFs, err)
 	}
 
-	filtered := make([]string, 0, len(propsByFS))
+	filtered := make([]*zfs.DatasetPath, 0, len(propsByFS))
 	for fs, props := range propsByFS {
 		path, err := zfs.NewDatasetPath(fs)
 		if err != nil {
@@ -200,7 +203,7 @@ func (self *SnapCheck) datasetsFromRootFs(
 		if p.Source == zfs.SourceLocal && p.Value == "on" {
 			continue
 		}
-		filtered = append(filtered, fs)
+		filtered = append(filtered, path)
 	}
 	return filtered, nil
 }
@@ -229,13 +232,8 @@ func (self *SnapCheck) preloadSnapshots(ctx context.Context,
 	return g.Wait() //nolint:wrapcheck // our error
 }
 
-func zfsListSnapshots(ctx context.Context, dataset string,
+func zfsListSnapshots(ctx context.Context, fs *zfs.DatasetPath,
 ) ([]zfs.FilesystemVersion, error) {
-	fs, err := zfs.NewDatasetPath(dataset)
-	if err != nil {
-		return nil, err
-	}
-
 	snaps, err := zfs.ZFSListFilesystemVersions(ctx, fs,
 		zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
 	if err != nil {
@@ -246,7 +244,12 @@ func zfsListSnapshots(ctx context.Context, dataset string,
 
 func (self *SnapCheck) checkCounts(ctx context.Context, j *config.JobEnum,
 ) error {
-	rules, err := self.overrideCountRules(j)
+	configRules, err := self.overrideCountRules(j)
+	if err != nil {
+		return err
+	}
+
+	rules, err := CountRulesFromConfig(configRules)
 	if err != nil {
 		return err
 	}
@@ -278,10 +281,10 @@ func (self *SnapCheck) overrideCountRules(j *config.JobEnum,
 	return rules, nil
 }
 
-func (self *SnapCheck) checkSnapsCounts(ctx context.Context, fsName string,
-	rules []config.MonitorCount,
+func (self *SnapCheck) checkSnapsCounts(ctx context.Context,
+	path *zfs.DatasetPath, rules []*CountRule,
 ) error {
-	snapshots, err := self.snapshots(ctx, fsName)
+	snapshots, err := self.snapshots(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -293,24 +296,24 @@ func (self *SnapCheck) checkSnapsCounts(ctx context.Context, fsName string,
 	grouped := groupSnapshots(snapshots, prefixes)
 
 	for i := range rules {
-		if !self.applyCountRule(&rules[i], fsName, &grouped[i]) {
+		if !self.applyCountRule(rules[i], path, &grouped[i]) {
 			break
 		}
 	}
 	return nil
 }
 
-func (self *SnapCheck) snapshots(ctx context.Context, fsName string,
+func (self *SnapCheck) snapshots(ctx context.Context, path *zfs.DatasetPath,
 ) ([]zfs.FilesystemVersion, error) {
-	if snaps, ok := self.datasets[fsName]; ok {
+	if snaps, ok := self.datasets[path]; ok {
 		return snaps, nil
 	}
 
-	snaps, err := zfsListSnapshots(ctx, fsName)
+	snaps, err := zfsListSnapshots(ctx, path)
 	if err != nil {
 		return nil, err
 	}
-	self.datasets[fsName] = snaps
+	self.datasets[path] = snaps
 	return snaps, err
 }
 
@@ -349,14 +352,22 @@ func (self *groupItem) Snapshot(oldest bool) *zfs.FilesystemVersion {
 	return self.Latest
 }
 
-func (self *SnapCheck) applyCountRule(rule *config.MonitorCount, fsName string,
+func (self *SnapCheck) applyCountRule(rule *CountRule, path *zfs.DatasetPath,
 	g *groupItem,
 ) bool {
+	if skip, err := rule.Skip(path); err != nil {
+		self.resp.UpdateStatus(monitoringplugin.UNKNOWN, fmt.Sprintf(
+			"error skipping dataset %q: %s", path.ToString(), err))
+		return false
+	} else if skip {
+		return true
+	}
+
 	if g.Count == 0 && rule.Prefix == "" {
 		return true
 	} else if g.Count == 0 {
 		self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
-			"%q has no snapshots with prefix %q", fsName, rule.Prefix))
+			"%q has no snapshots with prefix %q", path.ToString(), rule.Prefix))
 		return false
 	}
 
@@ -364,11 +375,11 @@ func (self *SnapCheck) applyCountRule(rule *config.MonitorCount, fsName string,
 	switch {
 	case g.Count >= rule.Critical:
 		self.updateStatus(monitoringplugin.CRITICAL, msg,
-			fsName, rule.Prefix, g.Count, rule.Critical)
+			path.ToString(), rule.Prefix, g.Count, rule.Critical)
 		return false
 	case rule.Warning > 0 && g.Count >= rule.Warning:
 		self.updateStatus(monitoringplugin.WARNING, msg,
-			fsName, rule.Prefix, g.Count, rule.Warning)
+			path.ToString(), rule.Prefix, g.Count, rule.Warning)
 		return false
 	default:
 		self.snapCount += g.Count
@@ -378,7 +389,12 @@ func (self *SnapCheck) applyCountRule(rule *config.MonitorCount, fsName string,
 
 func (self *SnapCheck) checkCreation(ctx context.Context, j *config.JobEnum,
 ) error {
-	rules, err := self.overrideAgeRules(self.rulesByCreation(j))
+	configRules, err := self.overrideAgeRules(self.rulesByCreation(j))
+	if err != nil {
+		return err
+	}
+
+	rules, err := AgeRulesFromConfig(configRules)
 	if err != nil {
 		return err
 	}
@@ -418,10 +434,10 @@ func (self *SnapCheck) rulesByCreation(j *config.JobEnum,
 	return cfg.Latest
 }
 
-func (self *SnapCheck) checkSnapsCreation(
-	ctx context.Context, fsName string, rules []config.MonitorCreation,
+func (self *SnapCheck) checkSnapsCreation(ctx context.Context,
+	path *zfs.DatasetPath, rules []*AgeRule,
 ) error {
-	snapshots, err := self.snapshots(ctx, fsName)
+	snapshots, err := self.snapshots(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -434,21 +450,29 @@ func (self *SnapCheck) checkSnapsCreation(
 
 	for i := range rules {
 		s := grouped[i].Snapshot(self.oldest)
-		if !self.applyCreationRule(&rules[i], s, fsName) {
+		if !self.applyCreationRule(rules[i], s, path) {
 			return nil
 		}
 	}
 	return nil
 }
 
-func (self *SnapCheck) applyCreationRule(rule *config.MonitorCreation,
-	snap *zfs.FilesystemVersion, fsName string,
+func (self *SnapCheck) applyCreationRule(rule *AgeRule,
+	snap *zfs.FilesystemVersion, path *zfs.DatasetPath,
 ) bool {
+	if skip, err := rule.Skip(path); err != nil {
+		self.resp.UpdateStatus(monitoringplugin.UNKNOWN, fmt.Sprintf(
+			"error skipping dataset %q: %s", path.ToString(), err))
+		return false
+	} else if skip {
+		return true
+	}
+
 	if snap == nil && rule.Prefix == "" {
 		return true
 	} else if snap == nil {
 		self.resp.UpdateStatus(monitoringplugin.CRITICAL, fmt.Sprintf(
-			"%q has no snapshots with prefix %q", fsName, rule.Prefix))
+			"%q has no snapshots with prefix %q", path.ToString(), rule.Prefix))
 		return false
 	}
 
@@ -458,11 +482,11 @@ func (self *SnapCheck) applyCreationRule(rule *config.MonitorCreation,
 	switch {
 	case d >= rule.Critical:
 		self.updateStatus(monitoringplugin.CRITICAL, tooOldFmt,
-			self.snapshotType(), snap.FullPath(fsName), d, rule.Critical)
+			self.snapshotType(), snap.FullPath(path.ToString()), d, rule.Critical)
 		return false
 	case rule.Warning > 0 && d >= rule.Warning:
 		self.updateStatus(monitoringplugin.WARNING, tooOldFmt,
-			self.snapshotType(), snap.FullPath(fsName), d, rule.Warning)
+			self.snapshotType(), snap.FullPath(path.ToString()), d, rule.Warning)
 		return false
 	case self.age == 0:
 		fallthrough

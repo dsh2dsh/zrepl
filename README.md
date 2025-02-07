@@ -313,7 +313,7 @@ pkg install zrepl-dsh2dsh
     is ok, latest or oldest snapshots are not too old. See
     [#765](https://github.com/zrepl/zrepl/pull/765). Configuration example:
 
-    ``` yaml
+    ```yaml
     monitor:
       count:
         - prefix: "zrepl_frequently_"
@@ -353,9 +353,23 @@ pkg install zrepl-dsh2dsh
           critical: "168h"      # 7d
     ```
 
-    Example of a daily script:
+    Every item can be configured to skip some datasets from the check, like:
 
-    ``` shell
+    ```yaml
+    - prefix: "zrepl_monthly_"
+      skip_datasets:
+        - pattern: "zdisk/video"
+      warning: 13
+      critical: 14
+    ```
+
+    In this example it checks number of snapshots with prefix `zrepl_monthly_`
+    for every dataset, configured in `datasets`, except `zdisk/video`.
+    `skip_datasets` has the same syntax, like `datasets`.
+
+    An example of a daily script:
+
+    ```shell
     echo
     echo "zrepl status:"
     zrepl monitor alive

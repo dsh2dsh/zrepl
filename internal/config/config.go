@@ -152,15 +152,17 @@ type MonitorSnapshots struct {
 }
 
 type MonitorCount struct {
-	Prefix   string `yaml:"prefix"`
-	Warning  uint   `yaml:"warning"`
-	Critical uint   `yaml:"critical" validate:"required"`
+	Prefix       string          `yaml:"prefix"`
+	SkipDatasets []DatasetFilter `yaml:"skip_datasets" validate:"dive"`
+	Warning      uint            `yaml:"warning"`
+	Critical     uint            `yaml:"critical" validate:"required"`
 }
 
 type MonitorCreation struct {
-	Prefix   string        `yaml:"prefix"`
-	Warning  time.Duration `yaml:"warning"`
-	Critical time.Duration `yaml:"critical" validate:"required"`
+	Prefix       string          `yaml:"prefix"`
+	SkipDatasets []DatasetFilter `yaml:"skip_datasets" validate:"dive"`
+	Warning      time.Duration   `yaml:"warning"`
+	Critical     time.Duration   `yaml:"critical" validate:"required"`
 }
 
 func (self *MonitorSnapshots) Valid() bool {
