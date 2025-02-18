@@ -5,19 +5,19 @@ go 1.24
 require (
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/charmbracelet/bubbles v0.20.0
-	github.com/charmbracelet/bubbletea v1.3.0
+	github.com/charmbracelet/bubbletea v1.3.3
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/creasty/defaults v1.8.0
 	github.com/dsh2dsh/cron/v3 v3.0.3
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.18.0
-	github.com/go-playground/validator/v10 v10.24.0
+	github.com/go-playground/validator/v10 v10.25.0
 	github.com/klauspost/compress v1.17.11
 	github.com/montanaflynn/stats v0.7.1
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sahilm/fuzzy v0.1.1
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	github.com/yudai/gojsondiff v1.0.0
@@ -41,7 +41,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
-	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/net v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 )
 
@@ -66,7 +66,7 @@ require (
 	github.com/sergi/go-diff v1.3.1 // indirect; go1.12 thinks it needs this
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
-	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/text v0.22.0
 	gopkg.in/yaml.v3 v3.0.1
 )
