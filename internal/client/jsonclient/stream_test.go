@@ -2,7 +2,6 @@ package jsonclient
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -39,7 +38,7 @@ func TestPostStream(t *testing.T) {
 
 	client, err := New("http://server", WithHTTPClient(&httpClient))
 	require.NoError(t, err)
-	require.NoError(t, client.PostStream(context.Background(),
+	require.NoError(t, client.PostStream(t.Context(),
 		"/", &testData, nil, bytes.NewBuffer(testStream)))
 }
 
@@ -82,8 +81,7 @@ func TestPostResponseStream(t *testing.T) {
 	require.NoError(t, err)
 
 	out := testData
-	r, err := client.PostResponseStream(context.Background(),
-		"/", &testData, &out)
+	r, err := client.PostResponseStream(t.Context(), "/", &testData, &out)
 	require.NoError(t, err)
 	defer r.Close()
 	assert.Equal(t, testData.Num+1, out.Num)

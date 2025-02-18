@@ -20,11 +20,9 @@ func TestZFSListHandlesProducesZFSErrorOnNonZeroExit(t *testing.T) {
 
 	var err error
 
-	ctx := context.Background()
-
 	ZfsBin = "./test_helpers/zfs_failer.sh"
 
-	_, err = ZFSList(ctx, []string{"fictionalprop"}, "nonexistent/dataset")
+	_, err = ZFSList(t.Context(), []string{"fictionalprop"}, "nonexistent/dataset")
 
 	require.Error(t, err)
 	var zfsError *ZFSError
@@ -519,7 +517,7 @@ func TestZFSCommonRecvArgsBuild(t *testing.T) {
 }
 
 func TestSendStream_Close_afterRead(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	const foobar = "foobar"
@@ -542,7 +540,7 @@ func TestSendStream_Close_afterRead(t *testing.T) {
 }
 
 func TestSendStream_Close_noRead(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	cmd := zfscmd.CommandContext(ctx, "seq", "1024")

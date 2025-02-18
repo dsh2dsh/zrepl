@@ -18,3 +18,7 @@ func WithError(l *slog.Logger, err error, msg string) *slog.Logger {
 	}
 	return l
 }
+
+func NewNullLogger() *slog.Logger {
+	return NewLogger(NewOutlets().Add(slog.DiscardHandler))
+}

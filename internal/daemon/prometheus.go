@@ -11,7 +11,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/daemon/middleware"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/version"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
@@ -80,5 +79,5 @@ func (self *promLogOutlet) WithGroup(name string) slog.Handler {
 	if name == "" {
 		return self
 	}
-	return logger.NewNullOutlet()
+	return self
 }

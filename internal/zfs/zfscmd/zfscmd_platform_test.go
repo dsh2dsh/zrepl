@@ -63,7 +63,7 @@ func TestCmdStderrBehaviorStdoutPipe(t *testing.T) {
 }
 
 func TestCmdProcessState(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sh", "-c", "echo running; sleep 3600")
 	stdout, err := cmd.StdoutPipe()
@@ -88,7 +88,7 @@ func TestCmdProcessState(t *testing.T) {
 }
 
 func TestSigpipe(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	cmd := CommandContext(ctx, "sh", "-c", "sleep 5; echo invalid input; exit 23")
 	r, w, err := os.Pipe()
@@ -120,7 +120,7 @@ func TestSigpipe(t *testing.T) {
 }
 
 func TestCmd_Pipe(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name         string

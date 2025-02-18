@@ -35,7 +35,7 @@ func TestClient_Receive(t *testing.T) {
 	jsonClient, err := jsonclient.New(ts.URL)
 	require.NoError(t, err)
 	client := NewClient("test", jsonClient)
-	err = client.Receive(context.Background(), &testReq,
+	err = client.Receive(t.Context(), &testReq,
 		io.NopCloser(bytes.NewReader(testStream)))
 	require.NoError(t, err)
 }
@@ -58,7 +58,7 @@ func TestClient_Send(t *testing.T) {
 	require.NoError(t, err)
 	client := NewClient("test", jsonClient)
 
-	_, r, err := client.Send(context.Background(), &testReq)
+	_, r, err := client.Send(t.Context(), &testReq)
 	require.NoError(t, err)
 	defer r.Close()
 

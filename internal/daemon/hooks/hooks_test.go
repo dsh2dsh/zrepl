@@ -72,7 +72,7 @@ func curry(f comparisonAssertionFunc, expected interface{}, right bool) (ret val
 }
 
 func TestHooks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	testFSName := "testpool/testdataset"
 	testSnapshotName := "testsnap"

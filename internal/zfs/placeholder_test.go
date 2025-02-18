@@ -1,7 +1,6 @@
 package zfs
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,8 +12,7 @@ func TestZFSGetFilesystemPlaceholderState_doesntExist(t *testing.T) {
 	fs, err := NewDatasetPath("zdisk/zrepl/doesntexist")
 	require.NoError(t, err)
 
-	ctx := context.Background()
-	state, err := ZFSGetFilesystemPlaceholderState(ctx, fs)
+	state, err := ZFSGetFilesystemPlaceholderState(t.Context(), fs)
 	require.NoError(t, err)
 	require.NotNil(t, state)
 	assert.False(t, state.FSExists)

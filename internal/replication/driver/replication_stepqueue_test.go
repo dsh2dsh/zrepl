@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestPqNotconcurrent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	var ctr uint32
 	q := newStepQueue()
 	var wg sync.WaitGroup
@@ -79,7 +78,7 @@ func (r record) String() string {
 func TestPqConcurrent(t *testing.T) {
 	t.Skip("is this test broken?")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	q := newStepQueue()
 	var wg sync.WaitGroup

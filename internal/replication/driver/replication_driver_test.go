@@ -145,15 +145,13 @@ func (f *mockStep) ReportInfo() *report.StepInfo {
 //
 // For the time being, let's just exercise the code a bit.
 func TestReplication(t *testing.T) {
-	ctx := context.Background()
-
 	mp := &mockPlanner{}
 	driverConfig := Config{
 		StepQueueConcurrency:     1,
 		MaxAttempts:              1,
 		ReconnectHardFailTimeout: 1 * time.Second,
 	}
-	getReport, wait := Do(ctx, driverConfig, mp)
+	getReport, wait := Do(t.Context(), driverConfig, mp)
 	begin := time.Now()
 	fireAt := []time.Duration{
 		// the following values are relative to the start
