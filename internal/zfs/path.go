@@ -74,16 +74,6 @@ func (self *DatasetPath) TrimPrefix(prefix *DatasetPath) {
 	}
 }
 
-func (self *DatasetPath) TrimNPrefixComps(n int) {
-	if len(self.comps) < n {
-		n = len(self.comps)
-	}
-	if n == 0 {
-		return
-	}
-	self.comps = self.comps[n:]
-}
-
 func (self *DatasetPath) Equal(q *DatasetPath) bool {
 	if len(self.comps) != len(q.comps) {
 		return false

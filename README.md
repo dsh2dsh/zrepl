@@ -652,6 +652,11 @@ pkg install zrepl-dsh2dsh
 
     See also zrepl/zrepl#634
 
+  * Faster `zfs list` (zrepl/zrepl#870)
+
+    Runs `zfs list filesystem...`, if possible, and list only specific datasets,
+    instead of `zfs list`, which lists every dataset on the entire system.
+
 ## Upstream user documentation
 
 **User Documentation** can be found at

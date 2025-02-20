@@ -2,6 +2,7 @@ package filters
 
 import (
 	"fmt"
+	"iter"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -11,8 +12,8 @@ import (
 )
 
 const (
-	MapFilterResultOk   = "ok"
-	MapFilterResultOmit = "!"
+	filterResultOk   = "ok"
+	filterResultOmit = "!"
 )
 
 func NoFilter() (*DatasetFilter, error) {
@@ -40,24 +41,36 @@ func New(size int) *DatasetFilter {
 }
 
 type DatasetFilter struct {
-	entries []*filterItem
+	entries     []*filterItem
+	parentPaths []*zfs.DatasetPath
 }
 
 func (self *DatasetFilter) AddList(in []config.DatasetFilter) error {
 	for i := range in {
-		configItem := &in[i]
-		entry := &filterItem{
-			pattern:      configItem.Pattern,
-			mapping:      !configItem.Exclude,
-			recursive:    configItem.Recursive,
-			shellPattern: configItem.Shell,
-		}
-		if err := entry.Init(); err != nil {
+		entry, err := NewItem(in[i])
+		if err != nil {
 			return err
 		}
-		self.entries = append(self.entries, entry)
+		self.append(entry)
 	}
 	return nil
+}
+
+func (self *DatasetFilter) append(e *filterItem) {
+	self.appendParent(e)
+	self.entries = append(self.entries, e)
+}
+
+func (self *DatasetFilter) appendParent(e *filterItem) {
+	for _, path := range slices.Backward(self.parentPaths) {
+		if e.HasPrefix(path) {
+			return
+		}
+	}
+
+	if p := e.ParentFilesystem(); p != nil {
+		self.parentPaths = append(self.parentPaths, p)
+	}
 }
 
 func (self *DatasetFilter) addMap(in map[string]bool) error {
@@ -75,12 +88,12 @@ func (self *DatasetFilter) addCompat(pathPattern string, mapping bool) error {
 	// assert path glob adheres to spec
 	const subTreeSep = "<"
 	pathStr, pattern, found := strings.Cut(pathPattern, subTreeSep)
-	entry := &filterItem{
-		pattern:   pathStr,
-		mapping:   mapping,
-		recursive: found,
-	}
-	if err := entry.Init(); err != nil {
+	entry, err := NewItem(config.DatasetFilter{
+		Pattern:   pathStr,
+		Exclude:   !mapping,
+		Recursive: found,
+	})
+	if err != nil {
 		return err
 	}
 
@@ -91,18 +104,15 @@ func (self *DatasetFilter) addCompat(pathPattern string, mapping bool) error {
 				pattern, pathPattern)
 		}
 		if !mapping {
-			rootEntry := entry.Clone()
-			rootEntry.mapping = true
-			self.entries = append(self.entries, rootEntry)
+			self.append(entry.Clone().WithMapping(true))
 		}
-		entry.pattern = filepath.Join(pathStr, pattern)
-		entry.shellPattern = true
-		if err := entry.Init(); err != nil {
+		shellPattern := filepath.Join(pathStr, pattern)
+		if err := entry.SetShellPattern(shellPattern); err != nil {
 			return err
 		}
 	}
 
-	self.entries = append(self.entries, entry)
+	self.append(entry)
 	return nil
 }
 
@@ -117,9 +127,9 @@ func (self *DatasetFilter) Add(path, mapping string) error {
 // Parse a dataset filter result
 func parseDatasetFilterResult(result string) (bool, error) {
 	switch strings.ToLower(result) {
-	case MapFilterResultOk:
+	case filterResultOk:
 		return true, nil
-	case MapFilterResultOmit:
+	case filterResultOmit:
 		return false, nil
 	}
 	return false, fmt.Errorf("%q is not a valid filter result", result)
@@ -129,6 +139,12 @@ func (self *DatasetFilter) CompatSort() {
 	slices.SortStableFunc(self.entries, func(a, b *filterItem) int {
 		return a.CompatCompare(b)
 	})
+
+	clear(self.parentPaths)
+	self.parentPaths = self.parentPaths[:0]
+	for _, e := range self.entries {
+		self.appendParent(e)
+	}
 }
 
 func (self *DatasetFilter) Filter(p *zfs.DatasetPath) (bool, error) {
@@ -145,7 +161,7 @@ func (self *DatasetFilter) Filter2(p *zfs.DatasetPath) (*zfs.DatasetPath, bool,
 		if matched, err := entry.Match(p); err != nil {
 			return nil, false, err
 		} else if matched {
-			result = entry.mapping
+			result = entry.Mapping()
 			if r := entry.RecursiveDataset(); r != nil {
 				recursiveRoot = r
 			}
@@ -157,7 +173,7 @@ func (self *DatasetFilter) Filter2(p *zfs.DatasetPath) (*zfs.DatasetPath, bool,
 func (self *DatasetFilter) UserSpecifiedDatasets() map[string]bool {
 	datasets := make(map[string]bool)
 	for i := range self.entries {
-		path := self.entries[i].path
+		path := self.entries[i].DatasetPath()
 		if path != nil {
 			datasets[path.ToString()] = true
 		}
@@ -172,4 +188,15 @@ func (self *DatasetFilter) SingleRecursiveDataset() *zfs.DatasetPath {
 		return nil
 	}
 	return self.entries[0].RecursiveDataset()
+}
+
+func (self *DatasetFilter) TopFilesystems() (int, iter.Seq[string]) {
+	fn := func(yield func(string) bool) {
+		for _, p := range self.parentPaths {
+			if !yield(p.ToString()) {
+				return
+			}
+		}
+	}
+	return len(self.parentPaths), fn
 }

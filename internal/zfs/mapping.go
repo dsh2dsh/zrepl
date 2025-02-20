@@ -3,19 +3,28 @@ package zfs
 import (
 	"context"
 	"fmt"
+	"iter"
+	"slices"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
 type DatasetFilter interface {
 	Filter2(path *DatasetPath) (*DatasetPath, bool, error)
+	TopFilesystems() (int, iter.Seq[string])
 	UserSpecifiedDatasets() map[string]bool
 }
 
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 ) ([]*DatasetPath, error) {
 	props := []string{"name"}
-	cmd := NewListCmd(ctx, props, []string{"-r", "-t", "filesystem,volume"})
+	args := []string{"-r", "-t", "filesystem,volume"}
+	n, pfs := filter.TopFilesystems()
+	if n != 0 {
+		args = slices.AppendSeq(slices.Grow(args, n), pfs)
+	}
+	cmd := NewListCmd(ctx, props, args)
+
 	v, err, _ := sg.Do(cmd.String(), func() (any, error) {
 		datasets := []*DatasetPath{}
 		for fields, err := range ListIter(ctx, props, nil, cmd) {
@@ -30,6 +39,7 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 		}
 		return datasets, nil
 	})
+
 	if err != nil {
 		return nil, err //nolint:wrapcheck // already wrapped
 	}
