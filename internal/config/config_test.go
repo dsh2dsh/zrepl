@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"text/template"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,22 +37,6 @@ func TestSampleConfigsAreParsedWithoutErrors(t *testing.T) {
 		})
 
 	}
-}
-
-// template must be a template/text template with a single '{{ . }}' as placeholder for val
-//
-//nolint:unused // keep it for debugging
-func testValidConfigTemplate(t *testing.T, tmpl string, val string) *Config {
-	tmp, err := template.New("master").Parse(tmpl)
-	if err != nil {
-		panic(err)
-	}
-	var buf bytes.Buffer
-	err = tmp.Execute(&buf, val)
-	if err != nil {
-		panic(err)
-	}
-	return testValidConfig(t, buf.String())
 }
 
 func testValidConfig(t *testing.T, input string) *Config {
