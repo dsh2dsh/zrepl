@@ -11,10 +11,10 @@ type execQueue struct {
 	pending, completed []*fs
 }
 
-func newExecQueue(cap int) *execQueue {
+func newExecQueue(size int) *execQueue {
 	q := execQueue{
-		pending:   make([]*fs, 0, cap),
-		completed: make([]*fs, 0, cap),
+		pending:   make([]*fs, 0, size),
+		completed: make([]*fs, 0, size),
 	}
 	return &q
 }

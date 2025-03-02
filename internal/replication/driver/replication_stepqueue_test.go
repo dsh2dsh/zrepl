@@ -90,11 +90,11 @@ func TestPqConcurrent(t *testing.T) {
 
 	begin := time.Now()
 	records := make(chan []record, filesystems)
-	for fs := 0; fs < filesystems; fs++ {
+	for fs := range filesystems {
 		go func(fs int) {
 			defer wg.Done()
 			recs := make([]record, 0)
-			for step := 0; step < stepsPerFS; step++ {
+			for step := range stepsPerFS {
 				pos := atomic.AddUint32(&globalCtr, 1)
 				t := time.Unix(int64(step), 0)
 				done := q.WaitReady(ctx, fs, t)
@@ -133,7 +133,7 @@ func TestPqConcurrent(t *testing.T) {
 
 	meansByStepId := make([]float64, stepsPerFS)
 	interQuartileRangesByStepIdx := make([]float64, stepsPerFS)
-	for step := 0; step < stepsPerFS; step++ {
+	for step := range stepsPerFS {
 		t.Logf("step %d", step)
 		mean, _ := stats.Mean(wakeTimesByStep[step])
 		meansByStepId[step] = mean
@@ -142,10 +142,10 @@ func TestPqConcurrent(t *testing.T) {
 		t.Logf("\tmedian: %v", median)
 		midhinge, _ := stats.Midhinge(wakeTimesByStep[step])
 		t.Logf("\tmidhinge: %v", midhinge)
-		min, _ := stats.Min(wakeTimesByStep[step])
-		t.Logf("\tmin: %v", min)
-		max, _ := stats.Max(wakeTimesByStep[step])
-		t.Logf("\tmax: %v", max)
+		minVal, _ := stats.Min(wakeTimesByStep[step])
+		t.Logf("\tmin: %v", minVal)
+		maxVal, _ := stats.Max(wakeTimesByStep[step])
+		t.Logf("\tmax: %v", maxVal)
 		quartiles, _ := stats.Quartile(wakeTimesByStep[step])
 		t.Logf("\t%#v", quartiles)
 		interQuartileRange, _ := stats.InterQuartileRange(wakeTimesByStep[step])

@@ -91,13 +91,13 @@ type activeSideTasks struct {
 func (a *ActiveSide) updateTasks(u func(*activeSideTasks)) activeSideTasks {
 	a.tasksMtx.Lock()
 	defer a.tasksMtx.Unlock()
-	copy := a.tasks
+	cloned := a.tasks
 	if u == nil {
-		return copy
+		return cloned
 	}
-	u(&copy)
-	a.tasks = copy
-	return copy
+	u(&cloned)
+	a.tasks = cloned
+	return cloned
 }
 
 type activeMode interface {

@@ -16,6 +16,7 @@ linters:
     - "nolintlint"
     - "perfsprint"
     - "prealloc"
+    - "predeclared"
     - "revive"
     - "sloglint"
     - "testifylint"
