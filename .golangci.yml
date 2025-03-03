@@ -1,5 +1,6 @@
 run:
   timeout: "5m"
+  relative-path-mode: "gomod"
 
 linters:
   enable:
