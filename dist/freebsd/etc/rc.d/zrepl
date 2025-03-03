@@ -73,7 +73,6 @@ zrepl_checkconfig() {
 zrepl_precmd() {
     install -d -g "$zrepl_control_group" -o "$zrepl_user" \
             -m "$zrepl_control_mode" "/var/run/zrepl"
-    zrepl_checkconfig
 }
 
 # shellcheck disable=SC2086,SC2154
