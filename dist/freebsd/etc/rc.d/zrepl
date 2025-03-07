@@ -72,16 +72,16 @@ zrepl_checkconfig() {
 
 zrepl_precmd() {
     install -d -g "$zrepl_control_group" -o "$zrepl_user" \
-            -m "$zrepl_control_mode" "/var/run/zrepl"
+        -m "$zrepl_control_mode" /var/run/zrepl
 }
 
 # shellcheck disable=SC2086,SC2154
 zrepl_graceful() {
     local _rc_prefix _return
-		( run_rc_command gracefulstop $rc_extra_args )
-		( run_rc_command start $rc_extra_args )
-		_return=$?
-		[ $_return -ne 0 ] && [ -z "$rc_force" ] && return 1
+    (run_rc_command gracefulstop $rc_extra_args)
+    (run_rc_command start $rc_extra_args)
+    _return=$?
+    [ $_return -ne 0 ] && [ -z "$rc_force" ] && return 1
     return $_return
 }
 
@@ -90,7 +90,6 @@ zrepl_gracefulstop() {
         echo 1>&2 "$name not running? (check $pidfile)."
         return 1
     fi
-
     echo "Gracefully stopping $name."
     eval "$procname" signal shutdown
     wait_for_pids "$rc_pid"

@@ -1,7 +1,6 @@
 #!/bin/sh
 
-if [ -r /etc/defaults/periodic.conf ]
-then
+if [ -r /etc/defaults/periodic.conf ]; then
     . /etc/defaults/periodic.conf
     source_periodic_confs
 fi
@@ -14,13 +13,13 @@ zrepl="/usr/local/bin/zrepl"
 rc=1
 case "$daily_zrepl_enable" in
     [Yy][Ee][Ss])
-	      if service zrepl enabled; then
+        if service zrepl enabled; then
             echo
             echo "Check zrepl status:"
             $zrepl monitor alive -w "$daily_zrepl_warn" -c "$daily_zrepl_crit"
             $zrepl monitor snapshots
-	      fi
-	      ;;
+        fi
+        ;;
 esac
 
 exit "$rc"
