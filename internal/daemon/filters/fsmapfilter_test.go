@@ -87,6 +87,11 @@ func TestDatasetFilter_Filter_filesystems(t *testing.T) {
 				"tank/home/john/bar":     false,
 				"tank/home/mark/foo":     false,
 			},
+			recursiveRoot: map[string]string{
+				"tank/home/bob/foo":   "tank/home",
+				"tank/home/alice/foo": "tank/home",
+				"tank/home/mark/foo":  "tank/home",
+			},
 		},
 		{
 			name:        "include first level",
@@ -156,13 +161,13 @@ func TestDatasetFilter_Filter_filesystems(t *testing.T) {
 				assert.Equal(t, checkPass, pass, "pattern: %s", p)
 
 				if tt.recursiveRoot == nil {
-					assert.Nil(t, recursiveRoot)
-					return
+					assert.Nil(t, recursiveRoot, "pattern: %s", p)
+					continue
 				}
 
 				path := tt.recursiveRoot[p]
 				if path == "" {
-					assert.Nil(t, recursiveRoot)
+					assert.Nil(t, recursiveRoot, "pattern: %s", p)
 				} else {
 					require.NotNil(t, recursiveRoot)
 					assert.Equal(t, path, recursiveRoot.ToString())
@@ -366,7 +371,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 
 				if tt.recursiveRoot == nil {
 					assert.Nil(t, recursiveRoot)
-					return
+					continue
 				}
 
 				path := tt.recursiveRoot[p]

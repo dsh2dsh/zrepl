@@ -156,3 +156,17 @@ func Test_filterItem_HasPrefix(t *testing.T) {
 		})
 	}
 }
+
+func Test_filterItem_SetShellPattern(t *testing.T) {
+	entry, err := NewItem(config.DatasetFilter{
+		Pattern:   "tank/home",
+		Exclude:   false,
+		Recursive: true,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, entry)
+	assert.NotNil(t, entry.DatasetPath())
+
+	require.NoError(t, entry.SetShellPattern("tank/home/*/foo"))
+	assert.NotNil(t, entry.DatasetPath())
+}
