@@ -526,6 +526,7 @@ pkg install zrepl-dsh2dsh
           args: [ "pre" ]         # optional positional parameters
           env:                    # optional environment variables
             ZREPL_FOOBAR: "foo"
+          timeout: "30s"          # optional, default is 1m
           # don't continue job if exit status is nonzero (default: false)
           err_is_fatal: true
         post:
@@ -533,6 +534,7 @@ pkg install zrepl-dsh2dsh
           args: [ "post" ]        # optional positional parameters
           env:                    # optional environment variables
             ZREPL_FOOBAR: "bar"
+          timeout: "0s"           # without timeout at all
     ```
 
     This configuration runs `/root/bin/zrepl_hook.sh pre` before replication
