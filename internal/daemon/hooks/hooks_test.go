@@ -368,7 +368,7 @@ jobs:
 		if err != nil {
 			panic("os.Getwd() failed")
 		}
-		var hooksTmpl string = "\n"
+		hooksTmpl := "\n"
 		for _, l := range tt.Config {
 			hooksTmpl += fmt.Sprintf("    - %s\n", l)
 		}
@@ -438,7 +438,8 @@ jobs:
 
 			t.Logf("len(runReports)=%v", len(report))
 			t.Logf("len(tt.ExpectStepReports)=%v", len(tt.ExpectStepReports))
-			require.Equal(t, len(tt.ExpectStepReports), len(report), "ExpectStepReports must be same length as expected number of hook runs, excluding possible Callback")
+			require.Len(t, report, len(tt.ExpectStepReports),
+				"ExpectStepReports must be same length as expected number of hook runs, excluding possible Callback")
 
 			// Check if callback ran, when required
 			if tt.ExpectCallbackSkipped {

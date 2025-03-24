@@ -124,10 +124,11 @@ func (self *JobRender) viewAttemptHeader(a *report.AttemptReport) {
 			time.Since(a.StartAt).Round(time.Second))))
 	}
 
-	if a.State == report.AttemptPlanningError {
+	switch a.State {
+	case report.AttemptPlanningError:
 		self.printLn(s.Content.Render(self.indentMultiline(fmt.Sprintf(
 			"Problem:\n%s", a.PlanError), s.Indent)))
-	} else if a.State == report.AttemptFanOutError {
+	case report.AttemptFanOutError:
 		self.printLn(s.Content.Render(
 			"Problem: one or more of the filesystems encountered errors"))
 	}
@@ -208,10 +209,10 @@ func (self *JobRender) renderFilesystemsBar(totalItems, visibleItems int) {
 	sb.WriteString(fmt.Sprintf("%s “%s” ",
 		eyes, strings.TrimSpace(self.filterValue)))
 	s := &self.Styles
-	switch {
-	case visibleItems == 0:
+	switch visibleItems {
+	case 0:
 		sb.WriteString(s.StatusEmpty.Render("Nothing matched"))
-	case visibleItems == 1:
+	case 1:
 		sb.WriteString(fmt.Sprintf("%d filesystem", visibleItems))
 	default:
 		sb.WriteString(fmt.Sprintf("%d filesystems", visibleItems))

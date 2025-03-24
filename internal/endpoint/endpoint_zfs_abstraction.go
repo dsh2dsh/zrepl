@@ -118,14 +118,14 @@ func (a AbstractionJSON) MarshalJSON() ([]byte, error) {
 		String            string
 	}
 	v := S{
-		Type:              a.Abstraction.GetType(),
-		FS:                a.Abstraction.GetFS(),
-		Name:              a.Abstraction.GetName(),
-		FullPath:          a.Abstraction.GetFullPath(),
-		JobID:             a.Abstraction.GetJobID(),
-		CreateTXG:         a.Abstraction.GetCreateTXG(),
-		FilesystemVersion: a.Abstraction.GetFilesystemVersion(),
-		String:            a.Abstraction.String(),
+		Type:              a.GetType(),
+		FS:                a.GetFS(),
+		Name:              a.GetName(),
+		FullPath:          a.GetFullPath(),
+		JobID:             a.GetJobID(),
+		CreateTXG:         a.GetCreateTXG(),
+		FilesystemVersion: a.GetFilesystemVersion(),
+		String:            a.String(),
 	}
 	return json.Marshal(v)
 }
@@ -851,8 +851,8 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 	for k := range by {
 		l := by[k]
 
-		switch {
-		case k.Type == AbstractionStepHold:
+		switch k.Type {
+		case AbstractionStepHold:
 			// all step holds older than the most recent cursor are stale, others are always live
 
 			// if we don't have a replication cursor yet, use untilBound = nil
@@ -896,8 +896,7 @@ func listStaleFiltering(abs []Abstraction, sinceBound *CreateTXGRangeBound) *Sta
 					ret.Live = append(ret.Live, a)
 				}
 			}
-		case k.Type == AbstractionReplicationCursorBookmarkV2 ||
-			k.Type == AbstractionLastReceivedHold:
+		case AbstractionReplicationCursorBookmarkV2, AbstractionLastReceivedHold:
 			// all cursors but the most recent cursor are stale by definition (we
 			// always _move_ them)
 			//

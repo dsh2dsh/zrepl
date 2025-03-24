@@ -124,7 +124,7 @@ func (self *JobDelegate) descrStyle(m list.Model, item *ListItem,
 	// https://github.com/charmbracelet/bubbles/blob/364eac96a86724819b8337adbd33630553ee03e6/list/defaultitem.go#L171
 	emptyFilter := m.FilterState() == list.Filtering &&
 		m.FilterValue() == ""
-	listStyles := &self.DefaultDelegate.Styles
+	listStyles := &self.Styles
 
 	if emptyFilter {
 		s = listStyles.DimmedDesc

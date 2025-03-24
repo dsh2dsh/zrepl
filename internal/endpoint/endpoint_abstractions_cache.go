@@ -193,11 +193,11 @@ func (s *abstractionsCache) TryBatchDestroy(ctx context.Context, jobId JobID, fs
 			hadErr = true
 			logger.WithError(
 				getLogger(ctx).With(
-					slog.String("abstraction", res.Abstraction.String())),
+					slog.String("abstraction", res.String())),
 				res.DestroyErr, "cannot destroy abstraction")
 		} else {
 			getLogger(ctx).
-				With(slog.String("abstraction", res.Abstraction.String())).
+				With(slog.String("abstraction", res.String())).
 				Info("destroyed abstraction")
 		}
 	}

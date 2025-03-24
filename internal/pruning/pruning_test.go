@@ -59,7 +59,7 @@ func testTable(tcs map[string]testCase, t *testing.T) {
 			t.Logf("destroySet:\n%#v", destroySet)
 			t.Logf("expected:\n%#v", tc.expDestroy)
 
-			require.Equal(t, len(tc.expDestroy), len(destroySet))
+			require.Len(t, destroySet, len(tc.expDestroy))
 			for name := range destroySet {
 				assert.True(t, tc.expDestroy[name], "%q", name)
 			}

@@ -56,7 +56,7 @@ func (e *expectedDatasetPathVisit) AssertEqual(t *testing.T, actual DatasetPathV
 }
 
 func expectedDatasetPathVisits(t *testing.T, expected []expectedDatasetPathVisit, actual []DatasetPathVisit) {
-	assert.Equal(t, len(expected), len(actual))
+	assert.Len(t, actual, len(expected))
 	for i := range expected {
 		expected[i].AssertEqual(t, actual[i])
 	}

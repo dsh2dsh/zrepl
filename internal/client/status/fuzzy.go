@@ -70,7 +70,7 @@ func filterPrunerFs(term string, items []prunerFs) ([]prunerFs, int) {
 type fuzzyPrunerFs []prunerFs
 
 func (self fuzzyPrunerFs) String(i int) string {
-	return self[i].FSReport.Filesystem
+	return self[i].Filesystem
 }
 
 func (self fuzzyPrunerFs) Len() int { return len(self) }

@@ -109,7 +109,7 @@ func sortPrunerFs(pending []pruner.FSReport, completed []pruner.FSReport,
 	}
 
 	slices.SortFunc(items, func(a, b prunerFs) int {
-		return cmp.Compare(a.FSReport.Filesystem, b.FSReport.Filesystem)
+		return cmp.Compare(a.Filesystem, b.Filesystem)
 	})
 	return items
 }

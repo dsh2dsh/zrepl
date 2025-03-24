@@ -507,7 +507,7 @@ func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
 func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 	flags := a.buildSendFlagsUnchecked()
 
-	if a.ZFSSendFlags.ResumeToken != "" {
+	if a.ResumeToken != "" {
 		return flags, nil
 	}
 
@@ -527,7 +527,7 @@ func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 	switch {
 	case fromV == "": // Initial
 		flags = append(flags, toV)
-	case a.ZFSSendFlags.Multi:
+	case a.Multi:
 		flags = append(flags, "-I", fromV, toV)
 	default:
 		flags = append(flags, "-i", fromV, toV)
