@@ -43,7 +43,7 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 	if testFilterArgs.job == "" {
 		return errors.New("must specify --job flag")
 	}
-	if !(testFilterArgs.all != (testFilterArgs.input != "")) { // xor
+	if testFilterArgs.all && testFilterArgs.input != "" {
 		return errors.New("must set one: --all or --input")
 	}
 

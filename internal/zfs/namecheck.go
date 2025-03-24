@@ -143,7 +143,7 @@ func EntityNamecheck(path string, t EntityType) (err *PathValidationError) {
 		snapCount := bytes.Count(comp, []byte("@"))
 		bookCount := bytes.Count(comp, []byte("#"))
 
-		if !(snapCount*bookCount == 0) {
+		if snapCount*bookCount != 0 {
 			panic("implementation error: delimiter checks before this loop must ensure this cannot happen")
 		}
 		bookmarkOrSnapshotDelims += snapCount + bookCount
@@ -184,7 +184,7 @@ func EntityNamecheck(path string, t EntityType) (err *PathValidationError) {
 }
 
 func isASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] > unicode.MaxASCII {
 			return false
 		}

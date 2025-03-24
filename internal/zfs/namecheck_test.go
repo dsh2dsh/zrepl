@@ -54,7 +54,7 @@ func TestEntityNamecheck(t *testing.T) {
 		t.Run(tcs[idx].input, func(t *testing.T) {
 			tc := tcs[idx]
 			err := EntityNamecheck(tc.input, tc.entityType)
-			if !((err == nil && tc.ok) || (err != nil && !tc.ok)) {
+			if (tc.ok && err != nil) || (!tc.ok && err == nil) {
 				t.Errorf("expecting ok=%v but got err=%v", tc.ok, err)
 			}
 		})

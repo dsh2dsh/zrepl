@@ -251,7 +251,7 @@ func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, f
 
 	fmt.Printf("most recent v2 replication cursor:\n%#v", oldCursor)
 
-	if !(mostRecentNew.CreateTXG >= oldCursor.CreateTXG) {
+	if oldCursor.CreateTXG > mostRecentNew.CreateTXG {
 		return errors.New("v1 replication cursor createtxg is higher than v2 cursor's, skipping this filesystem")
 	}
 
