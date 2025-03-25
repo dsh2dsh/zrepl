@@ -31,7 +31,6 @@ linters:
     - "perfsprint"
     - "prealloc"
     - "predeclared"
-    - "revive"
     - "sloglint"
     - "testifylint"
     - "unconvert"
@@ -65,10 +64,6 @@ linters:
       # suppressed.
       # Default: false
       require-specific: true
-
-    revive:
-      rules:
-        - name: "time-equal"
 
     sloglint:
       # Enforce using attributes only (overrides no-mixed-args, incompatible with kv-only).
