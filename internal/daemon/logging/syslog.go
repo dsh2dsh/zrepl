@@ -33,39 +33,47 @@ func (self *SyslogOutlet) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (self *SyslogOutlet) Handle(_ context.Context, r slog.Record) error {
-	b, err := self.Formatter.Format(r)
-	if err != nil {
+	if err := self.initWriter(); err != nil || self.writer == nil {
 		return err
 	}
+	w := self.levelWriter(r.Level)
+	return self.Formatter.FormatWithCallback(r,
+		func(b []byte) error { return w(string(b)) })
+}
 
-	if self.writer == nil {
-		now := time.Now()
-		if now.Sub(self.lastConnectAttempt) < self.RetryInterval {
+func (self *SyslogOutlet) initWriter() error {
+	if self.writer != nil {
+		return nil
+	}
+
+	if !self.lastConnectAttempt.IsZero() {
+		if time.Since(self.lastConnectAttempt) < self.RetryInterval {
 			return nil // not an error toward logger
 		}
-		self.writer, err = syslog.New(self.Facility, "zrepl")
-		self.lastConnectAttempt = time.Now()
-		if err != nil {
-			self.writer = nil
-			return fmt.Errorf("new syslog writer: %w", err)
-		}
 	}
 
-	s := string(b)
-	//nolint:wrapcheck // not needed
-	switch r.Level {
-	case slog.LevelDebug:
-		return self.writer.Debug(s)
-	case slog.LevelInfo:
-		return self.writer.Info(s)
-	case slog.LevelWarn:
-		return self.writer.Warning(s)
-	case slog.LevelError:
-		return self.writer.Err(s)
-	default:
-		// write as error as reaching this case is in fact an error
-		return self.writer.Err(s)
+	w, err := syslog.New(self.Facility, "zrepl")
+	self.lastConnectAttempt = time.Now()
+	if err != nil {
+		return fmt.Errorf("new syslog writer: %w", err)
 	}
+	self.writer = w
+	return nil
+}
+
+func (self *SyslogOutlet) levelWriter(l slog.Level) func(string) error {
+	switch l {
+	case slog.LevelDebug:
+		return self.writer.Debug
+	case slog.LevelInfo:
+		return self.writer.Info
+	case slog.LevelWarn:
+		return self.writer.Warning
+	case slog.LevelError:
+		return self.writer.Err
+	}
+	// write as error as reaching this case is in fact an error
+	return self.writer.Err
 }
 
 func (self *SyslogOutlet) WithAttrs(attrs []slog.Attr) slog.Handler {

@@ -118,13 +118,15 @@ func (self *SlogFormatter) hiddenField(name string) bool {
 	return hide
 }
 
-func (self *SlogFormatter) Format(r slog.Record) ([]byte, error) {
+func (self *SlogFormatter) FormatWithCallback(r slog.Record,
+	cb func(b []byte) error,
+) error {
 	self.lock()
 	defer self.unlock()
 	if err := self.format(r); err != nil {
-		return nil, err
+		return err
 	}
-	return bytes.Clone(self.b.Bytes()), nil
+	return cb(self.b.Bytes())
 }
 
 func (self *SlogFormatter) lock() {
