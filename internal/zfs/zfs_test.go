@@ -525,7 +525,7 @@ func TestSendStream_Close_afterRead(t *testing.T) {
 	var stderrBuf bytes.Buffer
 	pipeReader, err := cmd.PipeTo(nil, nil, &stderrBuf)
 	require.NoError(t, err)
-	require.NoError(t, cmd.StartPipe())
+	require.NoError(t, cmd.Start())
 
 	stream := NewSendStream(cmd, pipeReader, &stderrBuf, cancel)
 	stream.testMode = true
@@ -547,7 +547,7 @@ func TestSendStream_Close_noRead(t *testing.T) {
 	var stderrBuf bytes.Buffer
 	pipeReader, err := cmd.PipeTo(nil, nil, &stderrBuf)
 	require.NoError(t, err)
-	require.NoError(t, cmd.StartPipe())
+	require.NoError(t, cmd.Start())
 
 	stream := NewSendStream(cmd, pipeReader, &stderrBuf, cancel)
 	stream.testMode = true
@@ -556,4 +556,102 @@ func TestSendStream_Close_noRead(t *testing.T) {
 	t.Log(zfsError)
 	assert.Contains(t, zfsError.Error(), "signal: broken pipe")
 	assert.Empty(t, stderrBuf.Bytes())
+}
+
+func TestZFSSendArgsValidated_fromToAbs(t *testing.T) {
+	tests := []struct {
+		name string
+		args ZFSSendArgsValidated
+		from string
+		to   string
+	}{
+		{
+			name: "with To",
+			args: ZFSSendArgsValidated{
+				ZFSSendArgsUnvalidated: ZFSSendArgsUnvalidated{
+					FS: "zroot/zrepl",
+					To: &ZFSSendArgVersion{RelName: "@snap"},
+				},
+			},
+			to: "zroot/zrepl@snap",
+		},
+		{
+			name: "with From and To",
+			args: ZFSSendArgsValidated{
+				ZFSSendArgsUnvalidated: ZFSSendArgsUnvalidated{
+					FS:   "zroot/zrepl",
+					From: &ZFSSendArgVersion{RelName: "@snap1"},
+					To:   &ZFSSendArgVersion{RelName: "@snap2"},
+				},
+			},
+			from: "zroot/zrepl@snap1",
+			to:   "zroot/zrepl@snap2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			from, to, err := tt.args.fromToAbs()
+			require.NoError(t, err)
+			assert.Equal(t, tt.from, from)
+			assert.Equal(t, tt.to, to)
+		})
+	}
+}
+
+func TestZFSSendArgsValidated_env(t *testing.T) {
+	const resumeToken = "123"
+
+	tests := []struct {
+		name string
+		args ZFSSendArgsValidated
+		env  map[string]string
+	}{
+		{
+			name: "with ResumeToken",
+			args: ZFSSendArgsValidated{
+				ZFSSendArgsUnvalidated: ZFSSendArgsUnvalidated{
+					ZFSSendFlags: ZFSSendFlags{
+						ResumeToken: resumeToken,
+					},
+				},
+			},
+			env: map[string]string{"ZREPL_SEND_RESUME_TOKEN": resumeToken},
+		},
+		{
+			name: "with To",
+			args: ZFSSendArgsValidated{
+				ZFSSendArgsUnvalidated: ZFSSendArgsUnvalidated{
+					FS: "zroot/zrepl",
+					To: &ZFSSendArgVersion{RelName: "@snap"},
+				},
+			},
+			env: map[string]string{
+				"ZREPL_SEND_FROM":     "",
+				"ZREPL_SEND_SNAPSHOT": "zroot/zrepl@snap",
+			},
+		},
+		{
+			name: "with From and To",
+			args: ZFSSendArgsValidated{
+				ZFSSendArgsUnvalidated: ZFSSendArgsUnvalidated{
+					FS:   "zroot/zrepl",
+					From: &ZFSSendArgVersion{RelName: "@snap1"},
+					To:   &ZFSSendArgVersion{RelName: "@snap2"},
+				},
+			},
+			env: map[string]string{
+				"ZREPL_SEND_FROM":     "zroot/zrepl@snap1",
+				"ZREPL_SEND_SNAPSHOT": "zroot/zrepl@snap2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env, err := tt.args.env()
+			require.NoError(t, err)
+			assert.Equal(t, tt.env, env)
+		})
+	}
 }

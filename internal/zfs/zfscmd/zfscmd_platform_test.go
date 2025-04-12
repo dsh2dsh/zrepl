@@ -94,7 +94,7 @@ func TestSigpipe(t *testing.T) {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	var output bytes.Buffer
-	cmd.SetStdio(Stdio{
+	cmd.setStdio(Stdio{
 		Stdin:  r,
 		Stdout: &output,
 		Stderr: &output,
@@ -198,19 +198,19 @@ func TestCmd_Pipe(t *testing.T) {
 			assert.Equal(t, tt.wantCmdStr, cmd.String())
 
 			if tt.startErr {
-				require.Error(t, cmd.StartPipe())
-				require.NoError(t, cmd.WaitPipe())
+				require.Error(t, cmd.startPipe())
+				require.NoError(t, cmd.waitPipe())
 				return
 			}
-			require.NoError(t, cmd.StartPipe())
+			require.NoError(t, cmd.startPipe())
 
 			b, err := io.ReadAll(pipeReader)
 			require.NoError(t, err)
 
 			if tt.waitErr {
-				require.Error(t, cmd.WaitPipe())
+				require.Error(t, cmd.waitPipe())
 			} else {
-				require.NoError(t, cmd.WaitPipe())
+				require.NoError(t, cmd.waitPipe())
 			}
 			assert.Empty(t, stderr.String())
 

@@ -211,12 +211,7 @@ func (s *SendStream) closeWait() error {
 	return nil
 }
 
-func (s *SendStream) wait() error {
-	if s.testMode {
-		return s.cmd.WaitPipe()
-	}
-	return s.cmd.Wait()
-}
+func (s *SendStream) wait() error { return s.cmd.Wait() }
 
 func (s *SendStream) TestOnly_ReplaceStdoutReader(f io.ReadCloser,
 ) io.ReadCloser {
@@ -504,35 +499,59 @@ func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
 	return args
 }
 
-func (a ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
-	flags := a.buildSendFlagsUnchecked()
+func (self *ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
+	flags := self.buildSendFlagsUnchecked()
 
-	if a.ResumeToken != "" {
+	if self.ResumeToken != "" {
 		return flags, nil
 	}
 
-	toV, err := absVersion(a.FS, a.To)
+	fromV, toV, err := self.fromToAbs()
 	if err != nil {
 		return nil, err
-	}
-
-	fromV := ""
-	if a.From != nil {
-		fromV, err = absVersion(a.FS, a.From)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	switch {
 	case fromV == "": // Initial
 		flags = append(flags, toV)
-	case a.Multi:
+	case self.Multi:
 		flags = append(flags, "-I", fromV, toV)
 	default:
 		flags = append(flags, "-i", fromV, toV)
 	}
 	return flags, nil
+}
+
+func (self *ZFSSendArgsValidated) fromToAbs() (from string, to string,
+	err error,
+) {
+	if self.From != nil {
+		from, err = absVersion(self.FS, self.From)
+		if err != nil {
+			return
+		}
+	}
+	to, err = absVersion(self.FS, self.To)
+	return
+}
+
+func (self *ZFSSendArgsValidated) env() (map[string]string, error) {
+	if self.ResumeToken != "" {
+		return map[string]string{
+			"ZREPL_SEND_RESUME_TOKEN": self.ResumeToken,
+		}, nil
+	}
+
+	from, to, err := self.fromToAbs()
+	if err != nil {
+		return nil, err
+	}
+
+	env := map[string]string{
+		"ZREPL_SEND_FROM":     from,
+		"ZREPL_SEND_SNAPSHOT": to,
+	}
+	return env, nil
 }
 
 type ZFSSendArgsResumeTokenMismatchError struct {
@@ -552,7 +571,9 @@ const (
 	ZFSSendArgsResumeTokenMismatchFilesystem
 )
 
-func (c ZFSSendArgsResumeTokenMismatchErrorCode) fmt(format string, args ...interface{}) *ZFSSendArgsResumeTokenMismatchError {
+func (c ZFSSendArgsResumeTokenMismatchErrorCode) fmt(format string,
+	args ...any,
+) *ZFSSendArgsResumeTokenMismatchError {
 	return &ZFSSendArgsResumeTokenMismatchError{
 		What: c,
 		Err:  fmt.Errorf(format, args...),
@@ -660,12 +681,21 @@ func ZFSSend(
 	if err != nil {
 		return nil, err
 	}
+
+	env, err := sendArgs.env()
+	if err != nil {
+		return nil, err
+	}
+
 	args := make([]string, 0, len(sargs)+1)
 	args = append(args, "send")
 	args = append(args, sargs...)
 
 	ctx, cancel := context.WithCancel(ctx)
-	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).WithCommand(ZfsBin, args)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...).
+		WithEnv(env).
+		WithPipeLen(len(pipeCmds))
+
 	stderrBuf := new(bytes.Buffer)
 	pipeReader, err := cmd.PipeTo(pipeCmds, nil, stderrBuf)
 	if err != nil {
@@ -884,8 +914,9 @@ func ZFSRecv(
 	args = append(args, "recv")
 	args = append(args, recvFlags...)
 	args = append(args, fs)
-	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).
-		WithCommand(ZfsBin, args)
+	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...).
+		WithEnv(map[string]string{"ZREPL_RECV_FS": fs}).
+		WithPipeLen(len(pipeCmds))
 
 	// TODO report bug upstream Setup an unused stdout buffer. Otherwise, ZoL
 	// v0.6.5.9-1 3.16.0-4-amd64 writes the following error to stderr and exits

@@ -315,6 +315,10 @@ pkg install zrepl-dsh2dsh
       - [ "unzstd" ]
   ```
 
+  `zrepl` exports some `zfs send|recv` args as env variables:
+  `ZREPL_SEND_RESUME_TOKEN`, `ZREPL_SEND_FROM`, `ZREPL_SEND_SNAPSHOT` and
+  `ZREPL_RECV_FS`.
+
 * Added Icinga/Nagios checks for checking the daemon is alive, snapshots count
   is ok, latest or oldest snapshots are not too old.
 

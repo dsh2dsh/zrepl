@@ -27,11 +27,15 @@ func New(ctx context.Context) *Cmd {
 }
 
 type Cmd struct {
-	cmd                                      *exec.Cmd
-	cmds                                     []*exec.Cmd
-	ctx                                      context.Context
-	mtx                                      sync.RWMutex
-	startedAt, waitStartedAt, waitReturnedAt time.Time
+	cmd  *exec.Cmd
+	cmds []*exec.Cmd
+	ctx  context.Context
+	mtx  sync.RWMutex
+	env  []string
+
+	startedAt      time.Time
+	waitStartedAt  time.Time
+	waitReturnedAt time.Time
 
 	usage        usage
 	stderrOutput []byte
@@ -43,6 +47,15 @@ type Cmd struct {
 func (c *Cmd) WithCommand(name string, args []string) *Cmd {
 	c.cmd = exec.CommandContext(c.ctx, name, args...)
 	c.cmds = append(c.cmds, c.cmd)
+	return c
+}
+
+func (c *Cmd) WithEnv(env map[string]string) *Cmd {
+	c.env = make([]string, 0, len(os.Environ())+len(env))
+	c.env = append(c.env, os.Environ()...)
+	for k, v := range env {
+		c.env = append(c.env, k+"="+v)
+	}
 	return c
 }
 
@@ -106,7 +119,7 @@ type Stdio struct {
 	Stderr io.Writer
 }
 
-func (c *Cmd) SetStdio(stdio Stdio) {
+func (c *Cmd) setStdio(stdio Stdio) {
 	c.cmd.Stdin = stdio.Stdin
 	c.cmd.Stderr = stdio.Stderr
 	c.cmd.Stdout = stdio.Stdout
@@ -142,9 +155,9 @@ func (c *Cmd) log() *slog.Logger {
 // be called repeatedly.
 func (c *Cmd) Start() error {
 	c.startPre()
-	err := c.StartPipe()
+	err := c.startPipe()
 	if err != nil {
-		_ = c.WaitPipe()
+		_ = c.waitPipe()
 	}
 	c.startPost(err)
 	return err
@@ -166,13 +179,16 @@ func (c *Cmd) Process() *os.Process {
 // Only call this method after a successful call to .Start().
 func (c *Cmd) Wait() (err error) {
 	c.waitPre()
-	err = c.WaitPipe()
+	err = c.waitPipe()
 	c.waitPost(err)
 	return err
 }
 
 func (c *Cmd) startPre() {
 	startPreLogging(c, time.Now())
+	for _, cmd := range c.cmds {
+		cmd.Env = c.env
+	}
 }
 
 func (c *Cmd) startPost(err error) {
@@ -231,13 +247,13 @@ func (c *Cmd) waitPost(err error) {
 
 	if s == nil {
 		c.usage = usage{
-			total_secs:  c.Runtime().Seconds(),
+			total_secs:  c.runtime().Seconds(),
 			system_secs: -1,
 			user_secs:   -1,
 		}
 	} else {
 		c.usage = usage{
-			total_secs:  c.Runtime().Seconds(),
+			total_secs:  c.runtime().Seconds(),
 			system_secs: s.SystemTime().Seconds(),
 			user_secs:   s.UserTime().Seconds(),
 		}
@@ -255,7 +271,7 @@ func (c *Cmd) LogError(err error, debug bool) {
 }
 
 // returns 0 if the command did not yet finish
-func (c *Cmd) Runtime() time.Duration {
+func (c *Cmd) runtime() time.Duration {
 	if c.waitReturnedAt.IsZero() {
 		return 0
 	}
@@ -305,7 +321,7 @@ func (c *Cmd) PipeFrom(cmds [][]string, stdin io.ReadCloser, stdout,
 	}
 
 	c.cmds = append(c.cmds, c.cmd)
-	c.SetStdio(Stdio{
+	c.setStdio(Stdio{
 		Stdin:  r,
 		Stdout: stdout,
 		Stderr: stderr,
@@ -313,7 +329,7 @@ func (c *Cmd) PipeFrom(cmds [][]string, stdin io.ReadCloser, stdout,
 	return nil
 }
 
-func (c *Cmd) StartPipe() error {
+func (c *Cmd) startPipe() error {
 	for _, cmd := range c.cmds {
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("start %q: %w", cmd.String(), err)
@@ -322,7 +338,7 @@ func (c *Cmd) StartPipe() error {
 	return nil
 }
 
-func (c *Cmd) WaitPipe() error {
+func (c *Cmd) waitPipe() error {
 	var pipeErr error
 	for i, cmd := range c.cmds {
 		if cmd.Process == nil {
