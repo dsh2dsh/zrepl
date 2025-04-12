@@ -692,9 +692,9 @@ func ZFSSend(
 	args = append(args, sargs...)
 
 	ctx, cancel := context.WithCancel(ctx)
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...).
-		WithEnv(env).
-		WithPipeLen(len(pipeCmds))
+	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).
+		WithCommand(ZfsBin, args).
+		WithEnv(env)
 
 	stderrBuf := new(bytes.Buffer)
 	pipeReader, err := cmd.PipeTo(pipeCmds, nil, stderrBuf)
@@ -914,9 +914,9 @@ func ZFSRecv(
 	args = append(args, "recv")
 	args = append(args, recvFlags...)
 	args = append(args, fs)
-	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...).
-		WithEnv(map[string]string{"ZREPL_RECV_FS": fs}).
-		WithPipeLen(len(pipeCmds))
+	cmd := zfscmd.New(ctx).WithPipeLen(len(pipeCmds)).
+		WithCommand(ZfsBin, args).
+		WithEnv(map[string]string{"ZREPL_RECV_FS": fs})
 
 	// TODO report bug upstream Setup an unused stdout buffer. Otherwise, ZoL
 	// v0.6.5.9-1 3.16.0-4-amd64 writes the following error to stderr and exits
