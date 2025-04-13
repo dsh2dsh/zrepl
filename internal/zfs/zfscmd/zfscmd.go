@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -65,7 +66,11 @@ func (c *Cmd) WithLogError(v bool) *Cmd {
 }
 
 func (c *Cmd) WithPipeLen(n int) *Cmd {
-	c.cmds = make([]*exec.Cmd, 0, n+1)
+	if c.cmds == nil {
+		c.cmds = make([]*exec.Cmd, 0, n+1) // including c.cmd
+	} else {
+		c.cmds = slices.Grow(c.cmds, n)
+	}
 	return c
 }
 
