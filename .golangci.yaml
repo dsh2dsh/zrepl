@@ -49,7 +49,7 @@ linters:
         - "io/ioutil.ReadFile"
         - "io.Copy(*bytes.Buffer)"
         - "io.Copy(os.Stdout)"
-        - "(io.ReadCloser).Close"
+        - "(io.Closer).Close"
         - "(net.Conn).Close"
         - "(*os.File).Close"
         - "(*github.com/fatih/color.Color).Fprintf"
