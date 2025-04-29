@@ -123,7 +123,7 @@ type ActiveJob struct {
 	Type               string                   `yaml:"type" validate:"required"`
 	Name               string                   `yaml:"name" validate:"required"`
 	Connect            Connect                  `yaml:"connect"`
-	Pruning            PruningSenderReceiver    `yaml:"pruning" validate:"required"`
+	Pruning            PruningSenderReceiver    `yaml:"pruning"`
 	Replication        Replication              `yaml:"replication"`
 	ConflictResolution ConflictResolution       `yaml:"conflict_resolution"`
 	MonitorSnapshots   MonitorSnapshots         `yaml:"monitor"`
