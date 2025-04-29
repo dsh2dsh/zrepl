@@ -17,7 +17,7 @@ type DatasetFilter interface {
 
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 ) ([]*DatasetPath, error) {
-	props := []string{"name"}
+	props := []string{"name", "written"}
 	args := []string{"-r", "-t", "filesystem,volume"}
 	n, pfs := filter.TopFilesystems()
 	if n != 0 {
@@ -31,7 +31,7 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 			if err != nil {
 				return nil, err
 			}
-			path, err := NewDatasetPath(fields[0])
+			path, err := NewDatasetPath(fields[0], WithWritten(fields[1]))
 			if err != nil {
 				return nil, err
 			}

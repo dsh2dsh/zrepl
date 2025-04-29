@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
-func NewDatasetPath(s string) (*DatasetPath, error) {
+func NewDatasetPath(s string, opts ...DatasetPathOption) (*DatasetPath, error) {
 	p := new(DatasetPath)
 	if s == "" {
 		p.comps = make([]string, 0)
@@ -30,13 +31,36 @@ func NewDatasetPath(s string) (*DatasetPath, error) {
 	if p.comps[len(p.comps)-1] == "" {
 		return nil, errors.New("must not end with a '/'")
 	}
+
+	for _, fn := range opts {
+		if err := fn(p); err != nil {
+			return nil, fmt.Errorf("zfs: parse dataset path %q: %w", s, err)
+		}
+	}
 	return p, nil
 }
 
+type DatasetPathOption func(p *DatasetPath) error
+
+func WithWritten(s string) DatasetPathOption {
+	return func(p *DatasetPath) error { return p.parseWritten(s) }
+}
+
 type DatasetPath struct {
-	comps           []string
+	comps   []string
+	written uint64
+
 	recursive       bool
 	recursiveParent *DatasetPath
+}
+
+func (self *DatasetPath) parseWritten(s string) error {
+	written, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse 'written' property %q: %w", s, err)
+	}
+	self.written = written
+	return nil
 }
 
 func (self *DatasetPath) ToString() string {
@@ -122,3 +146,5 @@ func (self *DatasetPath) SetRecursiveParent(parent *DatasetPath) {
 func (self *DatasetPath) Recursive() bool { return self.recursive }
 
 func (self *DatasetPath) SetRecursive() { self.recursive = true }
+
+func (self *DatasetPath) Written() uint64 { return self.written }

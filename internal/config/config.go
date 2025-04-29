@@ -337,14 +337,15 @@ type SnapshottingEnum struct {
 }
 
 type SnapshottingPeriodic struct {
-	Type            string        `yaml:"type" validate:"required"`
-	Prefix          string        `yaml:"prefix" validate:"required"`
-	Interval        Duration      `yaml:"interval"`
-	Cron            string        `yaml:"cron"`
-	Hooks           []HookCommand `yaml:"hooks" validate:"dive"`
-	TimestampFormat string        `yaml:"timestamp_format" default:"dense" validate:"required"`
-	TimestampLocal  bool          `yaml:"timestamp_local" default:"true"`
-	Concurrency     uint          `yaml:"concurrency"`
+	Type             string        `yaml:"type" validate:"required"`
+	Prefix           string        `yaml:"prefix" validate:"required"`
+	Interval         Duration      `yaml:"interval"`
+	Cron             string        `yaml:"cron"`
+	Hooks            []HookCommand `yaml:"hooks" validate:"dive"`
+	TimestampFormat  string        `yaml:"timestamp_format" default:"dense" validate:"required"`
+	TimestampLocal   bool          `yaml:"timestamp_local" default:"true"`
+	Concurrency      uint          `yaml:"concurrency"`
+	WrittenThreshold uint64        `yaml:"written_threshold"`
 }
 
 func (self *SnapshottingPeriodic) CronSpec() string {

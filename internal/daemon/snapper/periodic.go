@@ -66,6 +66,7 @@ func periodicFromConfig(fsf *filters.DatasetFilter,
 				hooks:           hookList,
 				concurrency:     concurrency,
 			},
+			writtenThreshold: in.WrittenThreshold,
 			// ctx and log is set in Run()
 		},
 
@@ -76,10 +77,11 @@ func periodicFromConfig(fsf *filters.DatasetFilter,
 }
 
 type periodicArgs struct {
-	ctx      context.Context
-	interval time.Duration
-	fsf      *filters.DatasetFilter
-	planArgs planArgs
+	ctx              context.Context
+	interval         time.Duration
+	fsf              *filters.DatasetFilter
+	planArgs         planArgs
+	writtenThreshold uint64
 }
 
 type Periodic struct {
@@ -235,6 +237,20 @@ func periodicStatePlan(a periodicArgs, u updater) state {
 	fss, err := zfs.ZFSListMapping(a.ctx, a.fsf)
 	if err != nil {
 		return onErr(err, u)
+	}
+
+	if a.writtenThreshold != 0 {
+		log := getLogger(a.ctx)
+		fss = slices.DeleteFunc(fss, func(p *zfs.DatasetPath) bool {
+			if p.Written() < a.writtenThreshold {
+				log.Info("skip snapshotting, because 'written' below threshold",
+					slog.String("fs", p.ToString()),
+					slog.Uint64("written", p.Written()),
+					slog.Uint64("threshold", a.writtenThreshold))
+				return true
+			}
+			return false
+		})
 	}
 	p := makePlan(a.planArgs, fss)
 

@@ -421,9 +421,9 @@ pkg install zrepl-dsh2dsh
     keep_receiver:
   ```
 
-  which keeps all snapshots, now it's possible to omit `pruning:` at all, or one
-  of `keep_sender:` or `keep_receiver:`. In this case zrepl will early abort
-  pruning and mark it as done.
+  which keeps all snapshots, now it's possible to omit `pruning:` at all, or
+  just one of `keep_sender:` or `keep_receiver:`. In this case zrepl will early
+  abort pruning and mark it as done.
 
   Originally zrepl requests all snapshots and does nothing after that, because
   pruning configured to keep all snapshots, but anyway it spends some time
@@ -669,6 +669,23 @@ pkg install zrepl-dsh2dsh
 
   Runs `zfs list filesystem...`, if possible, and list only specific datasets,
   instead of `zfs list`, which lists every dataset on the entire system.
+
+* Don't create empty or small snapshots
+
+  New option `written_threshold` defines the amount of space that should be
+  written since the previous snapshot, before the new snapshot can be created.
+
+  With configuration like this:
+
+  ```yaml
+  snapshotting:
+    type: "periodic"
+    written_threshold: 1024
+  ```
+
+  any dataset, which has written less than 1024 bytes, will be skipped.
+
+  See also zrepl/zrepl#728
 
 ## Upstream user documentation
 
