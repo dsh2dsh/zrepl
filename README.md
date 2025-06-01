@@ -15,6 +15,10 @@ Stable version of this project can be easy installed on FreeBSD using
 pkg install zrepl-dsh2dsh
 ```
 
+I don't build RPMs, but if somebody needs, here is a [third party
+repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
+[fluoros-jp](https://github.com/fluoros-jp/zrepl-copr) for that.
+
 ## Breaking changes!!!
 
 * The project has switched from gRPC to REST API.
