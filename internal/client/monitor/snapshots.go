@@ -185,7 +185,7 @@ func (self *SnapCheck) datasetsFromRootFs(
 	}
 
 	propsByFS, err := zfs.ZFSGetRecursive(ctx,
-		rootFs, -1, []string{"filesystem"},
+		rootFs, -1, []string{"filesystem", "volume"},
 		[]string{zfs.PlaceholderPropertyName}, zfs.SourceAny)
 	if err != nil {
 		return nil, fmt.Errorf("properties of %q: %w", rootFs, err)
