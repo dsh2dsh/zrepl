@@ -27,6 +27,7 @@ func NewSenderOnce(ctx context.Context, endpoint logic.Sender,
 
 type SenderOnce struct {
 	logic.Sender
+
 	listFilesystemsOnce func() (*pdu.ListFilesystemRes, error)
 }
 

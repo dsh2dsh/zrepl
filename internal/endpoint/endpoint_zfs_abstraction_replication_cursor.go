@@ -240,9 +240,10 @@ func TentativeReplicationCursorExtractor(fs *zfs.DatasetPath, v zfs.FilesystemVe
 }
 
 type ReplicationCursorV1 struct {
+	zfs.FilesystemVersion
+
 	Type AbstractionType
 	FS   string
-	zfs.FilesystemVersion
 }
 
 func (c ReplicationCursorV1) GetType() AbstractionType                    { return c.Type }

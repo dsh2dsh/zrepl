@@ -696,6 +696,7 @@ func listAbstractionsImplFS(ctx context.Context, fs string, query *ListZFSHoldsA
 
 type BatchDestroyResult struct {
 	Abstraction
+
 	DestroyErr error
 }
 
@@ -783,6 +784,7 @@ func ListStale(ctx context.Context, q ListZFSHoldsAndBookmarksQuery) (*Staleness
 
 type fsAjobAtype struct {
 	fsAndJobId
+
 	Type AbstractionType
 }
 

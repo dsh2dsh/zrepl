@@ -309,13 +309,15 @@ func (v ZFSSendArgVersion) MustBeBookmark() {
 
 // When updating this struct, check Validate and ValidateCorrespondsToResumeToken (POTENTIALLY SECURITY SENSITIVE)
 type ZFSSendArgsUnvalidated struct {
+	ZFSSendFlags
+
 	FS       string
 	From, To *ZFSSendArgVersion // From may be nil
-	ZFSSendFlags
 }
 
 type ZFSSendArgsValidated struct {
 	ZFSSendArgsUnvalidated
+
 	FromVersion *FilesystemVersion
 	ToVersion   FilesystemVersion
 }

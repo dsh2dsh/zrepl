@@ -14,6 +14,7 @@ func NewReadCloser(rc io.ReadCloser) *ReadCloser {
 // the bytes written to during copying.
 type ReadCloser struct {
 	io.ReadCloser
+
 	count uint64
 }
 

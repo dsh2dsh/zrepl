@@ -254,7 +254,8 @@ type PlaceholderRecvOptions struct {
 }
 
 type PushJob struct {
-	ActiveJob    `yaml:",inline"`
+	ActiveJob `yaml:",inline"`
+
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
 	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
 	Datasets     []DatasetFilter   `yaml:"datasets" validate:"required_without=Filesystems,dive"`
@@ -269,8 +270,9 @@ func (j *PushJob) GetSendOptions() *SendOptions { return &j.Send }
 
 type PullJob struct {
 	ActiveJob `yaml:",inline"`
-	RootFS    string      `yaml:"root_fs" validate:"required"`
-	Recv      RecvOptions `yaml:"recv"`
+
+	RootFS string      `yaml:"root_fs" validate:"required"`
+	Recv   RecvOptions `yaml:"recv"`
 }
 
 func (j *PullJob) GetRootFS() string             { return j.RootFS }
@@ -307,8 +309,9 @@ func (i *PositiveDurationOrManual) UnmarshalYAML(value *yaml.Node) (err error) {
 
 type SinkJob struct {
 	PassiveJob `yaml:",inline"`
-	RootFS     string      `yaml:"root_fs" validate:"required"`
-	Recv       RecvOptions `yaml:"recv"`
+
+	RootFS string      `yaml:"root_fs" validate:"required"`
+	Recv   RecvOptions `yaml:"recv"`
 }
 
 func (j *SinkJob) GetRootFS() string             { return j.RootFS }
@@ -316,7 +319,8 @@ func (j *SinkJob) GetAppendClientIdentity() bool { return true }
 func (j *SinkJob) GetRecvOptions() *RecvOptions  { return &j.Recv }
 
 type SourceJob struct {
-	PassiveJob   `yaml:",inline"`
+	PassiveJob `yaml:",inline"`
+
 	Replication  Replication       `yaml:"replication"`
 	Snapshotting SnapshottingEnum  `yaml:"snapshotting"`
 	Filesystems  FilesystemsFilter `yaml:"filesystems" validate:"required_without=Datasets"`
@@ -443,21 +447,24 @@ type LoggingOutletCommon struct {
 
 type FileLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	FileName            string `yaml:"filename"`
+
+	FileName string `yaml:"filename"`
 }
 
 type SyslogLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	Facility            SyslogFacility `yaml:"facility" default:"local0" validate:"required"`
-	RetryInterval       time.Duration  `yaml:"retry_interval" default:"10s" validate:"gt=0s"`
+
+	Facility      SyslogFacility `yaml:"facility" default:"local0" validate:"required"`
+	RetryInterval time.Duration  `yaml:"retry_interval" default:"10s" validate:"gt=0s"`
 }
 
 type TCPLoggingOutlet struct {
 	LoggingOutletCommon `yaml:",inline"`
-	Address             string               `yaml:"address" validate:"required,hostname_port"`
-	Net                 string               `yaml:"net" default:"tcp" validate:"required"`
-	RetryInterval       time.Duration        `yaml:"retry_interval" default:"10s" validate:"gt=0s"`
-	TLS                 *TCPLoggingOutletTLS `yaml:"tls"`
+
+	Address       string               `yaml:"address" validate:"required,hostname_port"`
+	Net           string               `yaml:"net" default:"tcp" validate:"required"`
+	RetryInterval time.Duration        `yaml:"retry_interval" default:"10s" validate:"gt=0s"`
+	TLS           *TCPLoggingOutletTLS `yaml:"tls"`
 }
 
 type TCPLoggingOutletTLS struct {

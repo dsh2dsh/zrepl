@@ -9,9 +9,10 @@ import (
 )
 
 type bookmarkBasedAbstraction struct {
-	Type AbstractionType
-	FS   string
 	zfs.FilesystemVersion
+
+	Type  AbstractionType
+	FS    string
 	JobID JobID
 }
 
@@ -42,9 +43,10 @@ func (b bookmarkBasedAbstraction) Destroy(ctx context.Context) error {
 }
 
 type holdBasedAbstraction struct {
-	Type AbstractionType
-	FS   string
 	zfs.FilesystemVersion
+
+	Type  AbstractionType
+	FS    string
 	Tag   string
 	JobID JobID
 }

@@ -22,6 +22,7 @@ linters:
     - "asciicheck"
     - "bidichk"
     - "copyloopvar"
+    - "embeddedstructfieldcheck"
     - "errorlint"
     - "gocritic"
     - "makezero"
@@ -54,6 +55,10 @@ linters:
         - "(*os.File).Close"
         - "(*github.com/fatih/color.Color).Fprintf"
         - "(*github.com/fatih/color.Color).Printf"
+
+      # Display function signature instead of selector.
+      # Default: false
+      verbose: true
 
     nolintlint:
       # Enable to require an explanation of nonzero length after each nolint
