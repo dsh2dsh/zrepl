@@ -47,7 +47,7 @@ func DefaultRenderStyles() (s RenderStyles) {
 
 	s.SnapState = lipgloss.NewStyle()
 	s.SnapTime = lipgloss.NewStyle().Align(lipgloss.Right)
-	return
+	return s
 }
 
 type RenderStyles struct {

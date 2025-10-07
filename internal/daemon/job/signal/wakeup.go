@@ -6,7 +6,7 @@ type ctxKeyWakeup struct{}
 
 var wakeupCtxKey ctxKeyWakeup = struct{}{}
 
-func WithWakeup(ctx context.Context, wakeup context.Context) context.Context {
+func WithWakeup(ctx, wakeup context.Context) context.Context {
 	return context.WithValue(ctx, wakeupCtxKey, wakeup)
 }
 

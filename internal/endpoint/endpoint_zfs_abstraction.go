@@ -534,7 +534,7 @@ func (e ListAbstractionsError) Error() string {
 }
 
 type (
-	putListAbstractionErr func(err error, fs string, what string)
+	putListAbstractionErr func(err error, fs, what string)
 	putListAbstraction    func(a Abstraction)
 )
 
@@ -563,21 +563,19 @@ func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery,
 	defer drainDone()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		defer wg.Done()
 		for a := range outChan {
 			out = append(out, a)
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		defer wg.Done()
 		for err := range outErrsChan {
 			outErrs = append(outErrs, err)
 		}
-	}()
+	})
 	wg.Wait()
 	return out, outErrs, nil
 }
@@ -607,7 +605,7 @@ func ListAbstractionsStreamed(ctx context.Context,
 	outErrs := make(chan ListAbstractionsError)
 	out := make(chan Abstraction)
 
-	errCb := func(err error, fs string, what string) {
+	errCb := func(err error, fs, what string) {
 		outErrs <- ListAbstractionsError{Err: err, FS: fs, What: what}
 	}
 	emitAbstraction := func(a Abstraction) {

@@ -30,7 +30,7 @@ func makeVisitRecorder() (v DatasetPathsVisitor, rec *visitRecorder) {
 		rec.visits = append(rec.visits, *v)
 		return true
 	}
-	return
+	return v, rec
 }
 
 func buildForest(paths []*DatasetPath) (f *DatasetPathForest) {
@@ -38,7 +38,7 @@ func buildForest(paths []*DatasetPath) (f *DatasetPathForest) {
 	for _, p := range paths {
 		f.Add(p)
 	}
-	return
+	return f
 }
 
 type expectedDatasetPathVisit struct {

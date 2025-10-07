@@ -123,7 +123,7 @@ func (self *SnapJobStatus) Error() string {
 func (self *SnapJobStatus) Running() (d time.Duration, ok bool) {
 	if s := self.Snapshotting; s != nil {
 		if d, ok = s.Running(); ok {
-			return
+			return d, ok
 		}
 	}
 
@@ -134,7 +134,7 @@ func (self *SnapJobStatus) Running() (d time.Duration, ok bool) {
 			_, ok = p.Running()
 		}
 	}
-	return
+	return d, ok
 }
 
 func (self *SnapJobStatus) Cron() string {
@@ -170,7 +170,7 @@ func (self *SnapJobStatus) Steps() (expected, step int) {
 			step++
 		}
 	}
-	return
+	return expected, step
 }
 
 func (self *SnapJobStatus) Progress() (uint64, uint64) {

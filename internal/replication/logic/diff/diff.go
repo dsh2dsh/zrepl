@@ -118,7 +118,6 @@ func IncrementalPath(receiver, sender []*FilesystemVersion) (
 
 	var mrcaCandidate struct {
 		found bool
-		guid  uint64
 		r, s  int
 	}
 
@@ -126,7 +125,6 @@ findCandidate:
 	for r := len(receiver) - 1; r >= 0; r-- {
 		for s := len(sender) - 1; s >= 0; s-- {
 			if sender[s].GetGuid() == receiver[r].GetGuid() {
-				mrcaCandidate.guid = sender[s].GetGuid()
 				mrcaCandidate.s = s
 				mrcaCandidate.r = r
 				mrcaCandidate.found = true

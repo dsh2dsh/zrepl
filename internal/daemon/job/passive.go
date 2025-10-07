@@ -197,7 +197,7 @@ func (self *PassiveStatus) SleepingUntil() (sleepUntil time.Time) {
 	if snap := self.Snapper; snap != nil {
 		sleepUntil = snap.SleepingUntil()
 	}
-	return
+	return sleepUntil
 }
 
 func (self *PassiveStatus) Steps() (expected, step int) {
@@ -207,7 +207,7 @@ func (self *PassiveStatus) Steps() (expected, step int) {
 			step++
 		}
 	}
-	return
+	return expected, step
 }
 
 func (self *PassiveStatus) Progress() (uint64, uint64) {

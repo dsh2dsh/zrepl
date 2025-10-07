@@ -28,7 +28,7 @@ func (self *Client) Status() (s daemon.Status, err error) {
 	if err != nil {
 		err = fmt.Errorf("daemon status: %w", err)
 	}
-	return
+	return s, err
 }
 
 func (self *Client) StatusRaw() ([]byte, error) {
@@ -72,5 +72,5 @@ func (self *Client) Version() (v version.ZreplVersionInformation, err error) {
 	if err != nil {
 		err = fmt.Errorf("daemon version: %w", err)
 	}
-	return
+	return v, err
 }

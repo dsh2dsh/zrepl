@@ -60,15 +60,15 @@ func (t VersionType) String() string {
 
 func DecomposeVersionString(v string) (fs string, versionType VersionType, name string, err error) {
 	if len(v) < 3 {
-		err = fmt.Errorf("snapshot or bookmark name implausibly short: %s", v)
-		return
+		return fs, versionType, name, fmt.Errorf(
+			"snapshot or bookmark name implausibly short: %s", v)
 	}
 
 	snapSplit := strings.SplitN(v, "@", 2)
 	bookmarkSplit := strings.SplitN(v, "#", 2)
 	if len(snapSplit)*len(bookmarkSplit) != 2 {
-		err = fmt.Errorf("dataset cannot be snapshot and bookmark at the same time: %s", v)
-		return
+		return fs, versionType, name, fmt.Errorf(
+			"dataset cannot be snapshot and bookmark at the same time: %s", v)
 	}
 
 	if len(snapSplit) == 2 {
@@ -185,23 +185,21 @@ func ParseFilesystemVersion(args *ParseFilesystemVersionArgs,
 ) (v FilesystemVersion, err error) {
 	_, v.Type, v.Name, err = DecomposeVersionString(args.fullname)
 	if err != nil {
-		return
+		return v, err
 	}
 
 	if v.Guid, err = strconv.ParseUint(args.guid, 10, 64); err != nil {
-		err = fmt.Errorf("cannot parse GUID %q: %w", args.guid, err)
-		return
+		return v, fmt.Errorf("cannot parse GUID %q: %w", args.guid, err)
 	}
 
 	if v.CreateTXG, err = strconv.ParseUint(args.createtxg, 10, 64); err != nil {
-		err = fmt.Errorf("cannot parse CreateTXG %q: %w", args.createtxg, err)
-		return
+		return v, fmt.Errorf("cannot parse CreateTXG %q: %w", args.createtxg, err)
 	}
 
 	creationUnix, err := strconv.ParseInt(args.creation, 10, 64)
 	if err != nil {
-		err = fmt.Errorf("cannot parse creation date %q: %w", args.creation, err)
-		return
+		return v, fmt.Errorf("cannot parse creation date %q: %w",
+			args.creation, err)
 	} else {
 		v.Creation = time.Unix(creationUnix, 0)
 	}
@@ -209,15 +207,14 @@ func ParseFilesystemVersion(args *ParseFilesystemVersionArgs,
 	switch v.Type {
 	case Bookmark:
 		if args.userrefs != "-" {
-			err = fmt.Errorf(
-				"expecting %q for bookmark property userrefs, got %q", "-", args.userrefs)
-			return
+			return v, fmt.Errorf(
+				"expecting %q for bookmark property userrefs, got %q",
+				"-", args.userrefs)
 		}
 		v.UserRefs = OptionUint64{Valid: false}
 	case Snapshot:
 		if v.UserRefs.Value, err = strconv.ParseUint(args.userrefs, 10, 64); err != nil {
-			err = fmt.Errorf("cannot parse userrefs %q: %w", args.userrefs, err)
-			return
+			return v, fmt.Errorf("cannot parse userrefs %q: %w", args.userrefs, err)
 		}
 		v.UserRefs.Valid = true
 	default:
@@ -292,7 +289,7 @@ func ZFSGetFilesystemVersion(ctx context.Context, ds string,
 	props, err := zfsGet(ctx, ds,
 		[]string{"createtxg", "guid", "creation", "userrefs"}, SourceAny)
 	if err != nil {
-		return
+		return v, err
 	}
 	var args ParseFilesystemVersionArgs
 	return args.

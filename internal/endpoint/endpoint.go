@@ -426,7 +426,7 @@ func (s *Sender) SendDry(ctx context.Context, req *pdu.SendDryReq,
 		}
 		g.Go(func() (err error) {
 			resp.Items[i], err = s.zfsSendDry(ctx, &req.Items[i], sendArgs[i])
-			return
+			return err
 		})
 	}
 	return resp, g.Wait() //nolint:wrapcheck // it's our error
@@ -450,14 +450,13 @@ func (s *Sender) zfsSendDry(ctx context.Context, r *pdu.SendReq,
 ) (resp pdu.SendRes, err error) {
 	si, err := zfs.ZFSSendDry(ctx, args)
 	if err != nil {
-		err = fmt.Errorf("zfs send dry failed: %w", err)
-		return
+		return resp, fmt.Errorf("zfs send dry failed: %w", err)
 	}
 	resp = pdu.SendRes{
 		ExpectedSize:    si.SizeEstimate,
 		UsedResumeToken: r.ResumeToken != "",
 	}
-	return
+	return resp, nil
 }
 
 func (s *Sender) SendCompleted(ctx context.Context, r *pdu.SendCompletedReq,
@@ -586,9 +585,7 @@ func (c *ReceiverConfig) copyIn() {
 	c.InheritProperties = pInherit
 
 	pOverride := make(map[zfsprop.Property]string, len(c.OverrideProperties))
-	for key, value := range c.OverrideProperties {
-		pOverride[key] = value
-	}
+	maps.Copy(pOverride, c.OverrideProperties)
 	c.OverrideProperties = pOverride
 }
 

@@ -87,9 +87,7 @@ type recursiveDatasets struct {
 	skip     map[*DatasetPath]struct{}
 }
 
-func (self *recursiveDatasets) Add(root *DatasetPath, path *DatasetPath,
-	included bool,
-) {
+func (self *recursiveDatasets) Add(root, path *DatasetPath, included bool) {
 	switch {
 	case self.skipped(root):
 	case included:

@@ -115,7 +115,7 @@ func (self *AttemptReport) BytesSum() (expected, replicated uint64,
 		expected += e
 		replicated += r
 	}
-	return
+	return expected, replicated, invalidSizeEstimates
 }
 
 func (self *AttemptReport) FilesystemsProgress() (expected, replicated int) {
@@ -125,7 +125,7 @@ func (self *AttemptReport) FilesystemsProgress() (expected, replicated int) {
 			replicated++
 		}
 	}
-	return
+	return expected, replicated
 }
 
 func (self *AttemptReport) FilesystemsByState() map[FilesystemState][]*FilesystemReport {
@@ -160,7 +160,7 @@ func (self *FilesystemReport) BytesSum() (expected, replicated uint64,
 		containsInvalidSizeEstimates = containsInvalidSizeEstimates ||
 			step.Info.BytesExpected == 0
 	}
-	return
+	return expected, replicated, containsInvalidSizeEstimates
 }
 
 func (self *FilesystemReport) Error() *TimedError {
@@ -261,7 +261,7 @@ func (r *Report) Running() (d time.Duration, ok bool) {
 		att := r.Attempts[len(r.Attempts)-1]
 		d, ok = time.Since(att.StartAt), !att.IsTerminal()
 	}
-	return
+	return d, ok
 }
 
 func (r *Report) Progress() (uint64, uint64) {

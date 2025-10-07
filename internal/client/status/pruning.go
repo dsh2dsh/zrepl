@@ -92,11 +92,10 @@ func (self *JobRender) filterPrunerFs(items []prunerFs,
 	} else {
 		filtered, maxNameLen = prunerFsAsFiltered(items)
 	}
-	return
+	return filtered, maxNameLen
 }
 
-func sortPrunerFs(pending []pruner.FSReport, completed []pruner.FSReport,
-) []prunerFs {
+func sortPrunerFs(pending, completed []pruner.FSReport) []prunerFs {
 	items := make([]prunerFs, 0, len(pending)+len(completed))
 	for i := range pending {
 		item := &pending[i]

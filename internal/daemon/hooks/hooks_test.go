@@ -19,8 +19,8 @@ import (
 )
 
 type (
-	comparisonAssertionFunc func(require.TestingT, interface{}, interface{}, ...interface{})
-	valueAssertionFunc      func(require.TestingT, interface{}, ...interface{})
+	comparisonAssertionFunc func(require.TestingT, any, any, ...any)
+	valueAssertionFunc      func(require.TestingT, any, ...any)
 )
 
 type expectStep struct {
@@ -42,18 +42,17 @@ type testCase struct {
 	ExpectStepReports     []expectStep
 }
 
-func curryLeft(f comparisonAssertionFunc, expected interface{}) valueAssertionFunc {
+func curryLeft(f comparisonAssertionFunc, expected any) valueAssertionFunc {
 	return curry(f, expected, false)
 }
 
-func curryRight(f comparisonAssertionFunc, expected interface{}) valueAssertionFunc {
+func curryRight(f comparisonAssertionFunc, expected any) valueAssertionFunc {
 	return curry(f, expected, true)
 }
 
-func curry(f comparisonAssertionFunc, expected interface{}, right bool) (ret valueAssertionFunc) {
-	ret = func(t require.TestingT, s interface{}, v ...interface{}) {
-		var x interface{}
-		var y interface{}
+func curry(f comparisonAssertionFunc, expected any, right bool) (ret valueAssertionFunc) {
+	ret = func(t require.TestingT, s any, v ...any) {
+		var x, y any
 		if right {
 			x = s
 			y = expected
@@ -68,7 +67,7 @@ func curry(f comparisonAssertionFunc, expected interface{}, right bool) (ret val
 			f(t, x, y)
 		}
 	}
-	return
+	return ret
 }
 
 func TestHooks(t *testing.T) {

@@ -13,8 +13,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
-func NewListCmd(ctx context.Context, props []string, zfsArgs []string,
-) *zfscmd.Cmd {
+func NewListCmd(ctx context.Context, props, zfsArgs []string) *zfscmd.Cmd {
 	args := make([]string, 0, 4+len(zfsArgs))
 	args = append(args, "list", "-H", "-p", "-o", strings.Join(props, ","))
 	args = append(args, zfsArgs...)
@@ -82,7 +81,7 @@ func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf *bytes.Buffer,
 	case cmdErr != nil:
 		err = NewZfsError(cmdErr, stderrBuf.Bytes())
 	}
-	return
+	return err
 }
 
 func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {

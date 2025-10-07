@@ -8,8 +8,7 @@ type ctxKeyGraceful struct{}
 
 var gracefulCtxKey ctxKeyGraceful = struct{}{}
 
-func WithGraceful(ctx context.Context, graceful context.Context,
-) context.Context {
+func WithGraceful(ctx, graceful context.Context) context.Context {
 	return context.WithValue(ctx, gracefulCtxKey, graceful)
 }
 

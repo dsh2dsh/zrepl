@@ -75,7 +75,7 @@ func (self *JobRender) filterSnapperFs(items []*snapper.ReportFilesystem,
 	} else {
 		filtered, maxNameLen = snapperFsAsFiltered(items)
 	}
-	return
+	return filtered, maxNameLen
 }
 
 func (self *JobRender) snapperStates(items []filteredSnapperFs) []string {
@@ -123,7 +123,7 @@ func (self *JobRender) snapperTimes(items []filteredSnapperFs) []string {
 }
 
 func (self *JobRender) viewSnapperFs(fs *snapper.ReportFilesystem,
-	maxNameLen int, matches []int, state string, d string,
+	maxNameLen int, matches []int, state, d string,
 ) string {
 	s := &self.Styles
 	var sb strings.Builder
@@ -136,7 +136,7 @@ func (self *JobRender) viewSnapperFs(fs *snapper.ReportFilesystem,
 }
 
 func (self *JobRender) viewSnapperFsStatus(fs *snapper.ReportFilesystem,
-	state string, d string,
+	state, d string,
 ) string {
 	var sb strings.Builder
 	s := &self.Styles

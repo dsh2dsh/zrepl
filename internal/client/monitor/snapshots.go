@@ -121,7 +121,7 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 	jobConfig *config.JobEnum,
 ) (err error) {
 	if self.orderedDatasets != nil {
-		return
+		return err
 	}
 
 	var datasets []*zfs.DatasetPath
@@ -140,7 +140,7 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 		err = fmt.Errorf("unknown job type %T", j)
 	}
 	if err != nil {
-		return
+		return err
 	}
 
 	slices.SortFunc(datasets, func(a, b *zfs.DatasetPath) int {

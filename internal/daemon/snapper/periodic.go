@@ -406,7 +406,7 @@ func (self *Periodic) Running() (d time.Duration, ok bool) {
 	case Planning, Snapshotting:
 		ok = true
 	}
-	return
+	return d, ok
 }
 
 func (self *Periodic) Report() Report {
@@ -450,7 +450,7 @@ func (self *PeriodicReport) Running() (d time.Duration, ok bool) {
 	case Planning, Snapshotting:
 		ok = true
 	}
-	return
+	return d, ok
 }
 
 func (self *PeriodicReport) SortProgress() []*ReportFilesystem {
@@ -470,5 +470,5 @@ func (self *PeriodicReport) CompletionProgress() (expected, completed uint64) {
 			completed++
 		}
 	}
-	return
+	return expected, completed
 }

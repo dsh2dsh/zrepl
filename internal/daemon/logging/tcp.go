@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -27,7 +28,7 @@ func NewTCPOutlet(formatter Formatter, network, address string,
 		} else {
 			conn, err = dialer.DialContext(ctx, network, address)
 		}
-		return
+		return conn, fmt.Errorf("daemon/logging: %w", err)
 	}
 
 	// allow one message in flight while previous is in io.Copy()

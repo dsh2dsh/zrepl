@@ -94,5 +94,5 @@ func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 	if err = rc.Validate(); err != nil {
 		err = fmt.Errorf("cannot build receiver config: %w", err)
 	}
-	return
+	return rc, err
 }

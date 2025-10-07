@@ -9,7 +9,7 @@ import (
 )
 
 // returns the short name (no fs# prefix)
-func makeJobAndGuidBookmarkName(prefix string, fs string, guid uint64, jobid string) (string, error) {
+func makeJobAndGuidBookmarkName(prefix, fs string, guid uint64, jobid string) (string, error) {
 	bmname := fmt.Sprintf(prefix+"_G_%016x_J_%s", guid, jobid)
 	if err := zfs.EntityNamecheck(fmt.Sprintf("%s#%s", fs, bmname), zfs.EntityTypeBookmark); err != nil {
 		return "", err
@@ -19,7 +19,7 @@ func makeJobAndGuidBookmarkName(prefix string, fs string, guid uint64, jobid str
 
 var jobAndGuidBookmarkRE = regexp.MustCompile(`(.+)_G_([0-9a-f]{16})_J_(.+)$`)
 
-func parseJobAndGuidBookmarkName(fullname string, prefix string) (guid uint64, jobID JobID, _ error) {
+func parseJobAndGuidBookmarkName(fullname, prefix string) (guid uint64, jobID JobID, _ error) {
 	if len(prefix) == 0 {
 		panic("prefix must not be empty")
 	}

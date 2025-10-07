@@ -484,7 +484,7 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs) {
 	a.finishedAt = time.Now()
 }
 
-func (f *fs) debug(format string, args ...interface{}) {
+func (f *fs) debug(format string, args ...any) {
 	debugPrefix("fs=%s", f.fs.ReportInfo().Name)(format, args...)
 }
 
@@ -913,5 +913,5 @@ func (r *errorReport) MostRecent() (err *timedError, errClass errorClass) {
 			errClass = class
 		}
 	}
-	return
+	return err, errClass
 }

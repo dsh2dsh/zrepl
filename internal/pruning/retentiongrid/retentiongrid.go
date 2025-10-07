@@ -31,7 +31,7 @@ func NewGrid(l []Interval) *Grid {
 
 func (g Grid) FitEntries(entries []Entry) (keep, remove []Entry) {
 	if len(entries) == 0 {
-		return
+		return keep, remove
 	}
 
 	// determine 'now' based on youngest snapshot
@@ -79,7 +79,7 @@ func (b *bucket) AddIfContains(e Entry) (added bool) {
 	if added {
 		b.entries = append(b.entries, e)
 	}
-	return
+	return added
 }
 
 func (b *bucket) RemoveYoungerSnapsExceedingKeepCount() (removed []Entry) {
@@ -112,7 +112,7 @@ func (g Grid) fitEntriesWithNow(now time.Time, entries []Entry) (keep, remove []
 	remove = make([]Entry, 0)
 
 assignEntriesToBuckets:
-	for ei := 0; ei < len(entries); ei++ {
+	for ei := range len(entries) {
 		e := entries[ei]
 		// unconditionally keep entries that are in the future
 		if now.Before(e.Date()) {
@@ -135,5 +135,5 @@ assignEntriesToBuckets:
 		remove = append(remove, destroy...)
 		keep = append(keep, b.entries...)
 	}
-	return
+	return keep, remove
 }

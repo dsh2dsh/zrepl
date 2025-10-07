@@ -49,7 +49,7 @@ func fsvlist(fsv ...string) (r []*FilesystemVersion) {
 			panic("invalid character")
 		}
 	}
-	return
+	return r
 }
 
 func doTest(receiver, sender []*FilesystemVersion, validate func(incpath []*FilesystemVersion, conflict error)) {

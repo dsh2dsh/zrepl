@@ -524,17 +524,15 @@ func (self *ZFSSendArgsValidated) buildSendCommandLine() ([]string, error) {
 	return flags, nil
 }
 
-func (self *ZFSSendArgsValidated) fromToAbs() (from string, to string,
-	err error,
-) {
+func (self *ZFSSendArgsValidated) fromToAbs() (from, to string, err error) {
 	if self.From != nil {
 		from, err = absVersion(self.FS, self.From)
 		if err != nil {
-			return
+			return from, to, err
 		}
 	}
 	to, err = absVersion(self.FS, self.To)
-	return
+	return from, to, err
 }
 
 func (self *ZFSSendArgsValidated) env() (map[string]string, error) {
@@ -1184,7 +1182,7 @@ func ZFSGet(ctx context.Context, fs *DatasetPath, props []string) (*ZFSPropertie
 }
 
 // The returned error includes requested filesystem and version as quoted strings in its error message
-func ZFSGetGUID(ctx context.Context, fs string, version string) (_ uint64, err error) {
+func ZFSGetGUID(ctx context.Context, fs, version string) (_ uint64, err error) {
 	defer func(e *error) {
 		if *e != nil {
 			*e = fmt.Errorf("zfs get guid fs=%q version=%q: %w", fs, version, *e)
@@ -1328,7 +1326,7 @@ func (s PropertySource) zfsGetSourceFieldPrefixes() []string {
 }
 
 func ZFSGetRecursive(ctx context.Context, path string, depth int,
-	dstypes []string, props []string, allowedSources PropertySource,
+	dstypes, props []string, allowedSources PropertySource,
 ) (map[string]*ZFSProperties, error) {
 	cmd := zfscmd.CommandContext(ctx, ZfsBin,
 		zfsGetArgs(path, depth, dstypes, props)...).WithLogError(false)

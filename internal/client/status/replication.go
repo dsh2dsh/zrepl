@@ -197,7 +197,7 @@ func (self *JobRender) filterFilesystems(items []*report.FilesystemReport,
 	} else {
 		filtered, maxNameLen = filesystemsAsFiltered(items)
 	}
-	return
+	return filtered, maxNameLen
 }
 
 func (self *JobRender) renderFilesystemsBar(totalItems, visibleItems int) {

@@ -84,7 +84,7 @@ func DefaultJobStyles() (s JobStyles) {
 	s.DividerDot = lipgloss.NewStyle().
 		Foreground(verySubduedColor).
 		SetString(bullet)
-	return
+	return s
 }
 
 type JobStyles struct {
@@ -748,7 +748,7 @@ func (self *JobStatus) jumpToNextSection() tea.Cmd {
 	}
 
 	maxLine := self.viewport.TotalLineCount() - self.viewport.Height
-	for i := 0; i < len(jumpLines); i++ {
+	for i := range len(jumpLines) {
 		if nextLine := jumpLines[i]; nextLine > self.viewport.YOffset &&
 			nextLine <= maxLine {
 			self.viewport.SetYOffset(nextLine)

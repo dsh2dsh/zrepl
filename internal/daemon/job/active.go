@@ -530,7 +530,7 @@ func (self *ActiveSideStatus) Error() string {
 func (self *ActiveSideStatus) Running() (d time.Duration, ok bool) {
 	if s := self.Snapshotting; s != nil {
 		if d, ok = s.Running(); ok {
-			return
+			return d, ok
 		}
 	}
 
@@ -557,7 +557,7 @@ func (self *ActiveSideStatus) Running() (d time.Duration, ok bool) {
 			_, ok = p.Running()
 		}
 	}
-	return
+	return d, ok
 }
 
 func (self *ActiveSideStatus) Cron() string {
@@ -573,7 +573,7 @@ func (self *ActiveSideStatus) SleepingUntil() (sleepUntil time.Time) {
 	if snap := self.Snapshotting; snap != nil {
 		sleepUntil = snap.SleepingUntil()
 	}
-	return
+	return sleepUntil
 }
 
 func (self *ActiveSideStatus) Steps() (expected, step int) {
@@ -605,7 +605,7 @@ func (self *ActiveSideStatus) Steps() (expected, step int) {
 			step++
 		}
 	}
-	return
+	return expected, step
 }
 
 func (self *ActiveSideStatus) Progress() (expected, completed uint64) {
@@ -634,7 +634,7 @@ func (self *ActiveSideStatus) Progress() (expected, completed uint64) {
 			completed += completed2
 		}
 	}
-	return
+	return expected, completed
 }
 
 func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
@@ -822,5 +822,5 @@ func (j *ActiveSide) Running() (d time.Duration, ok bool) {
 		d = time.Since(tasks.startedAt)
 	}
 	ok = tasks.state != ActiveSideDone
-	return
+	return d, ok
 }

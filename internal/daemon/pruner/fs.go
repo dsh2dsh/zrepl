@@ -160,8 +160,7 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	return nil
 }
 
-func snapshotRanges(snapshots []pruning.Snapshot, destroy []pruning.Snapshot,
-) []string {
+func snapshotRanges(snapshots, destroy []pruning.Snapshot) []string {
 	names := make([]string, 0, len(destroy))
 	var lastIdx int
 	var r [2]int

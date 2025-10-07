@@ -53,5 +53,5 @@ func (self *Report) Progress() (expected, completed uint64) {
 		expected += uint64(fs.DestroysCount)
 		completed += uint64(fs.DestroysCount)
 	}
-	return
+	return expected, completed
 }

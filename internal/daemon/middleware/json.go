@@ -43,7 +43,7 @@ func writeErrorCode(w http.ResponseWriter, r *http.Request, statusCode int,
 	http.Error(w, err.Error(), statusCode)
 }
 
-func JsonRequestResponder[T1 any, T2 any](h func(ctx context.Context, req *T1,
+func JsonRequestResponder[T1, T2 any](h func(ctx context.Context, req *T1,
 ) (*T2, error),
 ) Middleware {
 	fn := func(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +90,7 @@ func JsonRequestStream[T any](h func(context.Context, *T, io.ReadCloser) error,
 	return func(next http.Handler) http.Handler { return http.HandlerFunc(fn) }
 }
 
-func JsonRequestResponseStream[T1 any, T2 any](
+func JsonRequestResponseStream[T1, T2 any](
 	h func(context.Context, *T1) (*T2, io.ReadCloser, error),
 ) Middleware {
 	fn := func(w http.ResponseWriter, r *http.Request) {

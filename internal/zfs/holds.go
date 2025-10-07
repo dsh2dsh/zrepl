@@ -88,7 +88,7 @@ func ZFSHolds(ctx context.Context, fs, snap string) ([]string, error) {
 }
 
 // Idempotent: if the hold doesn't exist, this is not an error
-func ZFSRelease(ctx context.Context, tag string, snap string) error {
+func ZFSRelease(ctx context.Context, tag, snap string) error {
 	var noSuchTagLines, otherLines []string
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, "release", tag, snap).
 		WithLogError(false)

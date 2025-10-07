@@ -52,7 +52,7 @@ func DefaultItemStyle() (s ItemStyle) {
 		SetString(bullet)
 
 	s.Bar = lipgloss.NewStyle().MarginLeft(1)
-	return
+	return s
 }
 
 type ItemStyle struct {
@@ -133,7 +133,7 @@ func (self *JobDelegate) descrStyle(m list.Model, item *ListItem,
 	}
 
 	s = s.MarginLeft(self.maxTitle - len(item.Title()))
-	return
+	return s
 }
 
 func (self *JobDelegate) job(item list.Item) (*ListItem, *job.Status) {
@@ -171,7 +171,7 @@ func (self *JobDelegate) renderTime(job *job.Status) (running bool) {
 		self.b.WriteString(s.Time.Render(
 			time.Until(t).Truncate(time.Second).String()))
 	}
-	return
+	return running
 }
 
 func (self *JobDelegate) viewSteps(job *job.Status) string {
@@ -284,7 +284,7 @@ func (self *JobsList) makeJobItems(jobs map[string]*job.Status) []ListItem {
 			items = append(items, ListItem{Caption: name})
 		}
 	}
-	slices.SortFunc(items, func(a ListItem, b ListItem) int {
+	slices.SortFunc(items, func(a, b ListItem) int {
 		return cmp.Compare(a.Title(), b.Title())
 	})
 	return items

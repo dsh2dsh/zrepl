@@ -18,7 +18,7 @@ func partitionSnapList(snaps []Snapshot, predicate func(Snapshot) bool) (sTrue, 
 			sFalse = append(sFalse, snaps[i])
 		}
 	}
-	return
+	return sTrue, sFalse
 }
 
 func shallowCopySnapList(snaps []Snapshot) []Snapshot {

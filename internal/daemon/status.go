@@ -27,5 +27,5 @@ func (self *Status) JobCounts() (running, withErr int) {
 			withErr++
 		}
 	}
-	return
+	return running, withErr
 }

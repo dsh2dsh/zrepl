@@ -39,7 +39,7 @@ var _ yaml.Unmarshaler = (*RetentionIntervalList)(nil)
 func (t *RetentionIntervalList) UnmarshalYAML(value *yaml.Node) (err error) {
 	var in string
 	if err := value.Decode(&in); err != nil {
-		return err
+		return fmt.Errorf("config: %w", err)
 	}
 
 	intervals, err := ParseRetentionIntervalSpec(in)
@@ -57,8 +57,8 @@ var retentionStringIntervalRegex *regexp.Regexp = regexp.MustCompile(`^\s*(\d+)\
 func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, err error) {
 	comps := retentionStringIntervalRegex.FindStringSubmatch(e)
 	if comps == nil {
-		err = errors.New("retention string does not match expected format")
-		return
+		return intervals, errors.New(
+			"retention string does not match expected format")
 	}
 
 	times, err := strconv.Atoi(comps[1])
@@ -80,16 +80,15 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 		re := regexp.MustCompile(`^\s*keep=(.+)\s*$`)
 		res := re.FindStringSubmatch(comps[4])
 		if res == nil || len(res) != 2 {
-			err = errors.New("interval parameter contains unknown parameters")
-			return
+			return intervals, errors.New(
+				"interval parameter contains unknown parameters")
 		}
 		if res[1] == "all" {
 			keepCount = RetentionGridKeepCountAll
 		} else {
 			keepCount, err = strconv.Atoi(res[1])
 			if err != nil {
-				err = errors.New("cannot parse keep_count value")
-				return
+				return nil, errors.New("cannot parse keep_count value")
 			}
 		}
 	}
@@ -101,8 +100,7 @@ func parseRetentionGridIntervalString(e string) (intervals []RetentionInterval, 
 			keepCount: keepCount,
 		}
 	}
-
-	return
+	return intervals, nil
 }
 
 func ParseRetentionIntervalSpec(s string) (intervals []RetentionInterval, err error) {
@@ -116,6 +114,5 @@ func ParseRetentionIntervalSpec(s string) (intervals []RetentionInterval, err er
 		}
 		intervals = append(intervals, parsed...)
 	}
-
-	return
+	return intervals, nil
 }

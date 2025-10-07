@@ -136,7 +136,7 @@ func parseLevel(s string) (l slog.Level, err error) {
 	if err = l.UnmarshalText([]byte(s)); err != nil {
 		err = fmt.Errorf("unparseable level '%s': %w", s, err)
 	}
-	return
+	return l, err
 }
 
 func parseTCPOutlet(in *config.TCPLoggingOutlet, formatter *SlogFormatter,
