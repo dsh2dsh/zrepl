@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/creasty/defaults"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 )
@@ -289,7 +289,7 @@ var _ yaml.Unmarshaler = (*PositiveDurationOrManual)(nil)
 func (i *PositiveDurationOrManual) UnmarshalYAML(value *yaml.Node) (err error) {
 	var s string
 	if err := value.Decode(&s); err != nil {
-		return err
+		return fmt.Errorf("config: %w", err)
 	}
 	switch s {
 	case "manual":
@@ -569,22 +569,36 @@ func enumUnmarshal(value *yaml.Node, types map[string]any) (any, error) {
 		Type string `yaml:"type" validate:"required"`
 	}
 	if err := value.Decode(&in); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config: %w", err)
 	} else if in.Type == "" {
-		return nil, &yaml.TypeError{Errors: []string{"must specify type"}}
+		return nil, &yaml.TypeError{
+			Errors: []*yaml.UnmarshalError{
+				{
+					Err:    errors.New("must specify type"),
+					Line:   value.Line,
+					Column: value.Column,
+				},
+			},
+		}
 	}
 
 	v, ok := types[in.Type]
 	if !ok {
 		return nil, &yaml.TypeError{
-			Errors: []string{"invalid type name " + in.Type},
+			Errors: []*yaml.UnmarshalError{
+				{
+					Err:    errors.New("invalid type name " + in.Type),
+					Line:   value.Line,
+					Column: value.Column,
+				},
+			},
 		}
 	}
 
 	if err := defaults.Set(v); err != nil {
 		return nil, fmt.Errorf("set defaults for type %q: %w", in.Type, err)
 	} else if err := value.Decode(v); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config: %w", err)
 	}
 	return v, nil
 }
@@ -599,7 +613,7 @@ func (t *JobEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 		"pull":   new(PullJob),
 		"source": new(SourceJob),
 	})
-	return
+	return err
 }
 
 var _ yaml.Unmarshaler = (*PruningEnum)(nil)
@@ -611,7 +625,7 @@ func (t *PruningEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 		"grid":           new(PruneGrid),
 		"regex":          new(PruneKeepRegex),
 	})
-	return
+	return err
 }
 
 var _ yaml.Unmarshaler = (*SnapshottingEnum)(nil)
@@ -622,7 +636,7 @@ func (t *SnapshottingEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 		"manual":   new(SnapshottingManual),
 		"cron":     new(SnapshottingPeriodic),
 	})
-	return
+	return err
 }
 
 var _ yaml.Unmarshaler = (*LoggingOutletEnum)(nil)
@@ -634,7 +648,7 @@ func (t *LoggingOutletEnum) UnmarshalYAML(value *yaml.Node) (err error) {
 		"syslog": new(SyslogLoggingOutlet),
 		"tcp":    new(TCPLoggingOutlet),
 	})
-	return
+	return err
 }
 
 var _ yaml.Unmarshaler = (*SyslogFacility)(nil)
@@ -642,7 +656,7 @@ var _ yaml.Unmarshaler = (*SyslogFacility)(nil)
 func (t *SyslogFacility) UnmarshalYAML(value *yaml.Node) (err error) {
 	var s string
 	if err := value.Decode(&s); err != nil {
-		return err
+		return fmt.Errorf("config: %w", err)
 	}
 	return t.UnmarshalJSON([]byte(s))
 }

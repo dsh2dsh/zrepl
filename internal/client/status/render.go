@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/lipgloss"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
 )

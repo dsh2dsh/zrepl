@@ -21,6 +21,7 @@ require (
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
 	github.com/yudai/gojsondiff v1.0.0
+	go.yaml.in/yaml/v4 v4.0.0-rc.2
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
 )
@@ -71,5 +72,5 @@ require (
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/text v0.28.0
-	gopkg.in/yaml.v3 v3.0.1
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -9,7 +9,7 @@ import (
 
 	"github.com/creasty/defaults"
 	"github.com/go-playground/validator/v10"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/dsh2dsh/zrepl/internal/config/env"
 )

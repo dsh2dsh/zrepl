@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type Duration struct{ d time.Duration }
@@ -20,12 +20,20 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	var s string
 	err := value.Decode(&s)
 	if err != nil {
-		return err
+		return fmt.Errorf("config: %w", err)
 	}
 	d.d, err = parseDuration(s)
 	if err != nil {
 		d.d = 0
-		return &yaml.TypeError{Errors: []string{fmt.Sprintf("cannot parse value %q: %s", s, err)}}
+		return &yaml.TypeError{
+			Errors: []*yaml.UnmarshalError{
+				{
+					Err:    fmt.Errorf("cannot parse value %q: %w", s, err),
+					Line:   value.Line,
+					Column: value.Column,
+				},
+			},
+		}
 	}
 	return nil
 }
@@ -63,8 +71,7 @@ var durationStringRegex *regexp.Regexp = regexp.MustCompile(`^\s*([\+-]?\d+)\s*(
 func parseDuration(e string) (d time.Duration, err error) {
 	comps := durationStringRegex.FindStringSubmatch(e)
 	if comps == nil {
-		err = fmt.Errorf("must match %s", durationStringRegex)
-		return
+		return 0, fmt.Errorf("must match %s", durationStringRegex)
 	}
 	if len(comps) != 3 {
 		panic(fmt.Sprintf("%#v", comps))
@@ -79,8 +86,7 @@ func parseDuration(e string) (d time.Duration, err error) {
 	switch comps[2] {
 	case "":
 		if durationFactor != 0 {
-			err = errors.New("missing time unit")
-			return
+			return 0, errors.New("missing time unit")
 		}
 		// It's the case where user specified '0'. We want to allow this, just like
 		// time.ParseDuration.
@@ -95,10 +101,7 @@ func parseDuration(e string) (d time.Duration, err error) {
 	case "w":
 		durationUnit = 24 * 7 * time.Hour
 	default:
-		err = fmt.Errorf("contains unknown time unit '%s'", comps[2])
-		return
+		return 0, fmt.Errorf("contains unknown time unit '%s'", comps[2])
 	}
-
-	d = time.Duration(durationFactor) * durationUnit
-	return
+	return time.Duration(durationFactor) * durationUnit, nil
 }

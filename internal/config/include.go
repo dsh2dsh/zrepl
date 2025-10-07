@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func appendYAML[T []E, E any](base, pattern string, target T) (T, error) {

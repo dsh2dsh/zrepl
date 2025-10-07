@@ -119,7 +119,6 @@ linters:
       # analysis. There are no defaults for this value.
       ignore-package-globs:
         - "encoding/*"
-        - "gopkg.in/yaml.v3"
         - "github.com/dsh2dsh/zrepl/*"
 
   exclusions:
