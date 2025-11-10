@@ -18,38 +18,33 @@ func TestPqNotconcurrent(t *testing.T) {
 	var ctr uint32
 	q := newStepQueue()
 	var wg sync.WaitGroup
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer q.WaitReady(ctx, "1", time.Unix(9999, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
 		assert.Equal(t, uint32(1), ret)
 		time.Sleep(1 * time.Second)
-	}()
+	})
 
 	// give goroutine "1" 500ms to enter queue, get the active slot and enter time.Sleep
 	defer q.Start(1)()
 	time.Sleep(500 * time.Millisecond)
 
 	// while "1" is still running, queue in "2", "3" and "4"
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer q.WaitReady(ctx, "2", time.Unix(2, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
 		assert.Equal(t, uint32(2), ret)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		defer q.WaitReady(ctx, "3", time.Unix(3, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
 		assert.Equal(t, uint32(3), ret)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		defer q.WaitReady(ctx, "4", time.Unix(4, 0))()
 		ret := atomic.AddUint32(&ctr, 1)
 		assert.Equal(t, uint32(4), ret)
-	}()
+	})
 
 	wg.Wait()
 }
@@ -85,14 +80,12 @@ func TestPqConcurrent(t *testing.T) {
 	filesystems := 100
 	stepsPerFS := 20
 	sleepTimePerStep := 50 * time.Millisecond
-	wg.Add(filesystems)
 	var globalCtr uint32
 
 	begin := time.Now()
 	records := make(chan []record, filesystems)
 	for fs := range filesystems {
-		go func(fs int) {
-			defer wg.Done()
+		wg.Go(func() {
 			recs := make([]record, 0)
 			for step := range stepsPerFS {
 				pos := atomic.AddUint32(&globalCtr, 1)
@@ -104,7 +97,7 @@ func TestPqConcurrent(t *testing.T) {
 				recs = append(recs, record{fs, step, pos, wakeAt})
 			}
 			records <- recs
-		}(fs)
+		})
 	}
 	concurrency := 5
 	defer q.Start(concurrency)()

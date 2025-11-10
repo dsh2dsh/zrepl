@@ -52,12 +52,9 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 
 	var line chainlock.L
 	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	// print results
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		enc := json.NewEncoder(os.Stdout)
 		for a := range abstractions {
 			func() {
@@ -73,14 +70,12 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 				}
 			}()
 		}
-	}()
+	})
 
 	// print errors to stderr
 	errorColor := color.New(color.FgRed)
 	var errorsSlice []endpoint.ListAbstractionsError
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for err := range errs {
 			func() {
 				defer line.Lock().Unlock()
@@ -88,7 +83,8 @@ func doZabsList(ctx context.Context, sc *cli.Subcommand, args []string) error {
 				errorColor.Fprintf(os.Stderr, "%s\n", err)
 			}()
 		}
-	}()
+	})
+
 	wg.Wait()
 	if len(errorsSlice) > 0 {
 		errorColor.Add(color.Bold).Fprintf(os.Stderr, "there were errors in listing the abstractions")

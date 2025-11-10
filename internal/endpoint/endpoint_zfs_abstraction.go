@@ -564,18 +564,17 @@ func ListAbstractions(ctx context.Context, query ListZFSHoldsAndBookmarksQuery,
 
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		defer wg.Done()
 		for a := range outChan {
 			out = append(out, a)
 		}
 	})
 
 	wg.Go(func() {
-		defer wg.Done()
 		for err := range outErrsChan {
 			outErrs = append(outErrs, err)
 		}
 	})
+
 	wg.Wait()
 	return out, outErrs, nil
 }

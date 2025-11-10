@@ -468,16 +468,14 @@ func (a *attempt) doFilesystems(ctx context.Context, prevs map[*fs]*fs) {
 
 	var fssesDone sync.WaitGroup
 	for _, f := range a.fss {
-		fssesDone.Add(1)
-		go func(f *fs) {
-			defer fssesDone.Done()
+		fssesDone.Go(func() {
 			// avoid explosion of tasks with name f.report().Info.Name
 			f.do(ctx, stepQueue, prevs[f])
 			f.l.HoldWhile(func() {
 				// every return from f means it's unblocked...
 				f.blockedOn = report.FsBlockedOnNothing
 			})
-		}(f)
+		})
 	}
 
 	a.l.DropWhile(func() { fssesDone.Wait() })
