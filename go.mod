@@ -23,7 +23,7 @@ require (
 	github.com/yudai/gojsondiff v1.0.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.3
 	golang.org/x/sync v0.18.0
-	golang.org/x/sys v0.37.0
+	golang.org/x/sys v0.38.0
 )
 
 require (
