@@ -57,10 +57,7 @@ func (k KeepLastN) KeepRule(_ context.Context, snaps []Snapshot,
 		return strings.Compare(matching[i].Name(), matching[j].Name()) == 1
 	})
 
-	n := k.n
-	if n > len(matching) {
-		n = len(matching)
-	}
+	n := min(k.n, len(matching))
 	destroyList = append(destroyList, matching[n:]...)
 	return destroyList
 }

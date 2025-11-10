@@ -93,7 +93,7 @@ func (self *DatasetPath) TrimPrefix(prefix *DatasetPath) {
 	newlen := len(self.comps) - prelen
 	oldcomps := self.comps
 	self.comps = make([]string, newlen)
-	for i := 0; i < newlen; i++ {
+	for i := range newlen {
 		self.comps[i] = oldcomps[prelen+i]
 	}
 }

@@ -13,7 +13,7 @@ func init() {
 	}
 }
 
-func debug(format string, args ...interface{}) {
+func debug(format string, args ...any) {
 	if debugEnabled {
 		fmt.Fprintf(os.Stderr, "zfs: %s\n", fmt.Sprintf(format, args...))
 	}

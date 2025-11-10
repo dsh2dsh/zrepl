@@ -62,7 +62,7 @@ func validateReceivingSidesDoNotOverlap(receivingRootFSs []string) error {
 	})
 	// add tailing slash because of hierarchy-simulation
 	// rootfs/ is not root of rootfs2/
-	for i := 0; i < len(rfss); i++ {
+	for i := range rfss {
 		rfss[i] += "/"
 	}
 	// idea:

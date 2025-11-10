@@ -9,7 +9,7 @@ import (
 )
 
 type stepQueueRec struct {
-	ident      interface{}
+	ident      any
 	targetDate time.Time
 	wakeup     chan StepCompletedFunc
 }
@@ -39,13 +39,13 @@ func (h stepQueueHeap) Len() int {
 	return len(h)
 }
 
-func (h *stepQueueHeap) Push(elem interface{}) {
+func (h *stepQueueHeap) Push(elem any) {
 	hitem := elem.(*stepQueueHeapItem)
 	hitem.idx = h.Len()
 	*h = append(*h, hitem)
 }
 
-func (h *stepQueueHeap) Pop() interface{} {
+func (h *stepQueueHeap) Pop() any {
 	elem := (*h)[h.Len()-1]
 	elem.idx = -1
 	*h = (*h)[:h.Len()-1]
@@ -76,7 +76,7 @@ func (q *stepQueue) Start(concurrency int) (done func()) {
 	// priority queue
 	pending := &stepQueueHeap{}
 	// ident => queueItem
-	queueItems := make(map[interface{}]*stepQueueHeapItem)
+	queueItems := make(map[any]*stepQueueHeapItem)
 	// stopped is used for cancellation of "wake" goroutine
 	stopped := false
 	active := 0
@@ -145,7 +145,7 @@ func (q *stepQueue) Start(concurrency int) (done func()) {
 
 type StepCompletedFunc func()
 
-func (q *stepQueue) sendAndWaitForWakeup(ident interface{}, targetDate time.Time) StepCompletedFunc {
+func (q *stepQueue) sendAndWaitForWakeup(ident any, targetDate time.Time) StepCompletedFunc {
 	req := stepQueueRec{
 		ident,
 		targetDate,
@@ -156,7 +156,7 @@ func (q *stepQueue) sendAndWaitForWakeup(ident interface{}, targetDate time.Time
 }
 
 // Wait for the ident with targetDate to be selected to run.
-func (q *stepQueue) WaitReady(ctx context.Context, ident interface{}, targetDate time.Time) StepCompletedFunc {
+func (q *stepQueue) WaitReady(ctx context.Context, ident any, targetDate time.Time) StepCompletedFunc {
 	if targetDate.IsZero() {
 		panic("targetDate of zero is reserved for marking Done")
 	}

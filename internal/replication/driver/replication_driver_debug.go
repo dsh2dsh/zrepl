@@ -13,17 +13,17 @@ func init() {
 	}
 }
 
-func debug(format string, args ...interface{}) {
+func debug(format string, args ...any) {
 	if debugEnabled {
 		fmt.Fprintf(os.Stderr, "repl: driver: %s\n", fmt.Sprintf(format, args...))
 	}
 }
 
-type debugFunc func(format string, args ...interface{})
+type debugFunc func(format string, args ...any)
 
-func debugPrefix(prefixFormat string, prefixFormatArgs ...interface{}) debugFunc {
+func debugPrefix(prefixFormat string, prefixFormatArgs ...any) debugFunc {
 	prefix := fmt.Sprintf(prefixFormat, prefixFormatArgs...)
-	return func(format string, args ...interface{}) {
+	return func(format string, args ...any) {
 		debug("%s: %s", prefix, fmt.Sprintf(format, args...))
 	}
 }

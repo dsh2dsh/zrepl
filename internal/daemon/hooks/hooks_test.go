@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -367,11 +368,14 @@ jobs:
 		if err != nil {
 			panic("os.Getwd() failed")
 		}
-		hooksTmpl := "\n"
+		var hooksTmpl strings.Builder
+		hooksTmpl.WriteByte('\n')
 		for _, l := range tt.Config {
-			hooksTmpl += fmt.Sprintf("    - %s\n", l)
+			hooksTmpl.WriteString("    - ")
+			hooksTmpl.WriteString(l)
+			hooksTmpl.WriteByte('\n')
 		}
-		tmpl.New("List").Parse(hooksTmpl)
+		tmpl.New("List").Parse(hooksTmpl.String())
 
 		var outBytes bytes.Buffer
 		data := struct {
