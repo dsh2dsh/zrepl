@@ -48,8 +48,9 @@ const (
 )
 
 type Status struct {
-	Err      string
-	NextCron time.Time
+	Err       string
+	NextCron  time.Time
+	CanWakeup bool
 
 	Type        Type
 	JobSpecific JobStatus
@@ -71,21 +72,14 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	}
 
 	switch st.Type {
-	case TypeSnap:
-		s.JobSpecific = new(SnapJobStatus)
-
-	case TypePull:
-		fallthrough
-	case TypePush:
-		s.JobSpecific = new(ActiveSideStatus)
-
-	case TypeSource:
-		fallthrough
-	case TypeSink:
-		s.JobSpecific = new(PassiveStatus)
-
 	case TypeInternal:
 		// internal jobs do not report specifics
+	case TypeSnap:
+		s.JobSpecific = new(SnapJobStatus)
+	case TypePull, TypePush:
+		s.JobSpecific = new(ActiveSideStatus)
+	case TypeSource, TypeSink:
+		s.JobSpecific = new(PassiveStatus)
 	default:
 		return fmt.Errorf("unknown status type: %s", st.Type)
 	}
@@ -128,7 +122,13 @@ func (s *Status) SleepingUntil() time.Time {
 func (s *Status) CanSignal() string {
 	if _, ok := s.Running(); ok {
 		return "reset"
-	} else if t := s.SleepingUntil(); !t.IsZero() {
+	}
+
+	if t := s.SleepingUntil(); !t.IsZero() {
+		return "wakeup"
+	}
+
+	if s.CanWakeup {
 		return "wakeup"
 	}
 	return ""

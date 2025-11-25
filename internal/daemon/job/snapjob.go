@@ -83,16 +83,21 @@ func (j *SnapJob) RegisterMetrics(registerer prometheus.Registerer) {
 }
 
 func (j *SnapJob) Status() *Status {
-	s := &SnapJobStatus{}
-	t := j.Type()
+	snapStatus := &SnapJobStatus{}
 	j.prunerMtx.Lock()
 	if j.pruner != nil {
-		s.Pruning = j.pruner.Report()
+		snapStatus.Pruning = j.pruner.Report()
 	}
 	j.prunerMtx.Unlock()
+
 	r := j.snapper.Report()
-	s.Snapshotting = &r
-	return &Status{Type: t, JobSpecific: s}
+	snapStatus.Snapshotting = &r
+
+	st := &Status{Type: j.Type(), JobSpecific: snapStatus}
+	if r.Periodic != nil {
+		st.CanWakeup = true
+	}
+	return st
 }
 
 type SnapJobStatus struct {

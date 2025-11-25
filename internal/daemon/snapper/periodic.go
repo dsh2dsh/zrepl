@@ -33,15 +33,15 @@ func periodicFromConfig(fsf *filters.DatasetFilter,
 	}
 
 	cronSpec := in.CronSpec()
-	if cronSpec == "" {
-		return nil, errors.New("both interval and cron not configured")
-	}
-
-	d := in.Interval.Duration()
-	if d < 0 {
-		return nil, errors.New("negative interval")
-	} else if _, err := cron.ParseStandard(cronSpec); err != nil {
-		return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)
+	if !in.Interval.Manual {
+		switch cronSpec {
+		case "":
+			return nil, errors.New("both interval and cron not configured")
+		default:
+			if _, err := cron.ParseStandard(cronSpec); err != nil {
+				return nil, fmt.Errorf("parse cron spec %q: %w", cronSpec, err)
+			}
+		}
 	}
 
 	hookList, err := hooks.ListFromConfig(in.Hooks)
@@ -57,7 +57,7 @@ func periodicFromConfig(fsf *filters.DatasetFilter,
 	s := &Periodic{
 		cronSpec: cronSpec,
 		args: periodicArgs{
-			interval: d.Truncate(time.Second),
+			interval: in.Interval.Duration().Truncate(time.Second),
 			fsf:      fsf,
 			planArgs: planArgs{
 				prefix:          in.Prefix,

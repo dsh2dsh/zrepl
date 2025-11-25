@@ -454,26 +454,33 @@ func (j *ActiveSide) Runnable() bool { return j.mode.Runnable() }
 
 func (j *ActiveSide) Status() *Status {
 	tasks := j.updateTasks(nil)
-	s := &ActiveSideStatus{
+	activeStatus := &ActiveSideStatus{
 		CronSpec:     j.mode.Cron(),
 		StartedAt:    tasks.startedAt,
 		Snapshotting: j.mode.Report(),
 	}
 
 	if tasks.err != nil {
-		s.Err = tasks.err.Error()
+		activeStatus.Err = tasks.err.Error()
 	}
 
 	if tasks.replicationReport != nil {
-		s.Replication = tasks.replicationReport()
+		activeStatus.Replication = tasks.replicationReport()
 	}
+
 	if tasks.prunerSender != nil {
-		s.PruningSender = tasks.prunerSender.Report()
+		activeStatus.PruningSender = tasks.prunerSender.Report()
 	}
+
 	if tasks.prunerReceiver != nil {
-		s.PruningReceiver = tasks.prunerReceiver.Report()
+		activeStatus.PruningReceiver = tasks.prunerReceiver.Report()
 	}
-	return &Status{Type: j.mode.Type(), JobSpecific: s}
+
+	return &Status{
+		CanWakeup:   true,
+		Type:        j.mode.Type(),
+		JobSpecific: activeStatus,
+	}
 }
 
 type ActiveSideStatus struct {

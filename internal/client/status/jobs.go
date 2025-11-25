@@ -165,13 +165,20 @@ func (self *JobDelegate) renderTime(job *job.Status) (running bool) {
 	if d, ok := job.Running(); ok {
 		self.b.WriteString(s.Running.Inherit(withError).Render())
 		self.b.WriteString(s.Time.Render(d.Truncate(time.Second).String()))
-		running = true
-	} else if t := job.SleepingUntil(); !t.IsZero() {
+		return true
+	}
+
+	if t := job.SleepingUntil(); !t.IsZero() {
 		self.b.WriteString(s.Sleeping.Inherit(withError).Render())
 		self.b.WriteString(s.Time.Render(
 			time.Until(t).Truncate(time.Second).String()))
+		return false
 	}
-	return running
+
+	if job.CanWakeup {
+		self.b.WriteString(s.Sleeping.Inherit(withError).Render())
+	}
+	return false
 }
 
 func (self *JobDelegate) viewSteps(job *job.Status) string {

@@ -27,10 +27,12 @@ jobs:
     - type: last_n
       count: 10
 `
+
 	manual := `
   snapshotting:
     type: manual
 `
+
 	periodic := `
   snapshotting:
     type: periodic
@@ -38,6 +40,7 @@ jobs:
     timestamp_format: dense
     interval: 10m
 `
+
 	cron := `
   snapshotting:
     type: cron
@@ -51,6 +54,14 @@ jobs:
     type: periodic
     prefix: zrepl_
     interval: 1d
+`
+
+	intervalManual := `
+  snapshotting:
+    type: periodic
+    prefix: zrepl_
+    timestamp_format: dense
+    interval: manual
 `
 
 	hooks := `
@@ -99,6 +110,15 @@ jobs:
 		assert.Equal(t, "cron", snp.Type)
 		assert.Equal(t, "zrepl_", snp.Prefix)
 		assert.Equal(t, "human", snp.TimestampFormat)
+	})
+
+	t.Run("interval_manual", func(t *testing.T) {
+		c = testValidConfig(t, fillSnapshotting(intervalManual))
+		snp := c.Jobs[0].Ret.(*PushJob).Snapshotting.Ret.(*SnapshottingPeriodic)
+		assert.Equal(t, "periodic", snp.Type)
+		assert.Zero(t, snp.Interval.Duration())
+		assert.True(t, snp.Interval.Manual)
+		assert.Equal(t, "zrepl_", snp.Prefix)
 	})
 
 	t.Run("hooks", func(t *testing.T) {

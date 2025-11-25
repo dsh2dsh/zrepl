@@ -691,6 +691,17 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   See also zrepl/zrepl#728
 
+* Manual "periodic" snapshot jobs
+
+  Snapshot jobs can be configured don't run periodically, but on signal only,
+  from CLI or `zrepl status`, like this:
+
+  ```yaml
+  snapshotting:
+    type: "periodic"
+    interval: "manual"
+  ```
+
 ## Upstream user documentation
 
 **User Documentation** can be found at

@@ -160,6 +160,8 @@ func (self *JobRender) viewType() {
 	} else if t := self.job.SleepingUntil(); !t.IsZero() {
 		self.printLn(fmt.Sprintf("Sleep until: %s (%s remaining)",
 			t, time.Until(t).Truncate(time.Second)))
+	} else if self.job.CanWakeup {
+		self.printLn("Sleep until: wakeup signal")
 	}
 
 	if err := self.job.Error(); err != "" {

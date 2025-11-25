@@ -525,10 +525,18 @@ func (self *JobStatus) renderJobTime(sb io.StringWriter) {
 	if d, ok := self.job.Running(); ok {
 		sb.WriteString(" " + runner)
 		sb.WriteString(s.StatusBar.Render(d.Truncate(time.Second).String()))
-	} else if t := self.job.SleepingUntil(); !t.IsZero() {
+		return
+	}
+
+	if t := self.job.SleepingUntil(); !t.IsZero() {
 		sb.WriteString(" " + sleeping)
 		sb.WriteString(s.StatusBar.Render(
 			time.Until(t).Truncate(time.Second).String()))
+		return
+	}
+
+	if self.job.CanWakeup {
+		sb.WriteString(" " + sleeping)
 	}
 }
 

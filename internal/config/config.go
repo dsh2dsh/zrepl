@@ -135,8 +135,8 @@ type ActiveJob struct {
 func (self *ActiveJob) CronSpec() string {
 	if self.Cron != "" {
 		return self.Cron
-	} else if self.Interval.Interval > 0 && !self.Interval.Manual {
-		return "@every " + self.Interval.Interval.Truncate(time.Second).String()
+	} else if self.Interval.Duration() > 0 {
+		return "@every " + self.Interval.Duration().Truncate(time.Second).String()
 	}
 	return ""
 }
@@ -286,25 +286,32 @@ type PositiveDurationOrManual struct {
 
 var _ yaml.Unmarshaler = (*PositiveDurationOrManual)(nil)
 
-func (i *PositiveDurationOrManual) UnmarshalYAML(value *yaml.Node) (err error) {
+func (self *PositiveDurationOrManual) UnmarshalYAML(value *yaml.Node) (err error) {
 	var s string
 	if err := value.Decode(&s); err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
 	switch s {
 	case "manual":
-		i.Manual = true
-		i.Interval = 0
+		self.Manual = true
+		self.Interval = 0
 	case "":
 		return errors.New("value must not be empty")
 	default:
-		i.Manual = false
-		i.Interval, err = parsePositiveDuration(s)
+		self.Manual = false
+		self.Interval, err = parsePositiveDuration(s)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (self *PositiveDurationOrManual) Duration() time.Duration {
+	if self.Manual {
+		return 0
+	}
+	return self.Interval
 }
 
 type SinkJob struct {
@@ -341,21 +348,22 @@ type SnapshottingEnum struct {
 }
 
 type SnapshottingPeriodic struct {
-	Type             string        `yaml:"type" validate:"required"`
-	Prefix           string        `yaml:"prefix" validate:"required"`
-	Interval         Duration      `yaml:"interval"`
-	Cron             string        `yaml:"cron"`
-	Hooks            []HookCommand `yaml:"hooks" validate:"dive"`
-	TimestampFormat  string        `yaml:"timestamp_format" default:"dense" validate:"required"`
-	TimestampLocal   bool          `yaml:"timestamp_local" default:"true"`
-	Concurrency      uint          `yaml:"concurrency"`
-	WrittenThreshold uint64        `yaml:"written_threshold"`
+	Type             string                   `yaml:"type" validate:"required,oneof=cron manual periodic"`
+	Prefix           string                   `yaml:"prefix" validate:"required"`
+	Interval         PositiveDurationOrManual `yaml:"interval"`
+	Cron             string                   `yaml:"cron"`
+	Hooks            []HookCommand            `yaml:"hooks" validate:"dive"`
+	TimestampFormat  string                   `yaml:"timestamp_format" default:"dense" validate:"required"`
+	TimestampLocal   bool                     `yaml:"timestamp_local" default:"true"`
+	Concurrency      uint                     `yaml:"concurrency"`
+	WrittenThreshold uint64                   `yaml:"written_threshold"`
 }
 
 func (self *SnapshottingPeriodic) CronSpec() string {
-	if self.Cron != "" {
+	switch {
+	case self.Cron != "":
 		return self.Cron
-	} else if self.Interval.Duration() > 0 {
+	case self.Interval.Duration() > 0:
 		return "@every " + self.Interval.Duration().Truncate(time.Second).String()
 	}
 	return ""
