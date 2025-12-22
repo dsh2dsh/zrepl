@@ -11,7 +11,7 @@ require (
 	github.com/dsh2dsh/cron/v3 v3.0.3
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.18.0
-	github.com/go-playground/validator/v10 v10.29.0
+	github.com/go-playground/validator/v10 v10.30.0
 	github.com/klauspost/compress v1.18.2
 	github.com/montanaflynn/stats v0.7.1
 	github.com/muesli/reflow v0.3.0
