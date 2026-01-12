@@ -26,14 +26,12 @@ type filteredFs struct {
 func filterFilesystems(term string, items []*report.FilesystemReport,
 ) ([]filteredFs, int) {
 	var maxLen int
-	filteredMatches := []filteredFs{}
-	for _, r := range fuzzy.FindFromNoSort(term, fuzzyFilesystems(items)) {
+	fuzzyMatches := fuzzy.FindFromNoSort(term, fuzzyFilesystems(items))
+	filteredMatches := make([]filteredFs, len(fuzzyMatches))
+	for i, r := range fuzzyMatches {
 		fs := items[r.Index]
 		maxLen = max(maxLen, len(fs.Info.Name))
-		filteredMatches = append(filteredMatches, filteredFs{
-			Fs:      fs,
-			Matches: r.MatchedIndexes,
-		})
+		filteredMatches[i] = filteredFs{Fs: fs, Matches: r.MatchedIndexes}
 	}
 	return filteredMatches, maxLen
 }
@@ -57,12 +55,13 @@ func prunerFsAsFiltered(items []prunerFs) ([]prunerFs, int) {
 
 func filterPrunerFs(term string, items []prunerFs) ([]prunerFs, int) {
 	var maxLen int
-	filteredMatches := []prunerFs{}
-	for _, r := range fuzzy.FindFromNoSort(term, fuzzyPrunerFs(items)) {
+	fuzzyMatches := fuzzy.FindFromNoSort(term, fuzzyPrunerFs(items))
+	filteredMatches := make([]prunerFs, len(fuzzyMatches))
+	for i, r := range fuzzyMatches {
 		item := items[r.Index]
 		item.Matches = r.MatchedIndexes
 		maxLen = max(maxLen, len(item.Filesystem))
-		filteredMatches = append(filteredMatches, item)
+		filteredMatches[i] = item
 	}
 	return filteredMatches, maxLen
 }
@@ -96,14 +95,12 @@ type filteredSnapperFs struct {
 func filterSnapperFs(term string, items []*snapper.ReportFilesystem,
 ) ([]filteredSnapperFs, int) {
 	var maxLen int
-	filteredMatches := []filteredSnapperFs{}
-	for _, r := range fuzzy.FindFromNoSort(term, fuzzySnapperFs(items)) {
+	fuzzyMatches := fuzzy.FindFromNoSort(term, fuzzySnapperFs(items))
+	filteredMatches := make([]filteredSnapperFs, len(fuzzyMatches))
+	for i, r := range fuzzyMatches {
 		fs := items[r.Index]
 		maxLen = max(maxLen, len(fs.Path))
-		filteredMatches = append(filteredMatches, filteredSnapperFs{
-			Fs:      fs,
-			Matches: r.MatchedIndexes,
-		})
+		filteredMatches[i] = filteredSnapperFs{Fs: fs, Matches: r.MatchedIndexes}
 	}
 	return filteredMatches, maxLen
 }

@@ -826,12 +826,11 @@ func (s *DrySendInfo) unmarshalInfoLine(l string) error {
 // May return BookmarkSizeEstimationNotSupported as err if from is a bookmark.
 func ZFSSendDry(ctx context.Context, sendArgs ZFSSendArgsValidated,
 ) (*DrySendInfo, error) {
-	args := []string{"send", "-n", "-v", "-P"}
 	sargs, err := sendArgs.buildSendCommandLine()
 	if err != nil {
 		return nil, err
 	}
-	args = append(args, sargs...)
+	args := slices.Concat([]string{"send", "-n", "-v", "-P"}, sargs)
 
 	cmd := zfscmd.CommandContext(ctx, ZfsBin, args...)
 	output, err := cmd.CombinedOutput()
