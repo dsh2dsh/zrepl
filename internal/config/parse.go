@@ -60,6 +60,8 @@ func ParseConfigBytes(path string, bytes []byte, opts ...Option,
 		return nil, fmt.Errorf("validate config: %w", err)
 	} else if err := env.Parse(); err != nil {
 		return nil, err
+	} else if err := validateJobNames(c); err != nil {
+		return nil, err
 	}
 	return c, nil
 }
@@ -84,4 +86,16 @@ func newValidator() *validator.Validate {
 		return name
 	})
 	return validate
+}
+
+func validateJobNames(config *Config) error {
+	seen := make(map[string]struct{}, len(config.Jobs))
+	for _, job := range config.Jobs {
+		name := job.Name()
+		if _, ok := seen[name]; ok {
+			return fmt.Errorf("duplicate job name %q", name)
+		}
+		seen[name] = struct{}{}
+	}
+	return nil
 }

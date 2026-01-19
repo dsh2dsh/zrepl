@@ -1,0 +1,11 @@
+- type: snap
+  name: "my_job"
+  filesystems: {
+    "<": true,
+  }
+  snapshotting:
+    type: manual
+  pruning:
+    keep:
+      - type: last_n
+        count: 5

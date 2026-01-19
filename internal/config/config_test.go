@@ -39,6 +39,20 @@ func TestSampleConfigsAreParsedWithoutErrors(t *testing.T) {
 	}
 }
 
+func TestInvalidSampleConfigsFailToParse(t *testing.T) {
+	paths, err := filepath.Glob("./samples/invalid/*/zrepl.yml")
+	require.NoError(t, err, "glob failed")
+	require.NotEmpty(t, paths, "no invalid sample configs found")
+
+	for _, p := range paths {
+		t.Run(p, func(t *testing.T) {
+			_, err := ParseConfig(p)
+			require.Error(t, err, "expected config %s to fail parsing", p)
+			t.Logf("config %s failed as expected: %v", p, err)
+		})
+	}
+}
+
 func testValidConfig(t *testing.T, input string) *Config {
 	t.Helper()
 	conf, err := testConfig(t, input)
