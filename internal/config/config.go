@@ -579,8 +579,8 @@ func enumUnmarshal(value *yaml.Node, types map[string]any) (any, error) {
 	if err := value.Decode(&in); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	} else if in.Type == "" {
-		return nil, &yaml.TypeError{
-			Errors: []*yaml.UnmarshalError{
+		return nil, &yaml.LoadErrors{
+			Errors: []*yaml.LoadError{
 				{
 					Err:    errors.New("must specify type"),
 					Line:   value.Line,
@@ -592,8 +592,8 @@ func enumUnmarshal(value *yaml.Node, types map[string]any) (any, error) {
 
 	v, ok := types[in.Type]
 	if !ok {
-		return nil, &yaml.TypeError{
-			Errors: []*yaml.UnmarshalError{
+		return nil, &yaml.LoadErrors{
+			Errors: []*yaml.LoadError{
 				{
 					Err:    errors.New("invalid type name " + in.Type),
 					Line:   value.Line,

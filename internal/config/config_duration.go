@@ -25,8 +25,8 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	d.d, err = parseDuration(s)
 	if err != nil {
 		d.d = 0
-		return &yaml.TypeError{
-			Errors: []*yaml.UnmarshalError{
+		return &yaml.LoadErrors{
+			Errors: []*yaml.LoadError{
 				{
 					Err:    fmt.Errorf("cannot parse value %q: %w", s, err),
 					Line:   value.Line,
