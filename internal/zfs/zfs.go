@@ -275,7 +275,9 @@ func (a ZFSSendArgVersion) ValidateExistsAndGetVersion(ctx context.Context, fs s
 	}
 
 	if realVersion.Guid != a.GUID {
-		return v, fmt.Errorf("`GUID` field does not match real dataset's GUID: %q != %q", realVersion.Guid, a.GUID)
+		return v, fmt.Errorf(
+			"`GUID` field does not match real dataset's GUID: %v != %v",
+			realVersion.Guid, a.GUID)
 	}
 
 	return realVersion, nil
