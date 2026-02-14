@@ -165,14 +165,14 @@ func NewPlanner(secsPerState *prometheus.HistogramVec, bytesReplicated *promethe
 }
 
 func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*pdu.FilesystemVersion, reason error) {
-	var errMostRecent *ConflictMostRecentSnapshotAlreadyPresent
-	if errors.As(conflict, &errMostRecent) {
+	_, ok := errors.AsType[*ConflictMostRecentSnapshotAlreadyPresent](conflict)
+	if ok {
 		// replicatoin is a no-op
 		return nil, nil
 	}
 
-	var noCommonAncestor *ConflictNoCommonAncestor
-	if errors.As(conflict, &noCommonAncestor) {
+	noCommonAncestor, ok := errors.AsType[*ConflictNoCommonAncestor](conflict)
+	if ok {
 		if len(noCommonAncestor.SortedReceiverVersions) == 0 {
 
 			if len(noCommonAncestor.SortedSenderVersions) == 0 {

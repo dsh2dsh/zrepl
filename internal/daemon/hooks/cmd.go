@@ -78,8 +78,8 @@ func (self *Cmd) wrapError(ctx context.Context, l *slog.Logger, err error,
 		return nil
 	}
 
-	var ee *exec.ExitError
-	if errors.As(err, &ee) && len(ee.Stderr) != 0 {
+	ee, ok := errors.AsType[*exec.ExitError](err)
+	if ok && len(ee.Stderr) != 0 {
 		logOutput(l, slog.LevelError, "stderr", ee.Stderr)
 		self.output = slices.Concat(self.output, ee.Stderr)
 	}

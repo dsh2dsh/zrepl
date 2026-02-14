@@ -29,8 +29,7 @@ func JsonResponder[T any](h func(context.Context) (*T, error)) Middleware {
 func writeError(w http.ResponseWriter, r *http.Request, err error, msg string,
 ) {
 	statusCode := http.StatusInternalServerError
-	var httpErr *HttpError
-	if errors.As(err, &httpErr) {
+	if httpErr, ok := errors.AsType[*HttpError](err); ok {
 		statusCode = httpErr.StatusCode()
 	}
 	writeErrorCode(w, r, statusCode, err, msg)

@@ -69,8 +69,8 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 		WithLogError(false)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		var exitError *exec.ExitError
-		if !errors.As(err, &exitError) || !exitError.Exited() {
+		exitError, ok := errors.AsType[*exec.ExitError](err)
+		if !ok || !exitError.Exited() {
 			cmd.LogError(err, false)
 			return nil, err
 		}

@@ -45,8 +45,7 @@ func waitPostLogging(c *Cmd, err error, debug bool) {
 		return
 	}
 
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
+	if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 		log = log.With(slog.Int("status", exitError.ExitCode()))
 	}
 

@@ -706,8 +706,7 @@ func listFilesystemsRecursive(ctx context.Context, root *zfs.DatasetPath,
 	fsProps, err := zfs.ZFSGetRecursive(ctx, rootStr, -1,
 		[]string{"filesystem", "volume"}, props, zfs.SourceAny)
 	if err != nil {
-		var errNotExist *zfs.DatasetDoesNotExist
-		if errors.As(err, &errNotExist) {
+		if _, ok := errors.AsType[*zfs.DatasetDoesNotExist](err); ok {
 			getLogger(ctx).With(slog.String("root", rootStr)).
 				Debug("no filesystems found")
 			return &pdu.ListFilesystemRes{}, nil

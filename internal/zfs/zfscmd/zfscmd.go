@@ -241,8 +241,7 @@ func (c *Cmd) waitPost(err error) {
 	if err == nil {
 		s = c.cmd.ProcessState
 	} else {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
+		if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 			s = exitError.ProcessState
 			if c.stderrOutput == nil {
 				c.stderrOutput = exitError.Stderr

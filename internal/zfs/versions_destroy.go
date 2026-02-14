@@ -90,8 +90,8 @@ func doDestroyBatched(ctx context.Context, fs string, fsbatch []*DestroySnapOp,
 
 	err := tryBatch(ctx, fs, fsbatch)
 	if err != nil {
-		var pe *os.PathError
-		if errors.As(err, &pe) && errors.Is(pe.Err, syscall.E2BIG) {
+		pe, ok := errors.AsType[*os.PathError](err)
+		if ok && errors.Is(pe.Err, syscall.E2BIG) {
 			// See TestExcessiveArgumentsResultInE2BIG. Try halving batch size,
 			// assuming snapshots names are roughly the same length.
 			debug("batch destroy: E2BIG encountered: %s", err)
@@ -109,8 +109,7 @@ func doDestroyBatched(ctx context.Context, fs string, fsbatch []*DestroySnapOp,
 	// below
 	seqSnaps := fsbatch
 
-	var errDestroy *DestroySnapshotsError
-	if errors.As(err, &errDestroy) {
+	if errDestroy, ok := errors.AsType[*DestroySnapshotsError](err); ok {
 		// eliminate undestroyable datasets from batch and try it once again
 		strippedBatch := make([]*DestroySnapOp, 0, len(fsbatch))
 		remaining := make([]*DestroySnapOp, 0, len(fsbatch))

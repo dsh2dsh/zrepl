@@ -32,11 +32,9 @@ var (
 
 func NewZfsError(err error, stderr []byte) *ZFSError {
 	if len(stderr) == 0 {
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
+		if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 			stderr = exitError.Stderr
 		}
-
 	}
 	return &ZFSError{Stderr: stderr, WaitErr: err}
 }
@@ -953,9 +951,9 @@ func ZFSRecv(
 func zfsRollbackForceRecv(ctx context.Context, fsdp *DatasetPath) error {
 	snaps, err := ZFSListFilesystemVersions(ctx, fsdp,
 		ListFilesystemVersionsOptions{Types: Snapshots})
-	var errNotExist *DatasetDoesNotExist
+	_, errNotExist := errors.AsType[*DatasetDoesNotExist](err)
 	switch {
-	case errors.As(err, &errNotExist):
+	case errNotExist:
 		snaps = []FilesystemVersion{}
 	case err != nil:
 		return fmt.Errorf(
@@ -1555,8 +1553,7 @@ func ZFSDestroy(ctx context.Context, arg string) error {
 
 func ZFSDestroyIdempotent(ctx context.Context, path string) error {
 	if err := ZFSDestroy(ctx, path); err != nil {
-		var errNotExist *DatasetDoesNotExist
-		if !errors.As(err, &errNotExist) {
+		if _, ok := errors.AsType[*DatasetDoesNotExist](err); !ok {
 			return err
 		}
 	}
@@ -1638,8 +1635,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion,
 	if v.IsBookmark() {
 		existingBm, err := ZFSGetFilesystemVersion(ctx, bookmarkname)
 		if err != nil {
-			var notExistsErr *DatasetDoesNotExist
-			if errors.As(err, &notExistsErr) {
+			if _, ok := errors.AsType[*DatasetDoesNotExist](err); ok {
 				return bm, ErrBookmarkCloningNotSupported
 			}
 			return bm, fmt.Errorf(

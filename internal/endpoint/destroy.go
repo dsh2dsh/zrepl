@@ -74,8 +74,8 @@ func destroyOneSnapshots(ctx context.Context, lp string, snapNames []string,
 				Name: destroy[i].Name,
 			})
 			failed := &destroyed[len(destroyed)-1]
-			var de *zfs.DestroySnapshotsError
-			if errors.As(err, &de) && len(de.Reason) == 1 {
+			de, ok := errors.AsType[*zfs.DestroySnapshotsError](err)
+			if ok && len(de.Reason) == 1 {
 				failed.Error = de.Reason[0]
 			} else {
 				failed.Error = err.Error()

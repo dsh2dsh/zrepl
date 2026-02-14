@@ -85,8 +85,8 @@ func scanCmdOutput(cmd *zfscmd.Cmd, r io.Reader, stderrBuf *bytes.Buffer,
 }
 
 func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {
-	var zfsError *ZFSError
-	if !errors.As(err, &zfsError) {
+	zfsError, ok := errors.AsType[*ZFSError](err)
+	if !ok {
 		return err
 	}
 
