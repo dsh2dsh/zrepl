@@ -33,24 +33,25 @@ type Subsystem string
 
 func OutletsFromConfig(in config.LoggingOutletEnumList,
 ) (*logger.Outlets, error) {
-	outlets := logger.NewOutlets()
-	if len(in) == 0 {
+	handlers := make([]slog.Handler, 0, len(in))
+	for i, le := range in {
+		outlet, err := ParseOutlet(le)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse outlet #%d: %w", i, err)
+		}
+		handlers = append(handlers, outlet)
+	}
+
+	if len(handlers) == 0 {
 		// Default config
 		o, err := NewFileOutlet("", NewSlogFormatter())
 		if err != nil {
 			return nil, err
 		}
-		outlets.Add(o)
-		return outlets, nil
+		handlers = append(handlers, o)
 	}
 
-	for lei, le := range in {
-		outlet, err := ParseOutlet(le)
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse outlet #%d: %w", lei, err)
-		}
-		outlets.Add(outlet)
-	}
+	outlets := logger.NewOutlets(handlers...)
 	return outlets, nil
 }
 

@@ -20,5 +20,9 @@ func WithError(l *slog.Logger, err error, msg string) *slog.Logger {
 }
 
 func NewNullLogger() *slog.Logger {
-	return NewLogger(NewOutlets().Add(slog.DiscardHandler))
+	return NewLogger(NewOutlets(slog.DiscardHandler))
+}
+
+func NewTestLogger() *slog.Logger {
+	return NewLogger(NewOutlets(slog.Default().Handler()))
 }

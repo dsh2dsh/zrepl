@@ -394,7 +394,7 @@ jobs:
 	fs, err := zfs.NewDatasetPath(testFSName)
 	require.NoError(t, err)
 
-	log := logger.NewTestLogger(t)
+	log := logger.NewTestLogger()
 
 	var cbReached bool
 	cb := hooks.NewCallbackHookForFilesystem("testcallback", fs, func(_ context.Context) error {
