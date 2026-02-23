@@ -25,14 +25,14 @@ func (r *CommandHookReport) String() string {
 	// printed in the same order
 	envKeys := slices.Sorted(maps.Keys(r.Env))
 	for _, k := range envKeys {
-		cmdLine.WriteString(fmt.Sprintf("%s%s='%s'", sep, k, r.Env[k]))
+		fmt.Fprintf(&cmdLine, "%s%s='%s'", sep, k, r.Env[k])
 		sep = " "
 	}
 
 	cmdLine.WriteString(sep)
 	cmdLine.WriteString(r.Command)
 	for _, a := range r.Args {
-		cmdLine.WriteString(fmt.Sprintf("%s'%s'", sep, a))
+		fmt.Fprintf(&cmdLine, "%s'%s'", sep, a)
 	}
 
 	var msg string

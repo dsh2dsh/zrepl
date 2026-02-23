@@ -140,8 +140,7 @@ func (self *JobRender) viewSnapperFsStatus(fs *snapper.ReportFilesystem,
 ) string {
 	var sb strings.Builder
 	s := &self.Styles
-	sb.WriteString(fmt.Sprintf("%s %s",
-		s.SnapState.Render(state), s.SnapTime.Render(d)))
+	fmt.Fprintf(&sb, "%s %s", s.SnapState.Render(state), s.SnapTime.Render(d))
 	if fs.State != snapper.SnapPending {
 		sb.WriteString(" @" + fs.SnapName)
 	}

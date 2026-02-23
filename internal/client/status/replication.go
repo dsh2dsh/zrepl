@@ -73,9 +73,9 @@ func (self *JobRender) viewAttempts(r *report.Report) *report.AttemptReport {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&sb,
 		"Attempt #%d. Previous attempts failed with the following statuses:",
-		len(r.Attempts)))
+		len(r.Attempts))
 	for i, a := range r.Attempts[:len(r.Attempts)-1] {
 		sb.WriteByte('\n')
 		sb.WriteString(s.Indent.Render(fmt.Sprintf(
@@ -206,16 +206,15 @@ func (self *JobRender) renderFilesystemsBar(totalItems, visibleItems int) {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("%s “%s” ",
-		eyes, strings.TrimSpace(self.filterValue)))
+	fmt.Fprintf(&sb, "%s “%s” ", eyes, strings.TrimSpace(self.filterValue))
 	s := &self.Styles
 	switch visibleItems {
 	case 0:
 		sb.WriteString(s.StatusEmpty.Render("Nothing matched"))
 	case 1:
-		sb.WriteString(fmt.Sprintf("%d filesystem", visibleItems))
+		fmt.Fprintf(&sb, "%d filesystem", visibleItems)
 	default:
-		sb.WriteString(fmt.Sprintf("%d filesystems", visibleItems))
+		fmt.Fprintf(&sb, "%d filesystems", visibleItems)
 	}
 
 	numFiltered := totalItems - visibleItems
@@ -271,11 +270,10 @@ func (self *JobRender) viewFsStatus(fs *report.FilesystemReport) string {
 	expected, replicated, invalidEstimates := fs.BytesSum()
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(
-		"%s (step %d/%d, %s / %s)",
+	fmt.Fprintf(&sb, "%s (step %d/%d, %s / %s)",
 		filesystemState(fs.State), stepNum, len(fs.Steps),
 		humanizeFormat(replicated, true, "%s %sB"),
-		humanizeFormat(expected, true, "%s %sB")))
+		humanizeFormat(expected, true, "%s %sB"))
 
 	if invalidEstimates {
 		sb.WriteString(" (some steps lack size estimation)")
