@@ -1,10 +1,10 @@
 package status
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func NewSimpleList(items []ListItem, w, h int, title string) *ListModel {
@@ -31,6 +31,8 @@ type ListItem struct {
 	ItemFunc func(item *ListItem) tea.Cmd
 }
 
+var _ list.DefaultItem = (*ListItem)(nil)
+
 func (self *ListItem) Title() string       { return self.Caption }
 func (self *ListItem) Description() string { return self.Desc }
 func (self *ListItem) FilterValue() string { return self.Caption }
@@ -39,6 +41,7 @@ func NewList(items []ListItem, d list.ItemDelegate, w, h int) *ListModel {
 	s := &ListModel{
 		Choose: key.NewBinding(key.WithKeys("enter"),
 			key.WithHelp("enter", "choose")),
+		darkMode: true,
 	}
 	return s.init(items, d, w, h)
 }
@@ -52,6 +55,8 @@ type ListModel struct {
 
 	itemFunc   func(item *ListItem) tea.Cmd
 	backToFunc func()
+
+	darkMode bool
 }
 
 func (self *ListModel) init(items []ListItem, d list.ItemDelegate, w, h int,
@@ -61,6 +66,7 @@ func (self *ListModel) init(items []ListItem, d list.ItemDelegate, w, h int,
 	l.AdditionalShortHelpKeys = self.helpKeys
 	l.AdditionalFullHelpKeys = self.helpKeys
 	l.Filter = list.UnsortedFilter
+	l.Styles = list.DefaultStyles(self.darkMode)
 	l.SetShowStatusBar(false)
 	self.list = l
 	return self
@@ -156,4 +162,13 @@ func (self *ListModel) List() *list.Model {
 func (self *ListModel) SetItems(items []ListItem) {
 	self.items = items
 	self.list.SetItems(makeListItems(self.items))
+}
+
+func (self *ListModel) SwitchDark(darkMode bool) {
+	if self.darkMode == darkMode {
+		return
+	}
+
+	self.list.Styles = list.DefaultStyles(darkMode)
+	self.darkMode = darkMode
 }

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/progress"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/progress"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
@@ -27,8 +27,9 @@ const (
 	sleeping   = "\U0001F4A4"
 )
 
-func DefaultItemStyle() (s ItemStyle) {
-	verySubduedColor := lipgloss.AdaptiveColor{Light: "#DDDADA", Dark: "#3C3C3C"}
+func DefaultItemStyle(darkMode bool) (s ItemStyle) {
+	lightDark := makeLightDark(darkMode)
+	verySubduedColor := lightDark("#DDDADA", "#3C3C3C")
 
 	s.Time = lipgloss.NewStyle().MarginLeft(1).Width(10).Align(lipgloss.Right)
 
@@ -37,14 +38,12 @@ func DefaultItemStyle() (s ItemStyle) {
 
 	s.WithError = lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(lipgloss.AdaptiveColor{
-			Light: "#FF0000", Dark: "#FF0000",
-		})
+		BorderForeground(lightDark("#FF0000", "#FF0000"))
 
 	s.Steps = lipgloss.NewStyle().Width(3).MarginLeft(1)
 
 	s.ActiveStepDot = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#847A85", Dark: "#979797"}).
+		Foreground(lightDark("#847A85", "#979797")).
 		SetString(bullet)
 
 	s.InactiveStepDot = lipgloss.NewStyle().
@@ -72,15 +71,6 @@ type ItemStyle struct {
 
 // --------------------------------------------------
 
-func NewJobDelegate() *JobDelegate {
-	return &JobDelegate{
-		DefaultDelegate: list.NewDefaultDelegate(),
-		Style:           DefaultItemStyle(),
-
-		bar: progress.New(),
-	}
-}
-
 type JobDelegate struct {
 	list.DefaultDelegate
 
@@ -91,6 +81,18 @@ type JobDelegate struct {
 
 	maxTitle int
 	bar      progress.Model
+}
+
+func NewJobDelegate(darkMode bool) *JobDelegate {
+	d := list.NewDefaultDelegate()
+	d.Styles = list.NewDefaultItemStyles(darkMode)
+
+	return &JobDelegate{
+		DefaultDelegate: d,
+		Style:           DefaultItemStyle(darkMode),
+
+		bar: progress.New(progress.WithDefaultBlend()),
+	}
 }
 
 func (self *JobDelegate) SetStatus(s *daemon.Status, items []ListItem) {
@@ -204,14 +206,18 @@ func (self *JobDelegate) renderProgressBar(job *job.Status) {
 	self.b.WriteString(self.Style.Bar.Render(self.bar.ViewAs(pct)))
 }
 
+func (self *JobDelegate) SwitchDark(darkMode bool) {
+	self.Styles = list.NewDefaultItemStyles(darkMode)
+}
+
 // --------------------------------------------------
 
-func NewJobsList() *JobsList {
+func NewJobsList(darkMode bool) *JobsList {
 	jobs := &JobsList{
-		Choose: key.NewBinding(key.WithKeys("enter"),
-			key.WithHelp("enter", "show")),
+		Choose: key.NewBinding(
+			key.WithKeys("enter"), key.WithHelp("enter", "show")),
 	}
-	return jobs.init()
+	return jobs.init(darkMode)
 }
 
 type JobsList struct {
@@ -226,13 +232,14 @@ type JobsList struct {
 	selected func(name string)
 }
 
-func (self *JobsList) init() *JobsList {
-	self.delegate = self.newJobDelegate()
+func (self *JobsList) init(darkMode bool) *JobsList {
+	self.delegate = self.newJobDelegate(darkMode)
 	l := NewList([]ListItem{}, self.delegate, 0, 0).
 		WithItemFunc(self.selectedCmd)
 	l.Choose = self.Choose
 	l.Style = self.Style
 	l.InitDelegate(&self.delegate.DefaultDelegate)
+	l.SwitchDark(darkMode)
 	self.list = l
 
 	ll := l.List()
@@ -241,8 +248,8 @@ func (self *JobsList) init() *JobsList {
 	return self
 }
 
-func (self *JobsList) newJobDelegate() *JobDelegate {
-	d := NewJobDelegate()
+func (self *JobsList) newJobDelegate(darkMode bool) *JobDelegate {
+	d := NewJobDelegate(darkMode)
 	d.ShowDescription = false
 	d.SetSpacing(0)
 	return d
@@ -271,7 +278,7 @@ func (self *JobsList) Loading() tea.Cmd {
 	return self.List().StartSpinner()
 }
 
-func (self *JobsList) SetItems(status *daemon.Status) tea.Cmd {
+func (self *JobsList) SetItems(status *daemon.Status) string {
 	self.status = status
 	self.items = self.makeJobItems(status.Jobs)
 	self.delegate.SetStatus(status, self.items)
@@ -315,7 +322,7 @@ func (self *JobsList) Select(name string) {
 	}
 }
 
-func (self *JobsList) RefreshTitle() tea.Cmd {
+func (self *JobsList) RefreshTitle() string {
 	var sb strings.Builder
 	runCnt, withErr := self.status.JobCounts()
 	if runCnt > 0 {
@@ -333,9 +340,11 @@ func (self *JobsList) RefreshTitle() tea.Cmd {
 	}
 
 	l := self.List()
-	if l.Title != title {
-		l.Title = title
-		return tea.SetWindowTitle(title)
-	}
-	return nil
+	l.Title = title
+	return title
+}
+
+func (self *JobsList) SwitchDark(darkMode bool) {
+	self.delegate.SwitchDark(darkMode)
+	self.list.SwitchDark(darkMode)
 }

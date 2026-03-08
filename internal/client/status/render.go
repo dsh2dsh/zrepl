@@ -6,16 +6,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/lipgloss/v2"
 	"go.yaml.in/yaml/v4"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
 )
 
-func DefaultRenderStyles() (s RenderStyles) {
-	verySubduedColor := lipgloss.AdaptiveColor{Light: "#DDDADA", Dark: "#3C3C3C"}
-	subduedColor := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
+func DefaultRenderStyles(darkMode bool) (s RenderStyles) {
+	lightDark := makeLightDark(darkMode)
+	verySubduedColor := lightDark("#DDDADA", "#3C3C3C")
+	subduedColor := lightDark("#9B9B9B", "#5C5C5C")
 
 	s.Title = lipgloss.NewStyle()
 	s.Content = lipgloss.NewStyle().MarginLeft(2)
@@ -26,15 +27,14 @@ func DefaultRenderStyles() (s RenderStyles) {
 	s.InactiveFsIcon = lipgloss.NewStyle().Width(2)
 	s.RunningFsIcon = s.InactiveFsIcon.SetString(runner)
 
-	s.InactiveFs = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
+	s.InactiveFs = lipgloss.NewStyle().Foreground(lightDark("#A49FA5", "#777777"))
 	s.RunningFs = lipgloss.NewStyle()
 	s.FsNext = lipgloss.NewStyle().MarginLeft(4)
 
 	s.FilterMatch = lipgloss.NewStyle().Underline(true)
 
 	s.StatusBar = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"}).
+		Foreground(lightDark("#A49FA5", "#777777")).
 		PaddingLeft(2)
 
 	s.StatusEmpty = lipgloss.NewStyle().Foreground(subduedColor)
@@ -85,18 +85,20 @@ func (self *RenderStyles) Filesystem(running bool) (lipgloss.Style,
 
 // --------------------------------------------------
 
-func NewJobRender() *JobRender {
+func NewJobRender(darkMode bool) *JobRender {
 	return &JobRender{
-		Styles: DefaultRenderStyles(),
+		Styles:   DefaultRenderStyles(darkMode),
+		darkMode: darkMode,
 
 		jumpLines: make([]int, 0, 4),
 
-		bar: progress.New(),
+		bar: progress.New(progress.WithDefaultBlend()),
 	}
 }
 
 type JobRender struct {
-	Styles RenderStyles
+	Styles   RenderStyles
+	darkMode bool
 
 	job *job.Status
 	b   bytes.Buffer
@@ -229,4 +231,11 @@ func (self *JobRender) SetFilter(value string) {
 
 func (self *JobRender) ResetFilter() {
 	self.filterState, self.filterValue = Unfiltered, ""
+}
+
+func (self *JobRender) SwitchDark(darkMode bool) {
+	if self.darkMode != darkMode {
+		self.Styles = DefaultRenderStyles(darkMode)
+		self.darkMode = darkMode
+	}
 }

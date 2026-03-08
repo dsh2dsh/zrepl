@@ -4,23 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
 )
-
-type tuiState uint
-
-const (
-	stateListJobs tuiState = iota
-	stateSelected
-)
-
-func NewStatusTUI(client *Client) *StatusTUI {
-	ui := &StatusTUI{client: client}
-	return ui.init()
-}
 
 type StatusTUI struct {
 	client *Client
@@ -28,10 +16,12 @@ type StatusTUI struct {
 	err    error
 	state  tuiState
 
+	darkMode   bool
 	initialJob string
 
 	updateEvery   time.Duration
 	width, height int
+	windowTitle   string
 
 	loaded   bool
 	jobs     *JobsList
@@ -39,9 +29,27 @@ type StatusTUI struct {
 	jobName  string
 }
 
-func (self *StatusTUI) init() *StatusTUI {
-	self.jobs = NewJobsList().WithSelected(self.selectJob)
-	self.selected = NewJobStatus(self.client, NewJobRender()).
+var _ tea.Model = (*StatusTUI)(nil)
+
+type tuiState int
+
+const (
+	stateListJobs tuiState = iota
+	stateSelected
+)
+
+func NewStatusTUI(client *Client) *StatusTUI {
+	self := &StatusTUI{
+		client:      client,
+		windowTitle: defTitle,
+	}
+	return self.init(true)
+}
+
+func (self *StatusTUI) init(darkMode bool) *StatusTUI {
+	self.darkMode = darkMode
+	self.jobs = NewJobsList(darkMode).WithSelected(self.selectJob)
+	self.selected = NewJobStatus(darkMode, self.client, NewJobRender(darkMode)).
 		WithBackTo(self.backToJobs)
 	return self
 }
@@ -57,10 +65,8 @@ func (self *StatusTUI) WithInitialJob(name string) *StatusTUI {
 }
 
 func (self *StatusTUI) Init() tea.Cmd {
-	return tea.Sequence(
-		tea.SetWindowTitle(defTitle),
-		self.jobs.Loading(),
-		func() tea.Msg { return self.load() })
+	return tea.Sequence(tea.RequestBackgroundColor, self.jobs.Loading(),
+		self.load)
 }
 
 func (self *StatusTUI) refreshCmd() tea.Cmd {
@@ -73,7 +79,9 @@ func (self *StatusTUI) load() tea.Msg {
 	s, err := self.client.Status()
 	if err != nil {
 		return err
-	} else if !self.loaded && self.initialJob != "" {
+	}
+
+	if !self.loaded && self.initialJob != "" {
 		if _, ok := s.Jobs[self.initialJob]; !ok {
 			return fmt.Errorf("specified job %q doesn't exists", self.initialJob)
 		}
@@ -83,6 +91,8 @@ func (self *StatusTUI) load() tea.Msg {
 
 func (self *StatusTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.BackgroundColorMsg:
+		return self, self.SwitchDark(msg.IsDark())
 	case tea.KeyMsg:
 		return self, self.handleKeys(msg)
 	case tea.WindowSizeMsg:
@@ -93,23 +103,16 @@ func (self *StatusTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case daemon.Status:
 		return self, self.handleStatus(msg)
 	}
-
-	if cmd, ok := self.updateState(msg); ok {
-		return self, cmd
-	}
-	return self, self.jobs.Update(msg)
-}
-
-func (self *StatusTUI) updateState(msg tea.Msg) (tea.Cmd, bool) {
-	if self.state == stateSelected {
-		return self.selected.Update(msg), true
-	}
-	return nil, false
+	return self, self.updateState(msg)
 }
 
 func (self *StatusTUI) handleKeys(msg tea.KeyMsg) tea.Cmd {
-	if cmd, ok := self.updateState(msg); ok {
-		return cmd
+	return self.updateState(msg)
+}
+
+func (self *StatusTUI) updateState(msg tea.Msg) tea.Cmd {
+	if self.state == stateSelected {
+		return self.selected.Update(msg)
 	}
 	return self.jobs.Update(msg)
 }
@@ -121,33 +124,42 @@ func (self *StatusTUI) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 
 func (self *StatusTUI) handleStatus(s daemon.Status) tea.Cmd {
 	self.status = s
-	var cmd tea.Cmd
 
 	if !self.loaded {
 		self.loaded = true
-		cmd = self.jobs.SetItems(&self.status)
+		self.windowTitle = self.jobs.SetItems(&self.status)
 		if self.initialJob != "" {
 			self.jobs.Select(self.initialJob)
 			self.initialJob = ""
 		}
-	} else {
-		if self.state == stateSelected {
-			self.selected.SetJob(self.jobName, self.job())
-		}
-		cmd = self.jobs.RefreshTitle()
+		return self.refreshCmd()
 	}
-	return tea.Sequence(cmd, self.refreshCmd())
+
+	if self.state == stateSelected {
+		self.selected.SetJob(self.jobName, self.job())
+	}
+
+	self.windowTitle = self.jobs.RefreshTitle()
+	return self.refreshCmd()
 }
 
 func (self *StatusTUI) job() *job.Status {
 	return self.status.Jobs[self.jobName]
 }
 
-func (self *StatusTUI) View() string {
-	if self.state == stateSelected {
-		return self.selected.View()
+func (self *StatusTUI) View() tea.View {
+	var s string
+	switch self.state {
+	case stateListJobs:
+		s = self.jobs.View()
+	case stateSelected:
+		s = self.selected.View()
 	}
-	return self.jobs.View()
+
+	v := tea.NewView(s)
+	v.AltScreen = true
+	v.WindowTitle = self.windowTitle
+	return v
 }
 
 func (self *StatusTUI) Err() error { return self.err }
@@ -162,4 +174,15 @@ func (self *StatusTUI) backToJobs() {
 	self.jobName = ""
 	self.selected.Reset()
 	self.state = stateListJobs
+}
+
+func (self *StatusTUI) SwitchDark(darkMode bool) tea.Cmd {
+	if self.darkMode == darkMode {
+		return nil
+	}
+
+	self.jobs.SwitchDark(darkMode)
+	self.selected.SwitchDark(darkMode)
+	self.darkMode = darkMode
+	return nil
 }

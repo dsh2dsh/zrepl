@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/zrepl/internal/cli"
@@ -41,7 +42,7 @@ var Subcommand = &cli.Subcommand{
 		return withStatusClient(cmd, func(c *Client) error {
 			model := NewStatusTUI(c).WithInitialJob(selectedJob).
 				WithUpdateEvery(refreshInterval)
-			p := tea.NewProgram(model, tea.WithAltScreen())
+			p := tea.NewProgram(model)
 			if _, err := p.Run(); err != nil {
 				return fmt.Errorf("running program: %w", err)
 			}
@@ -102,7 +103,8 @@ func dump(client *Client, jobName string) error {
 		return err
 	}
 
-	jobRender := NewJobRender()
+	darkMode := lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+	jobRender := NewJobRender(darkMode)
 	if jobName != "" {
 		return dumpJob(jobRender, jobName, status.Jobs)
 	}

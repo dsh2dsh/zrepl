@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/muesli/reflow/truncate"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -42,9 +42,10 @@ const (
 
 var titler = cases.Title(language.English)
 
-func DefaultJobStyles() (s JobStyles) {
-	subduedColor := lipgloss.AdaptiveColor{Light: "#9B9B9B", Dark: "#5C5C5C"}
-	verySubduedColor := lipgloss.AdaptiveColor{Light: "#DDDADA", Dark: "#3C3C3C"}
+func DefaultJobStyles(darkMode bool) (s JobStyles) {
+	lightDark := makeLightDark(darkMode)
+	subduedColor := lightDark("#9B9B9B", "#5C5C5C")
+	verySubduedColor := lightDark("#DDDADA", "#3C3C3C")
 
 	s.TitleBar = lipgloss.NewStyle().Padding(0, 0, 1, 2)
 	s.Title = lipgloss.NewStyle().
@@ -53,13 +54,13 @@ func DefaultJobStyles() (s JobStyles) {
 		Padding(0, 1)
 
 	s.FilterPrompt = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#04B575", Dark: "#ECFD65"})
+		Foreground(lightDark("#04B575", "#ECFD65"))
 
 	s.FilterCursor = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#EE6FF8", Dark: "#EE6FF8"})
+		Foreground(lightDark("#EE6FF8", "#EE6FF8"))
 
 	s.StatusBar = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#A49FA5", Dark: "#777777"})
+		Foreground(lightDark("#A49FA5", "#777777"))
 
 	s.View = lipgloss.NewStyle()
 
@@ -74,7 +75,7 @@ func DefaultJobStyles() (s JobStyles) {
 	s.Help = lipgloss.NewStyle().Padding(1, 0, 0, 2)
 
 	s.ActivePaginationDot = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#847A85", Dark: "#979797"}).
+		Foreground(lightDark("#847A85", "#979797")).
 		SetString(bullet)
 
 	s.InactivePaginationDot = lipgloss.NewStyle().
@@ -208,32 +209,6 @@ func (self *JobKeys) SetEnabled(v bool) {
 
 // --------------------------------------------------
 
-func NewJobStatus(client *Client, render *JobRender) *JobStatus {
-	styles := DefaultJobStyles()
-
-	filterInput := textinput.New()
-	filterInput.Prompt = "Filter: "
-	filterInput.PromptStyle = styles.FilterPrompt
-	filterInput.Cursor.Style = styles.FilterCursor
-	filterInput.CharLimit = 64
-	filterInput.Focus()
-
-	j := &JobStatus{
-		Styles:      styles,
-		Keys:        DefaultJobKeys(),
-		Help:        help.New(),
-		FilterInput: filterInput,
-
-		StatusMessageLifetime: 2 * time.Second,
-
-		client: client,
-		render: render,
-	}
-
-	j.updateKeybindings()
-	return j
-}
-
 type JobStatus struct {
 	Styles JobStyles
 	Keys   JobKeys
@@ -249,6 +224,7 @@ type JobStatus struct {
 	name      string
 	canSignal string
 
+	darkMode   bool
 	render     *JobRender
 	backToFunc func()
 
@@ -265,6 +241,38 @@ type JobStatus struct {
 
 	statusMessage string
 	statusId      uint64
+}
+
+func NewJobStatus(darkMode bool, client *Client, render *JobRender) *JobStatus {
+	styles := DefaultJobStyles(darkMode)
+
+	filterInput := textinput.New()
+	s := textinput.DefaultStyles(darkMode)
+	s.Focused.Prompt = styles.FilterPrompt
+	s.Cursor.Color = styles.FilterCursor.GetForeground()
+	filterInput.SetStyles(s)
+	filterInput.Prompt = "Filter: "
+	filterInput.CharLimit = 64
+	filterInput.Focus()
+
+	helpView := help.New()
+	helpView.Styles = help.DefaultStyles(darkMode)
+
+	j := &JobStatus{
+		Styles:      styles,
+		Keys:        DefaultJobKeys(),
+		Help:        helpView,
+		FilterInput: filterInput,
+
+		StatusMessageLifetime: 2 * time.Second,
+
+		client:   client,
+		render:   render,
+		darkMode: darkMode,
+	}
+
+	j.updateKeybindings()
+	return j
 }
 
 func (self *JobStatus) updateKeybindings() {
@@ -299,7 +307,8 @@ func (self *JobStatus) setViewportKeysEnabled(v bool) {
 
 func (self *JobStatus) init() *JobStatus {
 	height, ypos := self.viewportHeight()
-	self.viewport = viewport.New(self.width, height)
+	self.viewport = viewport.New(viewport.WithWidth(self.width),
+		viewport.WithHeight(height))
 	self.viewport.YPosition = ypos
 	self.viewport.Style = self.Styles.View
 	self.updateContent()
@@ -453,11 +462,11 @@ func (self *JobStatus) resetFiltering() tea.Cmd {
 func (self *JobStatus) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
 	self.width, self.height = msg.Width, msg.Height
 	s := &self.Styles
-	self.Help.Width = self.width - s.Help.GetHorizontalFrameSize()
+	self.Help.SetWidth(self.width - s.Help.GetHorizontalFrameSize())
 
-	self.viewport.Width = self.width
+	self.viewport.SetWidth(self.width)
 	height, _ := self.viewportHeight()
-	self.viewport.Height = height
+	self.viewport.SetHeight(height)
 
 	if cmd, ok := self.updateState(msg); ok {
 		return cmd
@@ -472,13 +481,14 @@ func (self *JobStatus) View() string {
 
 	header := self.headerView()
 	footer := self.footerView()
-	self.viewport.Height = self.height - lipgloss.Height(header) -
-		lipgloss.Height(footer)
+	self.viewport.SetHeight(self.height - lipgloss.Height(header) -
+		lipgloss.Height(footer))
 	if self.heightChanged {
 		footer = self.footerView()
 	}
-	return lipgloss.JoinVertical(lipgloss.Left,
-		header, self.viewport.View(), footer)
+
+	return lipgloss.JoinVertical(lipgloss.Left, header, self.viewport.View(),
+		footer)
 }
 
 func (self *JobStatus) headerView() string {
@@ -517,7 +527,7 @@ func (self *JobStatus) renderTitle(sb io.StringWriter) {
 
 //nolint:errcheck // I don't expect errors from sb
 func (self *JobStatus) renderJobTime(sb io.StringWriter) {
-	if self.viewport.YOffset <= self.render.JobTimeLine() {
+	if self.viewport.YOffset() <= self.render.JobTimeLine() {
 		return
 	}
 
@@ -572,7 +582,7 @@ func (self *JobStatus) paginationView() string {
 }
 
 func (self *JobStatus) pages() int {
-	height := self.viewport.Height
+	height := self.viewport.Height()
 	if height == 0 {
 		return 1
 	}
@@ -690,8 +700,10 @@ func (self *JobStatus) confirmSignal(name string) {
 	}
 	title := fmt.Sprintf("%s %s?", sigTitle, self.name)
 
-	self.signalYesNo = NewSimpleList(items, self.width, self.height, title).
+	l := NewSimpleList(items, self.width, self.height, title).
 		WithBackTo(self.switchToView)
+	l.SwitchDark(self.darkMode)
+	self.signalYesNo = l
 	self.state = stateJobSignal
 }
 
@@ -755,9 +767,9 @@ func (self *JobStatus) jumpToNextSection() tea.Cmd {
 		return nil
 	}
 
-	maxLine := self.viewport.TotalLineCount() - self.viewport.Height
+	maxLine := self.viewport.TotalLineCount() - self.viewport.Height()
 	for i := range len(jumpLines) {
-		if nextLine := jumpLines[i]; nextLine > self.viewport.YOffset &&
+		if nextLine := jumpLines[i]; nextLine > self.viewport.YOffset() &&
 			nextLine <= maxLine {
 			self.viewport.SetYOffset(nextLine)
 			return nil
@@ -765,4 +777,25 @@ func (self *JobStatus) jumpToNextSection() tea.Cmd {
 	}
 	self.viewport.SetYOffset(0)
 	return nil
+}
+
+func (self *JobStatus) SwitchDark(darkMode bool) {
+	if self.darkMode == darkMode {
+		return
+	}
+
+	styles := DefaultJobStyles(darkMode)
+	self.Styles = styles
+	self.Help.Styles = help.DefaultStyles(darkMode)
+
+	fi := &self.FilterInput
+	s := textinput.DefaultStyles(darkMode)
+	s.Focused.Prompt = styles.FilterPrompt
+	s.Cursor.Color = styles.FilterCursor.GetForeground()
+	fi.SetStyles(s)
+
+	if self.state == stateJobSignal {
+		self.signalYesNo.SwitchDark(darkMode)
+	}
+	self.darkMode = darkMode
 }
