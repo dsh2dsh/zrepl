@@ -11,7 +11,7 @@ require (
 	github.com/dsh2dsh/cron/v3 v3.0.3
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.19.0
-	github.com/go-playground/validator/v10 v10.30.1
+	github.com/go-playground/validator/v10 v10.30.2
 	github.com/klauspost/compress v1.18.5
 	github.com/montanaflynn/stats v0.9.0
 	github.com/muesli/reflow v0.3.0
@@ -37,7 +37,7 @@ require (
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -69,7 +69,7 @@ require (
 	github.com/sergi/go-diff v1.4.0 // indirect; go1.12 thinks it needs this
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
-	golang.org/x/crypto v0.46.0 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/text v0.35.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
