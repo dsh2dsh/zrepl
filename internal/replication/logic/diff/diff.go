@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -122,8 +123,8 @@ func IncrementalPath(receiver, sender []*FilesystemVersion) (
 	}
 
 findCandidate:
-	for r := len(receiver) - 1; r >= 0; r-- {
-		for s := len(sender) - 1; s >= 0; s-- {
+	for r := range slices.Backward(receiver) {
+		for s := range slices.Backward(sender) {
 			if sender[s].GetGuid() == receiver[r].GetGuid() {
 				mrcaCandidate.s = s
 				mrcaCandidate.r = r

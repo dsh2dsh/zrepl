@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -566,8 +567,8 @@ func (f *fs) do(ctx context.Context, pq *stepQueue, prev *fs) {
 			target.prev = -1
 			target.cur = -1
 		out:
-			for p := len(prevUncompleted) - 1; p >= 0; p-- {
-				for q := len(f.planned.steps) - 1; q >= 0; q-- {
+			for p := range slices.Backward(prevUncompleted) {
+				for q := range slices.Backward(f.planned.steps) {
 					if prevUncompleted[p].step.TargetEquals(f.planned.steps[q].step) {
 						target.prev = p
 						target.cur = q

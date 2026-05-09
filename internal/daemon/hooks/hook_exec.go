@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -131,7 +132,7 @@ func NewPlan(hooks List, phase Phase, cb *CallbackHook, extra map[string]string,
 	steps := make([]*Step, 0, len(pre)+len(post)+1)
 	steps = append(steps, pre...)
 	steps = append(steps, cbE)
-	for i := len(post) - 1; i >= 0; i-- {
+	for i := range slices.Backward(post) {
 		steps = append(steps, post[i])
 	}
 

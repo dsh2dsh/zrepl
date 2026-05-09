@@ -184,7 +184,7 @@ func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*
 			case InitialReplicationAutoResolutionMostRecent:
 
 				var mostRecentSnap *pdu.FilesystemVersion
-				for n := len(noCommonAncestor.SortedSenderVersions) - 1; n >= 0; n-- {
+				for n := range slices.Backward(noCommonAncestor.SortedSenderVersions) {
 					if noCommonAncestor.SortedSenderVersions[n].Type == pdu.FilesystemVersion_Snapshot {
 						mostRecentSnap = noCommonAncestor.SortedSenderVersions[n]
 						break
