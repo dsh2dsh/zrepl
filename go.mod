@@ -16,7 +16,7 @@ require (
 	github.com/montanaflynn/stats v0.9.0
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/sahilm/fuzzy v0.1.1
+	github.com/sahilm/fuzzy v0.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
@@ -70,6 +70,6 @@ require (
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	golang.org/x/crypto v0.49.0 // indirect
-	golang.org/x/text v0.36.0
+	golang.org/x/text v0.37.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
