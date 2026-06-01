@@ -702,6 +702,37 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
     interval: "manual"
   ```
 
+* Implement `zfs send -R` of recursive datasets
+
+  ```yaml
+  - name: "test"
+    type: "push"
+    datasets:
+      - pattern: "zroot/test"
+        recursive: true
+    replication:
+      recursive: true
+  ```
+
+  Instead of `zfs send` of dataset `zroot/test` and every its descendent dataset
+  one by one, that configuration will use `zfs send -R ... zroot/test` and
+  generate a replication stream package, which will replicate `zroot/test`, and
+  all descendent datasets. When received, all properties, snapshots, descendent
+  file systems, and clones are preserved.
+
+  This block
+
+  ```yaml
+  replication:
+    recursive: true
+  ```
+
+  enables `zfs send -R` for every `pattern` from `datasets`, which has
+
+  `recursive: true`
+
+  and doesn't have any later exclude.
+
 ## Upstream user documentation
 
 **User Documentation** can be found at
