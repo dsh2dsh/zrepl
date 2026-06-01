@@ -49,9 +49,8 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 func filterDatasets(ctx context.Context, filter DatasetFilter,
 	all []*DatasetPath,
 ) ([]*DatasetPath, error) {
-	var filterErr error
 	roots := newRecursiveDatasets()
-	unmatchedDatasets := filter.UserSpecifiedDatasets()
+	unmatched := filter.UserSpecifiedDatasets()
 
 	datasets := []*DatasetPath{}
 	for _, path := range all {
@@ -63,28 +62,28 @@ func filterDatasets(ctx context.Context, filter DatasetFilter,
 		if pass {
 			datasets = append(datasets, path)
 		}
-		delete(unmatchedDatasets, path.ToString())
+		delete(unmatched, path.ToString())
 	}
 	roots.UpdateChildren()
 
 	prom.ZFSListUnmatchedUserSpecifiedDatasetCount.
 		WithLabelValues(zfscmd.GetJobID(ctx)).
-		Add(float64(len(unmatchedDatasets)))
-	return datasets, filterErr
+		Add(float64(len(unmatched)))
+	return datasets, nil
 }
 
 // --------------------------------------------------
+
+type recursiveDatasets struct {
+	children map[*DatasetPath][]*DatasetPath
+	skip     map[*DatasetPath]struct{}
+}
 
 func newRecursiveDatasets() recursiveDatasets {
 	return recursiveDatasets{
 		children: make(map[*DatasetPath][]*DatasetPath),
 		skip:     make(map[*DatasetPath]struct{}),
 	}
-}
-
-type recursiveDatasets struct {
-	children map[*DatasetPath][]*DatasetPath
-	skip     map[*DatasetPath]struct{}
 }
 
 func (self *recursiveDatasets) Add(root, path *DatasetPath, included bool) {
@@ -108,6 +107,7 @@ func (self *recursiveDatasets) skipped(root *DatasetPath) bool {
 
 func (self *recursiveDatasets) UpdateChildren() {
 	for root, children := range self.children {
+		children[0].SetRecursive()
 		for _, p := range children {
 			p.SetRecursiveParent(root)
 		}

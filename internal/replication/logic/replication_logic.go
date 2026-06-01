@@ -59,11 +59,14 @@ type Planner struct {
 	promBytesReplicated *prometheus.CounterVec   // labels: filesystem
 }
 
+func (p *Planner) Recursive() bool { return p.policy.Recursive() }
+
 func (p *Planner) Plan(ctx context.Context) ([]driver.FS, error) {
 	fss, err := p.doPlanning(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	dfss := make([]driver.FS, len(fss))
 	for i := range dfss {
 		dfss[i] = fss[i]
@@ -121,7 +124,11 @@ type Filesystem struct {
 	Path                 string             // compat
 	receiverFS, senderFS *pdu.Filesystem    // receiverFS may be nil, senderFS never nil
 	promBytesReplicated  prometheus.Counter // compat
+
+	sendReplicate bool
 }
+
+func (f *Filesystem) SendReplicate() bool { return f.sendReplicate }
 
 func (f *Filesystem) EqualToPreviousAttempt(other driver.FS) bool {
 	g, ok := other.(*Filesystem)
@@ -217,64 +224,71 @@ func tryAutoresolveConflict(conflict error, policy ConflictResolution) (path []*
 
 func (p *Planner) doPlanning(ctx context.Context) ([]*Filesystem, error) {
 	log := getLogger(ctx)
-
 	log.Info("start planning")
-	var sfss, rfss []*pdu.Filesystem
 	g, ctx := errgroup.WithContext(ctx)
 
+	var src *pdu.ListFilesystemRes
 	g.Go(func() error {
-		slfssres, err := p.sender.ListFilesystems(ctx)
+		resp, err := p.sender.ListFilesystems(ctx)
 		if err != nil {
 			logger.WithError(
 				log.With(slog.String("errType", fmt.Sprintf("%T", err))),
 				err, "error listing sender filesystems")
 			return err
 		}
-		sfss = slfssres.GetFilesystems()
+		src = resp
 		return nil
 	})
 
+	var dst *pdu.ListFilesystemRes
 	g.Go(func() error {
-		rlfssres, err := p.receiver.ListFilesystems(ctx)
+		resp, err := p.receiver.ListFilesystems(ctx)
 		if err != nil {
 			logger.WithError(
 				log.With(slog.String("errType", fmt.Sprintf("%T", err))),
 				err, "error listing receiver filesystems")
 			return err
 		}
-		rfss = rlfssres.GetFilesystems()
+		dst = resp
 		return nil
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, err //nolint:wrapcheck // out error
+		return nil, err //nolint:wrapcheck // our error
 	}
+	return p.mergeFilesystems(src, dst), nil
+}
 
-	q := make([]*Filesystem, 0, len(sfss))
-	for _, fs := range sfss {
-		var receiverFS *pdu.Filesystem
-		for _, rfs := range rfss {
-			if rfs.Path == fs.Path {
-				receiverFS = rfs
-			}
+func (p *Planner) mergeFilesystems(src, dst *pdu.ListFilesystemRes,
+) []*Filesystem {
+	merged := make([]*Filesystem, 0, len(src.Filesystems))
+	for _, senderFS := range src.Filesystems {
+		if p.Recursive() && senderFS.Replicated {
+			continue
 		}
 
-		var ctr prometheus.Counter
+		fs := &Filesystem{
+			sender:        p.sender,
+			receiver:      p.receiver,
+			policy:        p.policy,
+			Path:          senderFS.Path,
+			senderFS:      senderFS,
+			sendReplicate: p.Recursive() && senderFS.Replicate,
+		}
+
+		i := slices.IndexFunc(dst.Filesystems,
+			func(dfs *pdu.Filesystem) bool { return dfs.Path == senderFS.Path })
+		if i != -1 {
+			fs.receiverFS = dst.Filesystems[i]
+		}
+
 		if p.promBytesReplicated != nil {
-			ctr = p.promBytesReplicated.WithLabelValues(fs.Path)
+			fs.promBytesReplicated = p.promBytesReplicated.
+				WithLabelValues(senderFS.Path)
 		}
-
-		q = append(q, &Filesystem{
-			sender:              p.sender,
-			receiver:            p.receiver,
-			policy:              p.policy,
-			Path:                fs.Path,
-			senderFS:            fs,
-			receiverFS:          receiverFS,
-			promBytesReplicated: ctr,
-		})
+		merged = append(merged, fs)
 	}
-	return q, nil
+	return merged
 }
 
 func (fs *Filesystem) doPlanning(ctx context.Context, prefix string) ([]*Step,

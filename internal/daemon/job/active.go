@@ -750,13 +750,11 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 	log.Info("start replication")
 
 	var repWait driver.WaitFunc
-	sender, receiver := j.mode.SenderReceiver()
+	p := j.planner()
 	j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.state = ActiveSideReplicating
-		tasks.replicationReport, repWait = driver.Do(
-			ctx, j.replicationDriverConfig, logic.NewPlanner(
-				j.promRepStateSecs, j.promBytesReplicated, sender, receiver,
-				j.mode.PlannerPolicy()))
+		tasks.replicationReport, repWait = driver.Do(ctx,
+			j.replicationDriverConfig, p)
 	})
 	repWait(true) // wait blocking
 
@@ -768,6 +766,13 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 	}
 	log.Info("finished replication")
 	return nil
+}
+
+func (j *ActiveSide) planner() *logic.Planner {
+	sender, receiver := j.mode.SenderReceiver()
+	p := logic.NewPlanner(j.promRepStateSecs, j.promBytesReplicated,
+		sender, receiver, j.mode.PlannerPolicy())
+	return p
 }
 
 func (j *ActiveSide) pruneSender(ctx context.Context) error {

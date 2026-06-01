@@ -63,14 +63,18 @@ type PlannerPolicy struct {
 	ReplicationConfig  *pdu.ReplicationConfig `validate:"required"`
 }
 
-func (p PlannerPolicy) Validate() error {
-	if err := config.Validator().Struct(&p); err != nil {
+func (self *PlannerPolicy) Validate() error {
+	if err := config.Validator().Struct(self); err != nil {
 		return fmt.Errorf("config validator: %w", err)
 	}
-	if err := p.ConflictResolution.Validate(); err != nil {
+	if err := self.ConflictResolution.Validate(); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (self *PlannerPolicy) Recursive() bool {
+	return self.ReplicationConfig.Recursive
 }
 
 func ReplicationConfigFromConfig(in *config.Replication) (*pdu.ReplicationConfig, error) {
@@ -87,6 +91,7 @@ func ReplicationConfigFromConfig(in *config.Replication) (*pdu.ReplicationConfig
 			Initial:     initial,
 			Incremental: incremental,
 		},
+		Recursive: in.Recursive,
 	}, nil
 }
 

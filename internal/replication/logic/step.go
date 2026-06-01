@@ -18,10 +18,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 )
 
-func NewStep(fs *Filesystem, from, to *pdu.FilesystemVersion) *Step {
-	return &Step{parent: fs, from: from, to: to}
-}
-
 type Step struct {
 	parent      *Filesystem
 	from, to    *pdu.FilesystemVersion // from may be nil, indicating full send
@@ -34,6 +30,14 @@ type Step struct {
 	// => concurrent read of that pointer from Step.ReportInfo must be protected
 	byteCounter    *bytecounter.ReadCloser
 	byteCounterMtx chainlock.L
+}
+
+func NewStep(fs *Filesystem, from, to *pdu.FilesystemVersion) *Step {
+	return &Step{
+		parent: fs,
+		from:   from,
+		to:     to,
+	}
 }
 
 func (self *Step) TargetEquals(other driver.Step) bool {
@@ -86,6 +90,7 @@ func (self *Step) buildSendRequest() pdu.SendReq {
 		From:              self.from, // may be nil
 		To:                self.to,
 		Multi:             self.multi,
+		Replicate:         self.parent.SendReplicate(),
 		ResumeToken:       self.resumeToken,
 		ReplicationConfig: self.parent.policy.ReplicationConfig,
 	}

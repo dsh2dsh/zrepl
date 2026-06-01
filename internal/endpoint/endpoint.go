@@ -107,8 +107,7 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	error,
 ) {
 	if root := s.FSFilter.SingleRecursiveDataset(); root != nil {
-		return listFilesystemsRecursive(ctx, root, true,
-			zfs.PlaceholderPropertyName)
+		return s.listFilesystemsRecursive(ctx, root)
 	}
 
 	fss, err := zfs.ZFSListMapping(ctx, s.FSFilter)
@@ -119,9 +118,12 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	rfss := make([]*pdu.Filesystem, len(fss))
 	for i, p := range fss {
 		rfss[i] = &pdu.Filesystem{
-			Path: p.ToString(),
+			Path:      p.ToString(),
+			Replicate: p.Recursive(),
 			// ResumeToken does not make sense from Sender.
 		}
+		rfss[i].Replicated = i > 0 && p.RecursiveParent() != nil &&
+			p.RecursiveParent() == fss[i-1].RecursiveParent()
 	}
 
 	if s.config.ListPlaceholders {
@@ -129,7 +131,26 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 			return nil, err
 		}
 	}
+
 	res := &pdu.ListFilesystemRes{Filesystems: rfss}
+	return res, nil
+}
+
+func (s *Sender) listFilesystemsRecursive(ctx context.Context,
+	root *zfs.DatasetPath,
+) (*pdu.ListFilesystemRes, error) {
+	res, err := listFilesystemsRecursive(ctx, root, true,
+		zfs.PlaceholderPropertyName)
+	if err != nil {
+		return nil, err
+	} else if len(res.Filesystems) < 2 {
+		return res, nil
+	}
+
+	res.Filesystems[0].Replicate = true
+	for i := 1; i < len(res.Filesystems); i++ {
+		res.Filesystems[i].Replicated = true
+	}
 	return res, nil
 }
 
@@ -235,6 +256,7 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 			EmbeddedData:     s.config.SendEmbeddedData,
 			Saved:            s.config.SendSaved,
 			Multi:            r.Multi,
+			Replicate:        r.Replicate,
 		},
 	}
 

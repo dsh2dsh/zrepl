@@ -332,6 +332,7 @@ type ZFSSendFlags struct {
 	EmbeddedData     bool
 	Saved            bool
 	Multi            bool
+	Replicate        bool
 
 	// Preferred if not empty. If not nil, must match what is specified in From,
 	// To (covered by ValidateCorrespondsToResumeToken)
@@ -453,49 +454,53 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
 	return validated, nil
 }
 
-func (f ZFSSendFlags) Validate() error { return nil }
+func (self *ZFSSendFlags) Validate() error { return nil }
 
 // If ResumeToken is empty, builds a command line with the flags specified.
 // If ResumeToken is not empty, build a command line with just `-t {{.ResumeToken}}`.
 //
 // SECURITY SENSITIVE it is the caller's responsibility to ensure that a.Encrypted semantics
 // hold for the file system that will be sent with the send flags returned by this function
-func (a ZFSSendFlags) buildSendFlagsUnchecked() []string {
-	args := make([]string, 0, 10)
+func (self *ZFSSendFlags) buildSendFlagsUnchecked() []string {
+	args := make([]string, 0, 11)
 
 	// ResumeToken takes precedence, we assume that it has been validated
 	// to reflect what is described by the other fields.
-	if a.ResumeToken != "" {
-		args = append(args, "-t", a.ResumeToken)
+	if self.ResumeToken != "" {
+		args = append(args, "-t", self.ResumeToken)
 		return args
 	}
 
-	if a.Encrypted || a.Raw {
+	if self.Encrypted || self.Raw {
 		args = append(args, "-w")
 	}
 
-	if a.Properties {
+	if self.Properties {
 		args = append(args, "-p")
 	}
 
-	if a.BackupProperties {
+	if self.BackupProperties {
 		args = append(args, "-b")
 	}
 
-	if a.LargeBlocks {
+	if self.LargeBlocks {
 		args = append(args, "-L")
 	}
 
-	if a.Compressed {
+	if self.Compressed {
 		args = append(args, "-c")
 	}
 
-	if a.EmbeddedData {
+	if self.EmbeddedData {
 		args = append(args, "-e")
 	}
 
-	if a.Saved {
+	if self.Saved {
 		args = append(args, "-S")
+	}
+
+	if self.Replicate {
+		args = append(args, "-R")
 	}
 
 	return args

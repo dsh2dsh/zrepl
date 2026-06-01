@@ -9,6 +9,8 @@ import (
 )
 
 func Test_recursiveDatasets(t *testing.T) {
+	paths := []string{"zroot", "zroot/foo", "zroot/bar", "zroot/baz"}
+
 	tests := []struct {
 		name      string
 		included  []bool
@@ -16,32 +18,30 @@ func Test_recursiveDatasets(t *testing.T) {
 	}{
 		{
 			name:      "all included",
-			included:  []bool{true, true, true},
+			included:  []bool{true, true, true, true},
 			recursive: true,
 		},
 		{
 			name:     "all excluded",
-			included: []bool{false, false, false},
+			included: []bool{false, false, false, false},
 		},
 		{
 			name:     "exclude 1",
-			included: []bool{false, true, true},
+			included: []bool{true, false, true, true},
 		},
 		{
 			name:     "exclude 2",
-			included: []bool{true, false, true},
+			included: []bool{true, true, false, true},
 		},
 		{
 			name:     "exclude 3",
-			included: []bool{true, true, false},
+			included: []bool{true, true, true, false},
 		},
 	}
 
 	root, err := NewDatasetPath("zroot")
 	require.NoError(t, err)
 	require.NotNil(t, root)
-
-	paths := []string{"zroot/foo", "zroot/bar", "zroot/baz"}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -57,12 +57,23 @@ func Test_recursiveDatasets(t *testing.T) {
 			}
 			roots.UpdateChildren()
 
+			assert.Equal(t, tt.recursive, datasets[0].Recursive())
+
+			var countRecursive int
+			for _, p := range datasets {
+				if p.Recursive() {
+					countRecursive++
+				}
+			}
+
 			if tt.recursive {
+				assert.Equal(t, 1, countRecursive)
 				assert.Equal(t, -1, slices.IndexFunc(datasets,
 					func(p *DatasetPath) bool {
 						return p.RecursiveParent() != root
 					}))
 			} else {
+				assert.Zero(t, countRecursive)
 				assert.Equal(t, -1, slices.IndexFunc(datasets,
 					func(p *DatasetPath) bool {
 						return p.RecursiveParent() != nil

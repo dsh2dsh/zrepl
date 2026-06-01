@@ -74,15 +74,13 @@ func (self *plan) makeHooksCount() {
 }
 
 func (self *plan) makeSnapsProgress(paths []*zfs.DatasetPath) {
-	for i, p := range paths {
-		if p.RecursiveParent() != nil {
-			paths[i] = p.RecursiveParent()
+	self.snaps = make(map[*zfs.DatasetPath]*progress, 1)
+	for i, fs := range paths {
+		sameParent := i > 0 && fs.RecursiveParent() != nil &&
+			fs.RecursiveParent() == paths[i-1].RecursiveParent()
+		if sameParent {
+			continue
 		}
-	}
-	paths = slices.Compact(paths)
-
-	self.snaps = make(map[*zfs.DatasetPath]*progress, len(paths))
-	for _, fs := range paths {
 		self.snaps[fs] = NewProgress()
 	}
 }

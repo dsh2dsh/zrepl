@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+type DatasetPath struct {
+	comps   []string
+	written uint64
+
+	recursive       bool
+	recursiveParent *DatasetPath
+}
+
 func NewDatasetPath(s string, opts ...DatasetPathOption) (*DatasetPath, error) {
 	p := new(DatasetPath)
 	if s == "" {
@@ -44,14 +52,6 @@ type DatasetPathOption func(p *DatasetPath) error
 
 func WithWritten(s string) DatasetPathOption {
 	return func(p *DatasetPath) error { return p.parseWritten(s) }
-}
-
-type DatasetPath struct {
-	comps   []string
-	written uint64
-
-	recursive       bool
-	recursiveParent *DatasetPath
 }
 
 func (self *DatasetPath) parseWritten(s string) error {
