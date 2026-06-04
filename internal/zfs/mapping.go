@@ -82,6 +82,10 @@ func newRecursiveDatasets() recursiveDatasets {
 }
 
 func (self *recursiveDatasets) Append(root, path *DatasetPath, included bool) {
+	if root == nil {
+		return
+	}
+
 	children := self.children[root]
 	if !included {
 		children[0].WithExcluded(path)
