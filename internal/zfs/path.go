@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -14,6 +15,8 @@ type DatasetPath struct {
 
 	recursive       bool
 	recursiveParent *DatasetPath
+
+	exclude []*DatasetPath
 }
 
 func NewDatasetPath(s string, opts ...DatasetPathOption) (*DatasetPath, error) {
@@ -145,6 +148,78 @@ func (self *DatasetPath) SetRecursiveParent(parent *DatasetPath) {
 
 func (self *DatasetPath) Recursive() bool { return self.recursive }
 
+func (self *DatasetPath) RecursiveSnapshot() bool {
+	return self.recursive && !self.HasExcluded()
+}
+
 func (self *DatasetPath) SetRecursive() { self.recursive = true }
 
 func (self *DatasetPath) Written() uint64 { return self.written }
+
+func (self *DatasetPath) WithExcluded(p *DatasetPath) *DatasetPath {
+	if !self.Excluded(p) {
+		self.exclude = append(self.exclude, p)
+	}
+	return self
+}
+
+func (self *DatasetPath) Excluded(p *DatasetPath) bool {
+	for _, ex := range slices.Backward(self.exclude) {
+		if p.HasPrefix(ex) {
+			return true
+		}
+	}
+	return false
+}
+
+func (self *DatasetPath) HasExcluded() bool { return len(self.exclude) != 0 }
+
+func (self *DatasetPath) ExcludedString() string {
+	n := len(self.exclude)
+	switch n {
+	case 0:
+		return ""
+	case 1:
+		return self.exclude[0].ToString()
+	}
+
+	size := n - 1
+	for _, p := range self.exclude {
+		size += p.stringLen()
+	}
+
+	var sb strings.Builder
+	sb.Grow(size)
+	for i, p := range self.exclude {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		p.writeStringTo(&sb)
+	}
+	return sb.String()
+}
+
+func (self *DatasetPath) stringLen() int {
+	n := len(self.comps)
+	switch n {
+	case 0:
+		return 0
+	case 1:
+		return len(self.comps[0])
+	}
+
+	size := n - 1
+	for _, s := range self.comps {
+		size += len(s)
+	}
+	return size
+}
+
+func (self *DatasetPath) writeStringTo(sb *strings.Builder) {
+	for i, s := range self.comps {
+		if i > 0 {
+			sb.WriteByte('/')
+		}
+		sb.WriteString(s)
+	}
+}

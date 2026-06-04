@@ -702,7 +702,7 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
     interval: "manual"
   ```
 
-* Implement `zfs send -R` of recursive datasets
+* Implement `zfs send -R` for recursive datasets
 
   ```yaml
   - name: "test"
@@ -731,7 +731,7 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   `recursive: true`
 
-  and doesn't have any later exclude.
+  For excluded descendent datasets it adds `-X dataset[,dataset]...`.
 
 ## Upstream user documentation
 

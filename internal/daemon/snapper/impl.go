@@ -75,13 +75,11 @@ func (self *plan) makeHooksCount() {
 
 func (self *plan) makeSnapsProgress(paths []*zfs.DatasetPath) {
 	self.snaps = make(map[*zfs.DatasetPath]*progress, 1)
-	for i, fs := range paths {
-		sameParent := i > 0 && fs.RecursiveParent() != nil &&
-			fs.RecursiveParent() == paths[i-1].RecursiveParent()
-		if sameParent {
-			continue
+	for _, fs := range paths {
+		parent := fs.RecursiveParent()
+		if parent == nil || parent.HasExcluded() {
+			self.snaps[fs] = NewProgress()
 		}
-		self.snaps[fs] = NewProgress()
 	}
 }
 
@@ -118,7 +116,7 @@ func (self *plan) execute(ctx context.Context, dryRun bool) bool {
 	for fs, progress := range self.snaps {
 		snapName := self.snapName()
 		ctx := logging.With(ctx, slog.String("fs", fs.ToString()),
-			slog.Bool("recursive", fs.Recursive()),
+			slog.Bool("recursive", fs.RecursiveSnapshot()),
 			slog.String("snap", snapName))
 
 		hookPlan := self.hookPlan(ctx, fs, snapName)
@@ -172,7 +170,7 @@ func createSnapshot(ctx context.Context, fs *zfs.DatasetPath, snapName string,
 ) error {
 	l := getLogger(ctx)
 	l.Debug("create snapshot")
-	err := zfs.ZFSSnapshot(ctx, fs, snapName, fs.Recursive())
+	err := zfs.ZFSSnapshot(ctx, fs, snapName, fs.RecursiveSnapshot())
 	if err != nil {
 		logger.WithError(l, err, "cannot create snapshot")
 		return err

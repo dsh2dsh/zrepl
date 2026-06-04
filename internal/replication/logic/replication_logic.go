@@ -126,9 +126,12 @@ type Filesystem struct {
 	promBytesReplicated  prometheus.Counter // compat
 
 	sendReplicate bool
+	sendExclude   string
 }
 
 func (f *Filesystem) SendReplicate() bool { return f.sendReplicate }
+
+func (f *Filesystem) SendExclude() string { return f.sendExclude }
 
 func (f *Filesystem) EqualToPreviousAttempt(other driver.FS) bool {
 	g, ok := other.(*Filesystem)
@@ -268,12 +271,14 @@ func (p *Planner) mergeFilesystems(src, dst *pdu.ListFilesystemRes,
 		}
 
 		fs := &Filesystem{
-			sender:        p.sender,
-			receiver:      p.receiver,
-			policy:        p.policy,
-			Path:          senderFS.Path,
-			senderFS:      senderFS,
+			sender:   p.sender,
+			receiver: p.receiver,
+			policy:   p.policy,
+			Path:     senderFS.Path,
+			senderFS: senderFS,
+
 			sendReplicate: p.Recursive() && senderFS.Replicate,
+			sendExclude:   senderFS.Exclude,
 		}
 
 		i := slices.IndexFunc(dst.Filesystems,

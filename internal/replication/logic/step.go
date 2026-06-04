@@ -91,6 +91,7 @@ func (self *Step) buildSendRequest() pdu.SendReq {
 		To:                self.to,
 		Multi:             self.multi,
 		Replicate:         self.parent.SendReplicate(),
+		Exclude:           self.parent.SendExclude(),
 		ResumeToken:       self.resumeToken,
 		ReplicationConfig: self.parent.policy.ReplicationConfig,
 	}

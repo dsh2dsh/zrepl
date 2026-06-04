@@ -333,6 +333,7 @@ type ZFSSendFlags struct {
 	Saved            bool
 	Multi            bool
 	Replicate        bool
+	Exclude          string
 
 	// Preferred if not empty. If not nil, must match what is specified in From,
 	// To (covered by ValidateCorrespondsToResumeToken)
@@ -462,7 +463,7 @@ func (self *ZFSSendFlags) Validate() error { return nil }
 // SECURITY SENSITIVE it is the caller's responsibility to ensure that a.Encrypted semantics
 // hold for the file system that will be sent with the send flags returned by this function
 func (self *ZFSSendFlags) buildSendFlagsUnchecked() []string {
-	args := make([]string, 0, 11)
+	args := make([]string, 0, 13)
 
 	// ResumeToken takes precedence, we assume that it has been validated
 	// to reflect what is described by the other fields.
@@ -501,6 +502,10 @@ func (self *ZFSSendFlags) buildSendFlagsUnchecked() []string {
 
 	if self.Replicate {
 		args = append(args, "-R")
+	}
+
+	if self.Exclude != "" {
+		args = append(args, "-X", self.Exclude)
 	}
 
 	return args

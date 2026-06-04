@@ -118,12 +118,12 @@ func (s *Sender) ListFilesystems(ctx context.Context) (*pdu.ListFilesystemRes,
 	rfss := make([]*pdu.Filesystem, len(fss))
 	for i, p := range fss {
 		rfss[i] = &pdu.Filesystem{
-			Path:      p.ToString(),
-			Replicate: p.Recursive(),
+			Path:       p.ToString(),
+			Replicate:  p.Recursive(),
+			Exclude:    p.ExcludedString(),
+			Replicated: p.RecursiveParent() != nil,
 			// ResumeToken does not make sense from Sender.
 		}
-		rfss[i].Replicated = i > 0 && p.RecursiveParent() != nil &&
-			p.RecursiveParent() == fss[i-1].RecursiveParent()
 	}
 
 	if s.config.ListPlaceholders {
@@ -257,6 +257,7 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 			Saved:            s.config.SendSaved,
 			Multi:            r.Multi,
 			Replicate:        r.Replicate,
+			Exclude:          r.Exclude,
 		},
 	}
 

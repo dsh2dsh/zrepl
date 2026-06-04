@@ -16,9 +16,9 @@ type Filesystem struct {
 	ResumeToken   string `json:"ResumeToken,omitempty"`
 	IsPlaceholder bool   `json:"IsPlaceholder,omitempty"`
 
-	Replicate  bool     `json:"Replicate,omitempty"`
-	Exclude    []string `json:"Exclude,omitempty"`
-	Replicated bool     `json:"Replicated,omitempty"`
+	Replicate  bool   `json:"Replicate,omitempty"`
+	Exclude    string `json:"Exclude,omitempty"`
+	Replicated bool   `json:"Replicated,omitempty"`
 }
 
 func (x *Filesystem) GetPath() string {
@@ -121,6 +121,7 @@ type SendReq struct {
 	To        *FilesystemVersion `json:"To,omitempty"`
 	Multi     bool               `json:"Multi,omitempty"`
 	Replicate bool               `json:"Replicate,omitempty"`
+	Exclude   string             `json:"Exclude,omitempty"`
 
 	// If ResumeToken is not empty, the resume token that CAN be used for 'zfs
 	// send' by the sender. The sender MUST indicate use of ResumeToken in the

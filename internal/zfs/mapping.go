@@ -58,13 +58,12 @@ func filterDatasets(ctx context.Context, filter DatasetFilter,
 		if err != nil {
 			return nil, fmt.Errorf("error calling filter: %w", err)
 		}
-		roots.Add(root, path, pass)
+		roots.Append(root, path, pass)
 		if pass {
 			datasets = append(datasets, path)
 		}
 		delete(unmatched, path.ToString())
 	}
-	roots.UpdateChildren()
 
 	prom.ZFSListUnmatchedUserSpecifiedDatasetCount.
 		WithLabelValues(zfscmd.GetJobID(ctx)).
@@ -76,40 +75,24 @@ func filterDatasets(ctx context.Context, filter DatasetFilter,
 
 type recursiveDatasets struct {
 	children map[*DatasetPath][]*DatasetPath
-	skip     map[*DatasetPath]struct{}
 }
 
 func newRecursiveDatasets() recursiveDatasets {
-	return recursiveDatasets{
-		children: make(map[*DatasetPath][]*DatasetPath),
-		skip:     make(map[*DatasetPath]struct{}),
-	}
+	return recursiveDatasets{children: map[*DatasetPath][]*DatasetPath{}}
 }
 
-func (self *recursiveDatasets) Add(root, path *DatasetPath, included bool) {
-	switch {
-	case self.skipped(root):
-	case included:
-		self.children[root] = append(self.children[root], path)
-	default:
-		delete(self.children, root)
-		self.skip[root] = struct{}{}
+func (self *recursiveDatasets) Append(root, path *DatasetPath, included bool) {
+	children := self.children[root]
+	if !included {
+		children[0].WithExcluded(path)
+		return
 	}
-}
 
-func (self *recursiveDatasets) skipped(root *DatasetPath) bool {
-	if root == nil {
-		return true
+	if n := len(children); n == 0 && root.Recursive() {
+		path.SetRecursive()
+	} else if n > 0 {
+		path.SetRecursiveParent(children[0])
 	}
-	_, ok := self.skip[root]
-	return ok
-}
-
-func (self *recursiveDatasets) UpdateChildren() {
-	for root, children := range self.children {
-		children[0].SetRecursive()
-		for _, p := range children {
-			p.SetRecursiveParent(root)
-		}
-	}
+	children = append(children, path)
+	self.children[root] = children
 }
