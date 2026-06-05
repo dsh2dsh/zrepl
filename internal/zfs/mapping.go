@@ -58,7 +58,7 @@ func filterDatasets(ctx context.Context, filter DatasetFilter,
 		if err != nil {
 			return nil, fmt.Errorf("error calling filter: %w", err)
 		}
-		roots.Append(root, path, pass)
+		roots.Add(root, path, pass)
 		if pass {
 			datasets = append(datasets, path)
 		}
@@ -74,29 +74,28 @@ func filterDatasets(ctx context.Context, filter DatasetFilter,
 // --------------------------------------------------
 
 type recursiveDatasets struct {
-	children map[*DatasetPath][]*DatasetPath
+	parents map[*DatasetPath]*DatasetPath
 }
 
 func newRecursiveDatasets() recursiveDatasets {
-	return recursiveDatasets{children: map[*DatasetPath][]*DatasetPath{}}
+	return recursiveDatasets{parents: make(map[*DatasetPath]*DatasetPath)}
 }
 
-func (self *recursiveDatasets) Append(root, path *DatasetPath, included bool) {
-	if root == nil {
+func (self *recursiveDatasets) Add(root, path *DatasetPath, included bool) {
+	if root == nil || !root.Recursive() {
 		return
 	}
 
-	children := self.children[root]
-	if !included {
-		children[0].WithExcluded(path)
-		return
-	}
-
-	if n := len(children); n == 0 && root.Recursive() {
+	if path.Equal(root) {
 		path.SetRecursive()
-	} else if n > 0 {
-		path.SetRecursiveParent(children[0])
+		self.parents[root] = path
+		return
 	}
-	children = append(children, path)
-	self.children[root] = children
+
+	parent := self.parents[root]
+	if included {
+		path.SetRecursiveParent(parent)
+	} else {
+		parent.WithExcluded(path)
+	}
 }

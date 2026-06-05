@@ -70,7 +70,7 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, p)
 				datasets[i] = p
-				roots.Append(root, p, tt.included[i])
+				roots.Add(root, p, tt.included[i])
 				if !tt.included[i] {
 					wantExcluded = append(wantExcluded, p.ToString())
 				}
