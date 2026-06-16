@@ -181,6 +181,7 @@ type PassiveJob struct {
 	ClientKeys       []string         `yaml:"client_keys" validate:"dive,required"`
 	Pruning          PruningLocal     `yaml:"pruning"`
 	MonitorSnapshots MonitorSnapshots `yaml:"monitor"`
+	Hooks            JobHooks         `yaml:"hooks"`
 }
 
 type SnapJob struct {

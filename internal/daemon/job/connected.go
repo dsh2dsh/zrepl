@@ -1,10 +1,16 @@
 package job
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 type Connected interface {
 	Name() string
 	Endpoint() Endpoint
+
+	PreHook(ctx context.Context) error
+	PostHook(ctx context.Context) error
 }
 
 func newLocalConnected(listenerName, clientIdentity string,
@@ -41,6 +47,14 @@ func (self *localConnected) job() *PassiveSide {
 	return j
 }
 
+func (self *localConnected) PreHook(ctx context.Context) error {
+	return self.job().PreHook(ctx)
+}
+
+func (self *localConnected) PostHook(ctx context.Context) error {
+	return self.job().PostHook(ctx)
+}
+
 func newServerConnected(name string, client *Client) *serverConnected {
 	return &serverConnected{name: name, client: client}
 }
@@ -55,3 +69,11 @@ var _ Connected = (*serverConnected)(nil)
 func (self *serverConnected) Name() string { return self.name }
 
 func (self *serverConnected) Endpoint() Endpoint { return self.client }
+
+func (self *serverConnected) PreHook(ctx context.Context) error {
+	return self.client.PreHook(ctx)
+}
+
+func (self *serverConnected) PostHook(ctx context.Context) error {
+	return self.client.PostHook(ctx)
+}

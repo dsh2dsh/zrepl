@@ -49,6 +49,12 @@ func (self *zfsJob) WithTimeout(d time.Duration) *zfsJob {
 func (self *zfsJob) Endpoints(mux *http.ServeMux, m ...middleware.Middleware) {
 	ep := job.EndpointNames("{job}")
 	m = slices.Concat(m, self.middlewares)
+
+	mux.Handle(ep[job.EpPreHook], middleware.Append(m,
+		middleware.NoContent(self.preHook)))
+	mux.Handle(ep[job.EpPostHook], middleware.Append(m,
+		middleware.NoContent(self.postHook)))
+
 	mux.Handle(ep[job.EpListFilesystems], middleware.Append(m,
 		middleware.GzipResponse,
 		middleware.JsonResponder(self.listFilesystems)))
@@ -80,7 +86,7 @@ func (self *zfsJob) healthCheck(w http.ResponseWriter, _ *http.Request) {
 
 func (self *zfsJob) listFilesystems(ctx context.Context,
 ) (*pdu.ListFilesystemRes, error) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,15 +101,10 @@ func (self *zfsJob) listFilesystems(ctx context.Context,
 	return resp, nil
 }
 
-func (self *zfsJob) jobEndpoint(ctx context.Context) (job.Endpoint, error) {
-	jobName := middleware.JobNameFrom(ctx)
-	if jobName == "" {
-		return nil, errors.New("context has no job")
-	}
-
-	j := self.connecter.Job(jobName)
-	if j == nil {
-		return nil, fmt.Errorf("job %q not found", jobName)
+func (self *zfsJob) endpoint(ctx context.Context) (job.Endpoint, error) {
+	jobName, j, err := self.jobFrom(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	clientIdentity, err := self.clientIdentity(ctx, j)
@@ -119,6 +120,21 @@ func (self *zfsJob) jobEndpoint(ctx context.Context) (job.Endpoint, error) {
 	return ep, nil
 }
 
+func (self *zfsJob) jobFrom(ctx context.Context) (string, *job.PassiveSide,
+	error,
+) {
+	jobName := middleware.JobNameFrom(ctx)
+	if jobName == "" {
+		return "", nil, errors.New("context has no job")
+	}
+
+	j := self.connecter.Job(jobName)
+	if j == nil {
+		return "", nil, fmt.Errorf("job %q not found", jobName)
+	}
+	return jobName, j, nil
+}
+
 func (self *zfsJob) clientIdentity(ctx context.Context, j *job.PassiveSide,
 ) (string, error) {
 	clientIdentity := middleware.ClientIdentityFrom(ctx)
@@ -132,7 +148,7 @@ func (self *zfsJob) clientIdentity(ctx context.Context, j *job.PassiveSide,
 func (self *zfsJob) listFilesystemVersions(ctx context.Context,
 	req *pdu.ListFilesystemVersionsReq,
 ) (*pdu.ListFilesystemVersionsRes, error) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +166,7 @@ func (self *zfsJob) listFilesystemVersions(ctx context.Context,
 func (self *zfsJob) destroySnapshots(ctx context.Context,
 	req *pdu.DestroySnapshotsReq,
 ) (*pdu.DestroySnapshotsRes, error) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +184,7 @@ func (self *zfsJob) destroySnapshots(ctx context.Context,
 func (self *zfsJob) receive(ctx context.Context, req *pdu.ReceiveReq,
 	r io.ReadCloser,
 ) error {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return err
 	}
@@ -183,7 +199,7 @@ func (self *zfsJob) receive(ctx context.Context, req *pdu.ReceiveReq,
 func (self *zfsJob) send(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes,
 	io.ReadCloser, error,
 ) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -198,7 +214,7 @@ func (self *zfsJob) send(ctx context.Context, req *pdu.SendReq) (*pdu.SendRes,
 
 func (self *zfsJob) sendDry(ctx context.Context, req *pdu.SendDryReq,
 ) (*pdu.SendDryRes, error) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +232,7 @@ func (self *zfsJob) sendDry(ctx context.Context, req *pdu.SendDryReq,
 func (self *zfsJob) sendCompleted(ctx context.Context,
 	req *pdu.SendCompletedReq,
 ) (*struct{}, error) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +251,7 @@ func (self *zfsJob) sendCompleted(ctx context.Context,
 func (self *zfsJob) replicationCursor(ctx context.Context,
 	req *pdu.ReplicationCursorReq,
 ) (*pdu.ReplicationCursorRes, error) {
-	ep, err := self.jobEndpoint(ctx)
+	ep, err := self.endpoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -248,4 +264,28 @@ func (self *zfsJob) replicationCursor(ctx context.Context,
 		return nil, fmt.Errorf("replication cursor %q: %w", req.Filesystem, err)
 	}
 	return resp, nil
+}
+
+func (self *zfsJob) preHook(ctx context.Context) error {
+	jName, j, err := self.jobFrom(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := j.PreHook(ctx); err != nil {
+		return fmt.Errorf("run pre hook(%s): %w", jName, err)
+	}
+	return nil
+}
+
+func (self *zfsJob) postHook(ctx context.Context) error {
+	jName, j, err := self.jobFrom(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := j.PostHook(ctx); err != nil {
+		return fmt.Errorf("run post hook(%s): %w", jName, err)
+	}
+	return nil
 }

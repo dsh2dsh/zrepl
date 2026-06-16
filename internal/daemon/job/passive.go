@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,6 +12,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
+	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -19,6 +21,9 @@ type PassiveSide struct {
 	name endpoint.JobID
 
 	clientKeys map[string]struct{}
+
+	preHook  *Hook
+	postHook *Hook
 }
 
 var _ Job = (*PassiveSide)(nil)
@@ -147,6 +152,13 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
 		return nil, err // no wrapping necessary
 	}
 
+	if in.Hooks.Pre != nil {
+		s.preHook = NewHookFromConfig(in.Hooks.Pre)
+	}
+	if in.Hooks.Post != nil {
+		s.postHook = NewHookFromConfig(in.Hooks.Post).WithPostHook(true)
+	}
+
 	connecter.AddJob(s.Name(), s)
 	return s, nil
 }
@@ -257,5 +269,42 @@ func (*PassiveSide) RegisterMetrics(registerer prometheus.Registerer) {}
 func (j *PassiveSide) Run(ctx context.Context) error {
 	j.mode.Run(signal.GracefulFrom(ctx))
 	GetLogger(ctx).Info("job exiting")
+	return nil
+}
+
+func (j *PassiveSide) PreHook(ctx context.Context) error {
+	h := j.preHook
+	if h == nil {
+		return nil
+	}
+
+	log := GetLogger(ctx)
+	log.Info("run pre hook")
+
+	if err := h.Run(ctx, j); err != nil {
+		errIsFatal := h.ErrIsFatal()
+		logger.WithError(
+			log.With(slog.Bool("err_is_fatal", errIsFatal)), err,
+			"pre hook exited with error")
+		if errIsFatal {
+			return fmt.Errorf("pre hook exited with error: %w", err)
+		}
+	}
+	return nil
+}
+
+func (j *PassiveSide) PostHook(ctx context.Context) error {
+	h := j.postHook
+	if h == nil {
+		return nil
+	}
+
+	log := GetLogger(ctx)
+	log.Info("run post hook")
+
+	if err := h.Run(ctx, j); err != nil {
+		logger.WithError(log, err, "post hook exited with error")
+		return fmt.Errorf("post hook exited with error: %w", err)
+	}
 	return nil
 }

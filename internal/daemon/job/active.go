@@ -713,24 +713,51 @@ func (j *ActiveSide) before(ctx context.Context) error {
 		}
 	})
 
+	if err := j.runLocalPreHook(ctx); err != nil {
+		return err
+	}
+	return j.runRemotePreHook(ctx)
+}
+
+func (j *ActiveSide) runLocalPreHook(ctx context.Context) error {
 	h := j.preHook
 	if h == nil {
 		return nil
 	}
+
 	log := GetLogger(ctx)
 	log.Info("run pre hook")
 
-	if err := h.Run(ctx, j); err != nil {
-		logger.WithError(
-			log.With(slog.Bool("err_is_fatal", h.ErrIsFatal())), err,
-			"pre hook exited with error")
-		err = fmt.Errorf("pre hook exited with error: %w", err)
-		j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
-		if h.ErrIsFatal() {
-			return err
-		}
+	err := h.Run(ctx, j)
+	if err == nil {
+		return nil
+	}
+
+	errIsFatal := h.ErrIsFatal()
+	logger.WithError(
+		log.With(slog.Bool("err_is_fatal", errIsFatal)), err,
+		"pre hook exited with error")
+	err = fmt.Errorf("pre hook exited with error: %w", err)
+	j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
+	if errIsFatal {
+		return err
 	}
 	return nil
+}
+
+func (j *ActiveSide) runRemotePreHook(ctx context.Context) error {
+	log := GetLogger(ctx)
+	log.Debug("run remote pre hook")
+
+	err := j.connected.PreHook(ctx)
+	if err == nil {
+		return nil
+	}
+
+	logger.WithError(log, err, "failed remote pre hook")
+	err = fmt.Errorf("remote pre hook: %w", err)
+	j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
+	return err
 }
 
 func (j *ActiveSide) snapshot(ctx context.Context) error {
@@ -815,17 +842,43 @@ func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
 }
 
 func (j *ActiveSide) afterPruning(ctx context.Context) error {
-	if j.postHook != nil {
-		log := GetLogger(ctx)
-		log.Info("run post hook")
-		if err := j.postHook.Run(ctx, j); err != nil {
-			logger.WithError(log, err, "post hook exited with error")
-			j.updateTasks(func(tasks *activeSideTasks) {
-				tasks.err = fmt.Errorf("post hook exited with error: %w", err)
-			})
-		}
-	}
+	j.runRemotePostHook(ctx)
+	j.runLocalPostHook(ctx)
 	return nil
+}
+
+func (j *ActiveSide) runRemotePostHook(ctx context.Context) {
+	log := GetLogger(ctx)
+	log.Debug("run remote post hook")
+
+	err := j.connected.PostHook(ctx)
+	if err == nil {
+		return
+	}
+
+	logger.WithError(log, err, "failed remote post hook")
+	j.updateTasks(func(tasks *activeSideTasks) {
+		tasks.err = fmt.Errorf("remote post hook: %w", err)
+	})
+}
+
+func (j *ActiveSide) runLocalPostHook(ctx context.Context) {
+	if j.postHook == nil {
+		return
+	}
+
+	log := GetLogger(ctx)
+	log.Info("run post hook")
+
+	err := j.postHook.Run(ctx, j)
+	if err == nil {
+		return
+	}
+
+	logger.WithError(log, err, "post hook exited with error")
+	j.updateTasks(func(tasks *activeSideTasks) {
+		tasks.err = fmt.Errorf("post hook exited with error: %w", err)
+	})
 }
 
 func (j *ActiveSide) Running() (d time.Duration, ok bool) {

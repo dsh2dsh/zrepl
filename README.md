@@ -530,7 +530,9 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   See also zrepl/zrepl#780
 
-* New optional `pre` and `post` hooks for `push` and `pull` jobs. Example:
+* New optional `pre` and `post` hooks for active and passive jobs.
+
+  An example of `push` job with `pre` and `post` hooks:
 
   ```yaml
   - name: "zroot-to-zdisk"
@@ -574,6 +576,12 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   The `post` hook sets `ZREPL_JOB_ERR` to the last error. It's empty if the job
   finished without errors.
+
+  Passive jobs (`sink` and `source`) can have hooks too. Active jobs (`push` and
+  `pull`) remote execute it before replication and right after pruning. If an
+  active job has their own hooks, it execites first their `pre` hook and remote
+  `pre` hook after. After pruning it executes remote `post` hook first and their
+  `post` hook after that.
 
 * The pruning now prunes filesystems concurrently.
 

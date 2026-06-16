@@ -23,6 +23,9 @@ const (
 	EpSendCompleted
 	EpReplicationCursor
 
+	EpPreHook
+	EpPostHook
+
 	numEndpoints
 )
 
@@ -38,6 +41,9 @@ var allEndpoints = [numEndpoints]string{
 	"/zfs/drysend/", // epSendDry
 	"/zfs/sendok/",  // epSendCompleted
 	"/zfs/cursor/",  // epReplicationCursor
+
+	"/hooks/pre/",  // EpPre
+	"/hooks/post/", // EpPost
 }
 
 func NewClient(jobName string, client *jsonclient.Client) *Client {
@@ -206,4 +212,26 @@ func (self *Client) ReplicationCursor(ctx context.Context,
 	return &pdu.ReplicationCursorRes{
 		Result: &pdu.ReplicationCursorRes_Result{Guid: resp.Result.Guid},
 	}, nil
+}
+
+func (self *Client) PreHook(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, self.timeout)
+	defer cancel()
+
+	ep := self.endpoint(EpPreHook)
+	if err := self.json().Post(ctx, ep, nil, nil); err != nil {
+		return fmt.Errorf("endpoint %q: %w", ep, err)
+	}
+	return nil
+}
+
+func (self *Client) PostHook(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, self.timeout)
+	defer cancel()
+
+	ep := self.endpoint(EpPostHook)
+	if err := self.json().Post(ctx, ep, nil, nil); err != nil {
+		return fmt.Errorf("endpoint %q: %w", ep, err)
+	}
+	return nil
 }

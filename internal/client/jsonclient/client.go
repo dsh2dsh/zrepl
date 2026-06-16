@@ -174,12 +174,15 @@ func (self *Client) Do(req *http.Request, out any) error {
 
 	if err := checkStatusCode(resp); err != nil {
 		return fmt.Errorf("unexpected response from %q: %w", req.URL, err)
+	} else if resp.StatusCode == http.StatusNoContent {
+		return nil
 	}
 	return unmarshalBody(resp.Body, out)
 }
 
 func checkStatusCode(resp *http.Response) error {
-	if resp.StatusCode == http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusNoContent:
 		return nil
 	}
 
