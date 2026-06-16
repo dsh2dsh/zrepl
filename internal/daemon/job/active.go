@@ -792,7 +792,24 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 		j.promLastSuccessful.SetToCurrentTime()
 	}
 	log.Info("finished replication")
+
+	j.runRemotePostHook(ctx)
 	return nil
+}
+
+func (j *ActiveSide) runRemotePostHook(ctx context.Context) {
+	log := GetLogger(ctx)
+	log.Debug("run remote post hook")
+
+	err := j.connected.PostHook(ctx)
+	if err == nil {
+		return
+	}
+
+	logger.WithError(log, err, "failed remote post hook")
+	j.updateTasks(func(tasks *activeSideTasks) {
+		tasks.err = fmt.Errorf("remote post hook: %w", err)
+	})
 }
 
 func (j *ActiveSide) planner() *logic.Planner {
@@ -842,29 +859,8 @@ func (j *ActiveSide) pruneReceiver(ctx context.Context) error {
 }
 
 func (j *ActiveSide) afterPruning(ctx context.Context) error {
-	j.runRemotePostHook(ctx)
-	j.runLocalPostHook(ctx)
-	return nil
-}
-
-func (j *ActiveSide) runRemotePostHook(ctx context.Context) {
-	log := GetLogger(ctx)
-	log.Debug("run remote post hook")
-
-	err := j.connected.PostHook(ctx)
-	if err == nil {
-		return
-	}
-
-	logger.WithError(log, err, "failed remote post hook")
-	j.updateTasks(func(tasks *activeSideTasks) {
-		tasks.err = fmt.Errorf("remote post hook: %w", err)
-	})
-}
-
-func (j *ActiveSide) runLocalPostHook(ctx context.Context) {
 	if j.postHook == nil {
-		return
+		return nil
 	}
 
 	log := GetLogger(ctx)
@@ -872,13 +868,14 @@ func (j *ActiveSide) runLocalPostHook(ctx context.Context) {
 
 	err := j.postHook.Run(ctx, j)
 	if err == nil {
-		return
+		return nil
 	}
 
 	logger.WithError(log, err, "post hook exited with error")
 	j.updateTasks(func(tasks *activeSideTasks) {
 		tasks.err = fmt.Errorf("post hook exited with error: %w", err)
 	})
+	return nil
 }
 
 func (j *ActiveSide) Running() (d time.Duration, ok bool) {
