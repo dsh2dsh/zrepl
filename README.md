@@ -579,9 +579,9 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   Passive jobs (`sink` and `source`) can have hooks too. Active jobs (`push` and
   `pull`) remote execute it right before and after replication. If an active job
-  has their own hooks, before replication it executes first their `pre` hook and
-  remote `pre` hook after. After replication it executes remote `post` hook
-  and their `post` hook after pruning.
+  has their own hooks, before snapshotting it executes their `pre` hook and
+  remote `pre` hook after. After replication it executes remote `post` hook and
+  their `post` hook after pruning.
 
 * The pruning now prunes filesystems concurrently.
 

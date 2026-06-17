@@ -716,7 +716,7 @@ func (j *ActiveSide) before(ctx context.Context) error {
 	if err := j.runLocalPreHook(ctx); err != nil {
 		return err
 	}
-	return j.runRemotePreHook(ctx)
+	return nil
 }
 
 func (j *ActiveSide) runLocalPreHook(ctx context.Context) error {
@@ -745,21 +745,6 @@ func (j *ActiveSide) runLocalPreHook(ctx context.Context) error {
 	return nil
 }
 
-func (j *ActiveSide) runRemotePreHook(ctx context.Context) error {
-	log := GetLogger(ctx)
-	log.Debug("run remote pre hook")
-
-	err := j.connected.PreHook(ctx)
-	if err == nil {
-		return nil
-	}
-
-	logger.WithError(log, err, "failed remote pre hook")
-	err = fmt.Errorf("remote pre hook: %w", err)
-	j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
-	return err
-}
-
 func (j *ActiveSide) snapshot(ctx context.Context) error {
 	if !j.mode.Periodic() {
 		return nil
@@ -773,6 +758,10 @@ func (j *ActiveSide) snapshot(ctx context.Context) error {
 }
 
 func (j *ActiveSide) replicate(ctx context.Context) error {
+	if err := j.runRemotePreHook(ctx); err != nil {
+		return err
+	}
+
 	log := GetLogger(ctx)
 	log.Info("start replication")
 
@@ -797,9 +786,24 @@ func (j *ActiveSide) replicate(ctx context.Context) error {
 	return nil
 }
 
+func (j *ActiveSide) runRemotePreHook(ctx context.Context) error {
+	log := GetLogger(ctx)
+	log.Info("run remote pre hook")
+
+	err := j.connected.PreHook(ctx)
+	if err == nil {
+		return nil
+	}
+
+	logger.WithError(log, err, "failed remote pre hook")
+	err = fmt.Errorf("remote pre hook: %w", err)
+	j.updateTasks(func(tasks *activeSideTasks) { tasks.err = err })
+	return err
+}
+
 func (j *ActiveSide) runRemotePostHook(ctx context.Context) {
 	log := GetLogger(ctx)
-	log.Debug("run remote post hook")
+	log.Info("run remote post hook")
 
 	err := j.connected.PostHook(ctx)
 	if err == nil {
