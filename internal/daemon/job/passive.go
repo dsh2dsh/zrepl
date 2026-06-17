@@ -233,17 +233,6 @@ func (self *PassiveStatus) Progress() (uint64, uint64) {
 	return 0, 0
 }
 
-func (j *PassiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool,
-) {
-	sink, ok := j.mode.(*modeSink)
-	if !ok {
-		// make sure we didn't introduce a new job type
-		_ = j.mode.(*modeSource)
-		return nil, false
-	}
-	return sink.receiverConfig.RootWithoutClientComponent.Copy(), true
-}
-
 func (j *PassiveSide) SenderConfig() *endpoint.SenderConfig {
 	source, ok := j.mode.(*modeSource)
 	if !ok {

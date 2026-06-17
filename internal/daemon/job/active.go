@@ -21,7 +21,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 type ActiveSide struct {
@@ -642,15 +641,6 @@ func (self *ActiveSideStatus) Progress() (expected, completed uint64) {
 		}
 	}
 	return expected, completed
-}
-
-func (j *ActiveSide) OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool) {
-	pull, ok := j.mode.(*modePull)
-	if !ok {
-		_ = j.mode.(*modePush) // make sure we didn't introduce a new job type
-		return nil, false
-	}
-	return pull.receiverConfig.RootWithoutClientComponent.Copy(), true
 }
 
 func (j *ActiveSide) SenderConfig() *endpoint.SenderConfig {

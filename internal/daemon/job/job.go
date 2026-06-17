@@ -11,7 +11,6 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 func GetLogger(ctx context.Context) *slog.Logger {
@@ -28,9 +27,6 @@ type Job interface {
 
 	Name() string
 	Status() *Status
-	// Jobs that return a subtree of the dataset hierarchy
-	// must return the root of that subtree as rfs and ok = true
-	OwnedDatasetSubtreeRoot() (rfs *zfs.DatasetPath, ok bool)
 	SenderConfig() *endpoint.SenderConfig
 	Runnable() bool
 	Cron() string

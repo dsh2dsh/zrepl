@@ -18,7 +18,6 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
 func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob,
@@ -191,10 +190,6 @@ func (self *SnapJobStatus) Progress() (uint64, uint64) {
 		}
 	}
 	return 0, 0
-}
-
-func (j *SnapJob) OwnedDatasetSubtreeRoot() (*zfs.DatasetPath, bool) {
-	return nil, false
 }
 
 func (j *SnapJob) SenderConfig() *endpoint.SenderConfig { return nil }
