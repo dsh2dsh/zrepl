@@ -48,11 +48,11 @@ func (self *localConnected) job() *PassiveSide {
 }
 
 func (self *localConnected) PreHook(ctx context.Context) error {
-	return self.job().PreHook(ctx)
+	return self.job().PreHook(ctx, self.clientIdentity)
 }
 
 func (self *localConnected) PostHook(ctx context.Context) error {
-	return self.job().PostHook(ctx)
+	return self.job().PostHook(ctx, self.clientIdentity)
 }
 
 func newServerConnected(name string, client *Client) *serverConnected {

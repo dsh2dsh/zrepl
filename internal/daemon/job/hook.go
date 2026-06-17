@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
@@ -42,22 +43,33 @@ func (self *Hook) WithPostHook(v bool) *Hook {
 func (self *Hook) ErrIsFatal() bool { return self.errIsFatal }
 
 func (self *Hook) Run(ctx context.Context, j Job) error {
+	return self.run(ctx, j, nil)
+}
+
+func (self *Hook) run(ctx context.Context, j Job, env map[string]string) error {
 	cmd := hooks.NewCommand(self.path, self.args...).
-		WithEnv(self.env, self.makeJobEnv(j)).
+		WithEnv(self.env, self.makeJobEnv(j, env)).
 		WithTimeout(self.timeout)
 	return cmd.Run(ctx)
 }
 
-func (self *Hook) makeJobEnv(j Job) map[string]string {
+func (self *Hook) makeJobEnv(j Job, runtime map[string]string,
+) map[string]string {
 	var jobErr string
 	if self.postHook {
 		if jobStatus := j.Status(); jobStatus != nil {
 			jobErr = jobStatus.Error()
 		}
 	}
-	env := map[string]string{
-		envJobName: j.Name(),
-		envJobErr:  jobErr,
-	}
+
+	env := make(map[string]string, 2+len(runtime))
+	maps.Copy(env, runtime)
+	env[envJobName] = j.Name()
+	env[envJobErr] = jobErr
 	return env
+}
+
+func (self *Hook) RunEnv(ctx context.Context, j Job, env map[string]string,
+) error {
+	return self.run(ctx, j, env)
 }

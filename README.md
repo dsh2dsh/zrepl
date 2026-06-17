@@ -554,7 +554,7 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
         timeout: "0s"           # without timeout at all
   ```
 
-  This configuration runs `/root/bin/zrepl_hook.sh pre` before replication with
+  This configuration runs `/root/bin/zrepl_hook.sh pre` before snapshotting with
   environment variables:
 
   ```
@@ -582,6 +582,9 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
   has their own hooks, before snapshotting it executes their `pre` hook and
   remote `pre` hook after. After replication it executes remote `post` hook and
   their `post` hook after pruning.
+
+  Passive jobs run their hooks with additional environment variable
+  `ZREPL_CLIENT_IDENTITY`.
 
 * The pruning now prunes filesystems concurrently.
 

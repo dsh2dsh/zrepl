@@ -16,6 +16,8 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
+const envClientIdentity = "ZREPL_CLIENT_IDENTITY"
+
 type PassiveSide struct {
 	mode passiveMode
 	name endpoint.JobID
@@ -272,7 +274,8 @@ func (j *PassiveSide) Run(ctx context.Context) error {
 	return nil
 }
 
-func (j *PassiveSide) PreHook(ctx context.Context) error {
+func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
+) error {
 	h := j.preHook
 	if h == nil {
 		return nil
@@ -281,7 +284,10 @@ func (j *PassiveSide) PreHook(ctx context.Context) error {
 	log := GetLogger(ctx)
 	log.Info("run pre hook")
 
-	if err := h.Run(ctx, j); err != nil {
+	err := h.RunEnv(ctx, j, map[string]string{
+		envClientIdentity: clientIdentity,
+	})
+	if err != nil {
 		errIsFatal := h.ErrIsFatal()
 		logger.WithError(
 			log.With(slog.Bool("err_is_fatal", errIsFatal)), err,
@@ -293,7 +299,8 @@ func (j *PassiveSide) PreHook(ctx context.Context) error {
 	return nil
 }
 
-func (j *PassiveSide) PostHook(ctx context.Context) error {
+func (j *PassiveSide) PostHook(ctx context.Context, clientIdentity string,
+) error {
 	h := j.postHook
 	if h == nil {
 		return nil
@@ -302,7 +309,10 @@ func (j *PassiveSide) PostHook(ctx context.Context) error {
 	log := GetLogger(ctx)
 	log.Info("run post hook")
 
-	if err := h.Run(ctx, j); err != nil {
+	err := h.RunEnv(ctx, j, map[string]string{
+		envClientIdentity: clientIdentity,
+	})
+	if err != nil {
 		logger.WithError(log, err, "post hook exited with error")
 		return fmt.Errorf("post hook exited with error: %w", err)
 	}

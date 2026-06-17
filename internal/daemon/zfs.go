@@ -272,7 +272,12 @@ func (self *zfsJob) preHook(ctx context.Context) error {
 		return err
 	}
 
-	if err := j.PreHook(ctx); err != nil {
+	clientIdentity, err := self.clientIdentity(ctx, j)
+	if err != nil {
+		return err
+	}
+
+	if err := j.PreHook(ctx, clientIdentity); err != nil {
 		return fmt.Errorf("run pre hook(%s): %w", jName, err)
 	}
 	return nil
@@ -284,7 +289,12 @@ func (self *zfsJob) postHook(ctx context.Context) error {
 		return err
 	}
 
-	if err := j.PostHook(ctx); err != nil {
+	clientIdentity, err := self.clientIdentity(ctx, j)
+	if err != nil {
+		return err
+	}
+
+	if err := j.PostHook(ctx, clientIdentity); err != nil {
 		return fmt.Errorf("run post hook(%s): %w", jName, err)
 	}
 	return nil
