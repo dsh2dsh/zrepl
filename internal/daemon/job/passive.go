@@ -16,7 +16,11 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
-const envClientIdentity = "ZREPL_CLIENT_IDENTITY"
+const (
+	envClientIdentity = "ZREPL_CLIENT_IDENTITY"
+	envClientRoot     = "ZREPL_CLIENT_ROOT"
+	envSubtreeRoot    = "ZREPL_JOB_ROOT"
+)
 
 type PassiveSide struct {
 	mode passiveMode
@@ -273,9 +277,7 @@ func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
 	log := GetLogger(ctx)
 	log.Info("run pre hook")
 
-	err := h.RunEnv(ctx, j, map[string]string{
-		envClientIdentity: clientIdentity,
-	})
+	err := h.RunEnv(ctx, j, j.hookEnv(clientIdentity))
 	if err != nil {
 		errIsFatal := h.ErrIsFatal()
 		logger.WithError(
@@ -285,6 +287,32 @@ func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
 			return fmt.Errorf("pre hook exited with error: %w", err)
 		}
 	}
+	return nil
+}
+
+func (j *PassiveSide) hookEnv(clientIdentity string) map[string]string {
+	var subtreeRoot, clientRoot string
+	if p := j.ownedSubtreeRoot(); p != nil {
+		subtreeRoot = p.ToString()
+		if p2, err := endpoint.ClientRoot(p, clientIdentity); err != nil {
+			clientRoot = p2.ToString()
+		}
+	}
+
+	return map[string]string{
+		envClientIdentity: clientIdentity,
+		envClientRoot:     clientRoot,
+		envSubtreeRoot:    subtreeRoot,
+	}
+}
+
+func (j *PassiveSide) ownedSubtreeRoot() *zfs.DatasetPath {
+	if sink, ok := j.mode.(*modeSink); ok {
+		return sink.receiverConfig.RootWithoutClientComponent
+	}
+
+	// make sure we didn't introduce a new job type
+	_ = j.mode.(*modeSource)
 	return nil
 }
 
@@ -298,9 +326,7 @@ func (j *PassiveSide) PostHook(ctx context.Context, clientIdentity string,
 	log := GetLogger(ctx)
 	log.Info("run post hook")
 
-	err := h.RunEnv(ctx, j, map[string]string{
-		envClientIdentity: clientIdentity,
-	})
+	err := h.RunEnv(ctx, j, j.hookEnv(clientIdentity))
 	if err != nil {
 		logger.WithError(log, err, "post hook exited with error")
 		return fmt.Errorf("post hook exited with error: %w", err)

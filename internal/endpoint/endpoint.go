@@ -689,7 +689,7 @@ func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
 		clientIdentity = identity
 	}
 
-	clientRoot, err := clientRoot(s.conf.RootWithoutClientComponent,
+	clientRoot, err := ClientRoot(s.conf.RootWithoutClientComponent,
 		clientIdentity)
 	if err != nil {
 		err = fmt.Errorf(
@@ -700,7 +700,8 @@ func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
 	return clientRoot
 }
 
-func clientRoot(rootFS *zfs.DatasetPath, clientIdentity string) (*zfs.DatasetPath, error) {
+func ClientRoot(rootFS *zfs.DatasetPath, clientIdentity string,
+) (*zfs.DatasetPath, error) {
 	rootFSLen := rootFS.Length()
 	clientRootStr := path.Join(rootFS.ToString(), clientIdentity)
 	clientRoot, err := zfs.NewDatasetPath(clientRootStr)
@@ -708,7 +709,8 @@ func clientRoot(rootFS *zfs.DatasetPath, clientIdentity string) (*zfs.DatasetPat
 		return nil, err
 	}
 	if rootFSLen+1 != clientRoot.Length() {
-		return nil, errors.New("client identity must be a single ZFS filesystem path component")
+		return nil, errors.New(
+			"client identity must be a single ZFS filesystem path component")
 	}
 	return clientRoot, nil
 }

@@ -583,8 +583,8 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
   remote `pre` hook after. After replication it executes remote `post` hook and
   their `post` hook after pruning.
 
-  Passive jobs run their hooks with additional environment variable
-  `ZREPL_CLIENT_IDENTITY`.
+  Passive jobs run their hooks with additional environment variables:
+  `ZREPL_CLIENT_IDENTITY`, `ZREPL_CLIENT_ROOT` and `ZREPL_JOB_ROOT` .
 
 * The pruning now prunes filesystems concurrently.
 
