@@ -29,7 +29,7 @@ jobs:
         uses: "actions/upload-artifact@v7"
         with:
           name: "snapshot"
-          path: ".build/zrepl_*"
+          path: ".build/zrepl_*.tar.gz"
           retention-days: 1
           compression-level: 0
 
