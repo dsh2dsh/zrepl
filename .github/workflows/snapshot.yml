@@ -32,6 +32,7 @@ jobs:
           path: ".build/zrepl_*.tar.gz"
           retention-days: 1
           compression-level: 0
+          include-hidden-files: true
 
       - name: "Cleanup"
         run: "rm -rf .build vendor"
