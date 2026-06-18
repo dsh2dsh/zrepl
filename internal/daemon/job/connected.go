@@ -3,6 +3,9 @@ package job
 import (
 	"context"
 	"fmt"
+	"log/slog"
+
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 )
 
 type Connected interface {
@@ -48,11 +51,17 @@ func (self *localConnected) job() *PassiveSide {
 }
 
 func (self *localConnected) PreHook(ctx context.Context) error {
-	return self.job().PreHook(ctx, self.clientIdentity)
+	return self.job().PreHook(self.hookContext(ctx), self.clientIdentity)
+}
+
+func (self *localConnected) hookContext(ctx context.Context) context.Context {
+	log := GetLogger(ctx).With(
+		slog.String("client_identity", self.clientIdentity))
+	return logging.WithLogger(ctx, log)
 }
 
 func (self *localConnected) PostHook(ctx context.Context) error {
-	return self.job().PostHook(ctx, self.clientIdentity)
+	return self.job().PostHook(self.hookContext(ctx), self.clientIdentity)
 }
 
 func newServerConnected(name string, client *Client) *serverConnected {
