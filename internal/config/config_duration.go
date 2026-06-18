@@ -25,13 +25,11 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	d.d, err = parseDuration(s)
 	if err != nil {
 		d.d = 0
+		err := fmt.Errorf("cannot parse value %q: %w", s, err)
 		return &yaml.LoadErrors{
 			Errors: []*yaml.LoadError{
-				{
-					Err:    fmt.Errorf("cannot parse value %q: %w", s, err),
-					Line:   value.Line,
-					Column: value.Column,
-				},
+				yaml.NewLoadError(yaml.ConstructorStage, err.Error(),
+					yaml.Mark{Line: value.Line, Column: value.Column}, err),
 			},
 		}
 	}
