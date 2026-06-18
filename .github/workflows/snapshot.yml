@@ -22,7 +22,7 @@ jobs:
         uses: "goreleaser/goreleaser-action@v7"
         with:
           version: "latest"
-          args: "release --snapshot --clean"
+          args: "release --snapshot"
 
       - name: "Upload artifacts"
         if: "${{ !cancelled() }}"
@@ -31,7 +31,7 @@ jobs:
           name: "snapshot"
           path: ".build/zrepl-*"
           retention-days: 1
-          compression: 0
+          compression-level: 0
 
       - name: "Cleanup"
         run: "rm -rf .build vendor"
