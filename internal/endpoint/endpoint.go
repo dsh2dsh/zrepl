@@ -702,13 +702,13 @@ func (s *Receiver) clientRootFromCtx(ctx context.Context) *zfs.DatasetPath {
 
 func ClientRoot(rootFS *zfs.DatasetPath, clientIdentity string,
 ) (*zfs.DatasetPath, error) {
-	rootFSLen := rootFS.Length()
 	clientRootStr := path.Join(rootFS.ToString(), clientIdentity)
 	clientRoot, err := zfs.NewDatasetPath(clientRootStr)
 	if err != nil {
 		return nil, err
 	}
-	if rootFSLen+1 != clientRoot.Length() {
+
+	if clientRoot.Length() != rootFS.Length()+1 {
 		return nil, errors.New(
 			"client identity must be a single ZFS filesystem path component")
 	}

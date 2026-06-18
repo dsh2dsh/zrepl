@@ -277,7 +277,7 @@ func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
 	log := GetLogger(ctx)
 	log.Info("run pre hook")
 
-	err := h.RunEnv(ctx, j, j.hookEnv(clientIdentity))
+	err := h.RunEnv(ctx, j, j.hookEnv(log, clientIdentity))
 	if err != nil {
 		errIsFatal := h.ErrIsFatal()
 		logger.WithError(
@@ -290,11 +290,15 @@ func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
 	return nil
 }
 
-func (j *PassiveSide) hookEnv(clientIdentity string) map[string]string {
+func (j *PassiveSide) hookEnv(log *slog.Logger, clientIdentity string,
+) map[string]string {
 	var subtreeRoot, clientRoot string
 	if p := j.ownedSubtreeRoot(); p != nil {
 		subtreeRoot = p.ToString()
-		if p2, err := endpoint.ClientRoot(p, clientIdentity); err != nil {
+		p2, err := endpoint.ClientRoot(p, clientIdentity)
+		if err != nil {
+			logger.WithError(log, err, "unable build "+envClientRoot)
+		} else {
 			clientRoot = p2.ToString()
 		}
 	}
@@ -326,7 +330,7 @@ func (j *PassiveSide) PostHook(ctx context.Context, clientIdentity string,
 	log := GetLogger(ctx)
 	log.Info("run post hook")
 
-	err := h.RunEnv(ctx, j, j.hookEnv(clientIdentity))
+	err := h.RunEnv(ctx, j, j.hookEnv(log, clientIdentity))
 	if err != nil {
 		logger.WithError(log, err, "post hook exited with error")
 		return fmt.Errorf("post hook exited with error: %w", err)
