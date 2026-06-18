@@ -1,0 +1,37 @@
+# https://goreleaser.com/ci/actions/#workflow
+name: "goreleaser snapshot"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  goreleaser:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v6.0.3"
+        with:
+          fetch-depth: 0
+
+      - name: "Set up Go"
+        uses: "actions/setup-go@v6"
+        with:
+          go-version-file: 'go.mod'
+
+      - name: "Run GoReleaser"
+        uses: "goreleaser/goreleaser-action@v7"
+        with:
+          version: "latest"
+          args: "release --snapshot --clean"
+
+      - name: "Upload artifacts"
+        if: "${{ !cancelled() }}"
+        uses: "actions/upload-artifact@v7"
+        with:
+          name: "snapshot"
+          path: ".build/zrepl-*"
+          retention-days: 1
+          compression: 0
+
+      - name: "Cleanup"
+        run: "rm -rf .build vendor"
