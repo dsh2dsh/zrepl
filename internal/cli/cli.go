@@ -85,8 +85,8 @@ type Subcommand struct {
 	Long    string
 	Example string
 
-	NoRequireConfig    bool
-	ConfigWithIncludes bool
+	NoRequireConfig bool
+	IncludeKeys     bool
 
 	Run func(ctx context.Context, subcommand *Subcommand,
 		args []string) error
@@ -121,8 +121,8 @@ func (s *Subcommand) run(cmd *cobra.Command, args []string) {
 
 func (s *Subcommand) tryParseConfig() {
 	opts := make([]config.Option, 0, 1)
-	if !s.ConfigWithIncludes {
-		opts = append(opts, config.WithoutIncludes())
+	if s.IncludeKeys {
+		opts = append(opts, config.WithIncludeKeys())
 	}
 
 	config, err := config.ParseConfig(rootArgs.configPath, opts...)

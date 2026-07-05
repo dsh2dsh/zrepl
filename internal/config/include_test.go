@@ -9,7 +9,7 @@ import (
 )
 
 func TestAppendYAML_keys(t *testing.T) {
-	c, err := ParseConfig("testdata/include_keys.yaml")
+	c, err := ParseConfig("testdata/include_keys.yaml", WithIncludeKeys())
 	require.NoError(t, err)
 	assert.Equal(t, []AuthKey{
 		{

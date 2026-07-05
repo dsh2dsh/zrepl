@@ -14,8 +14,8 @@ import (
 
 type Option func(self *Config)
 
-func WithoutIncludes() Option {
-	return func(self *Config) { self.skipIncludes = true }
+func WithIncludeKeys() Option {
+	return func(self *Config) { self.includeKeys = true }
 }
 
 func New(opts ...Option) *Config {
@@ -33,7 +33,7 @@ type Config struct {
 	Jobs        []JobEnum `yaml:"jobs" validate:"min=1,dive"`
 	IncludeJobs string    `yaml:"include_jobs" validate:"omitempty,filepath"`
 
-	skipIncludes bool
+	includeKeys bool
 }
 
 func (c *Config) init(opts ...Option) *Config {
@@ -46,7 +46,15 @@ func (c *Config) init(opts ...Option) *Config {
 func (c *Config) lateInit(path string) error {
 	if len(c.Global.Logging) == 0 {
 		c.Global.Logging.SetDefaults()
-	} else if c.skipIncludes {
+	}
+
+	if jobs, err := appendYAML(path, c.IncludeJobs, c.Jobs); err != nil {
+		return err
+	} else if jobs != nil {
+		c.Jobs = jobs
+	}
+
+	if !c.includeKeys {
 		return nil
 	}
 
@@ -54,12 +62,6 @@ func (c *Config) lateInit(path string) error {
 		return err
 	} else if keys != nil {
 		c.Keys = keys
-	}
-
-	if jobs, err := appendYAML(path, c.IncludeJobs, c.Jobs); err != nil {
-		return err
-	} else if jobs != nil {
-		c.Jobs = jobs
 	}
 	return nil
 }

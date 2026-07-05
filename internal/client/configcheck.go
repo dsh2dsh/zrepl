@@ -24,7 +24,7 @@ var ConfigcheckCmd = &cli.Subcommand{
 	Use:   "configcheck",
 	Short: "check if config can be parsed without errors",
 
-	ConfigWithIncludes: true,
+	IncludeKeys: true,
 
 	SetupFlags: func(f *pflag.FlagSet) {
 		f.StringVar(&configcheckArgs.format, "format", "",

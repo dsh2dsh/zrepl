@@ -178,7 +178,7 @@ func TestSampleConfigsAreBuiltWithoutErrors(t *testing.T) {
 		}
 
 		t.Run(p, func(t *testing.T) {
-			c, err := config.ParseConfig(p)
+			c, err := config.ParseConfig(p, config.WithIncludeKeys())
 			if err != nil {
 				t.Fatalf("error parsing %s:\n%+v", p, err)
 			}
