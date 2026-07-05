@@ -51,9 +51,9 @@ func (self *zfsJob) Endpoints(mux *http.ServeMux, m ...middleware.Middleware) {
 	m = slices.Concat(m, self.middlewares)
 
 	mux.Handle(ep[job.EpPreHook], middleware.Append(m,
-		middleware.NoContent(self.preHook)))
+		middleware.JsonRequest(self.preHook)))
 	mux.Handle(ep[job.EpPostHook], middleware.Append(m,
-		middleware.NoContent(self.postHook)))
+		middleware.JsonRequest(self.postHook)))
 
 	mux.Handle(ep[job.EpListFilesystems], middleware.Append(m,
 		middleware.GzipResponse,
@@ -266,7 +266,8 @@ func (self *zfsJob) replicationCursor(ctx context.Context,
 	return resp, nil
 }
 
-func (self *zfsJob) preHook(ctx context.Context) error {
+func (self *zfsJob) preHook(ctx context.Context, remote *pdu.PassiveHookData,
+) error {
 	jName, j, err := self.jobFrom(ctx)
 	if err != nil {
 		return err
@@ -277,13 +278,14 @@ func (self *zfsJob) preHook(ctx context.Context) error {
 		return err
 	}
 
-	if err := j.PreHook(ctx, clientIdentity); err != nil {
+	if err := j.PreHook(ctx, clientIdentity, remote); err != nil {
 		return fmt.Errorf("run pre hook(%s): %w", jName, err)
 	}
 	return nil
 }
 
-func (self *zfsJob) postHook(ctx context.Context) error {
+func (self *zfsJob) postHook(ctx context.Context, remote *pdu.PassiveHookData,
+) error {
 	jName, j, err := self.jobFrom(ctx)
 	if err != nil {
 		return err
@@ -294,7 +296,7 @@ func (self *zfsJob) postHook(ctx context.Context) error {
 		return err
 	}
 
-	if err := j.PostHook(ctx, clientIdentity); err != nil {
+	if err := j.PostHook(ctx, clientIdentity, remote); err != nil {
 		return fmt.Errorf("run post hook(%s): %w", jName, err)
 	}
 	return nil

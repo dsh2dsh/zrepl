@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
+	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 )
 
@@ -133,3 +134,29 @@ func (s *Status) CanSignal() string {
 func (s *Status) Steps() (expected, step int) { return s.JobSpecific.Steps() }
 
 func (s *Status) Progress() (uint64, uint64) { return s.JobSpecific.Progress() }
+
+func (s *Status) Snapshots() string {
+	if st := s.snapshotting(); st != nil {
+		return st.Snapshots()
+	}
+	return ""
+}
+
+func (s *Status) snapshotting() *snapper.Report {
+	switch v := s.JobSpecific.(type) {
+	case *ActiveSideStatus:
+		return v.Snapshotting
+	case *PassiveStatus:
+		return v.Snapper
+	case *SnapJobStatus:
+		return v.Snapshotting
+	}
+	return nil
+}
+
+func (s *Status) Replicated() string {
+	if v, ok := s.JobSpecific.(*ActiveSideStatus); ok {
+		return v.Replication.Replicated()
+	}
+	return ""
+}

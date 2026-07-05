@@ -9,6 +9,28 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/client/jsonclient"
 )
 
+func JsonRequest[T1 any](h func(ctx context.Context, req *T1) error,
+) Middleware {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		var req T1
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErrorCode(w, r, http.StatusBadRequest, err,
+				"json unmarshal error",
+			)
+			return
+		}
+
+		err := h(r.Context(), &req)
+		if err != nil {
+			writeError(w, r, err, "handler error")
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+	return func(next http.Handler) http.Handler { return http.HandlerFunc(fn) }
+}
+
 func JsonResponder[T any](h func(context.Context) (*T, error)) Middleware {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		resp, err := h(r.Context())

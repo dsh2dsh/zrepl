@@ -13,6 +13,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
+	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 )
 
@@ -20,6 +21,8 @@ const (
 	envClientIdentity = "ZREPL_CLIENT_IDENTITY"
 	envClientRoot     = "ZREPL_CLIENT_ROOT"
 	envSubtreeRoot    = "ZREPL_JOB_ROOT"
+	envHookSnapshots  = "ZREPL_REMOTE_SNAPSHOTS"
+	envHookReplicated = "ZREPL_REMOTE_REPLICATED"
 )
 
 type PassiveSide struct {
@@ -162,7 +165,7 @@ func passiveSideFromConfig(g *config.Global, in *config.PassiveJob,
 		s.preHook = NewHookFromConfig(in.Hooks.Pre)
 	}
 	if in.Hooks.Post != nil {
-		s.postHook = NewHookFromConfig(in.Hooks.Post).WithPostHook(true)
+		s.postHook = NewHookFromConfig(in.Hooks.Post)
 	}
 
 	connecter.AddJob(s.Name(), s)
@@ -268,6 +271,7 @@ func (j *PassiveSide) Run(ctx context.Context) error {
 }
 
 func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
+	remote *pdu.PassiveHookData,
 ) error {
 	h := j.preHook
 	if h == nil {
@@ -277,7 +281,7 @@ func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
 	log := GetLogger(ctx)
 	log.Info("run pre hook")
 
-	err := h.RunEnv(ctx, j, j.hookEnv(log, clientIdentity))
+	err := h.RunEnv(ctx, j, j.hookEnv(log, clientIdentity, remote))
 	if err != nil {
 		errIsFatal := h.ErrIsFatal()
 		logger.WithError(
@@ -291,6 +295,7 @@ func (j *PassiveSide) PreHook(ctx context.Context, clientIdentity string,
 }
 
 func (j *PassiveSide) hookEnv(log *slog.Logger, clientIdentity string,
+	remote *pdu.PassiveHookData,
 ) map[string]string {
 	var subtreeRoot, clientRoot string
 	if p := j.ownedSubtreeRoot(); p != nil {
@@ -307,6 +312,8 @@ func (j *PassiveSide) hookEnv(log *slog.Logger, clientIdentity string,
 		envClientIdentity: clientIdentity,
 		envClientRoot:     clientRoot,
 		envSubtreeRoot:    subtreeRoot,
+		envHookSnapshots:  remote.Snapshots,
+		envHookReplicated: remote.Replicated,
 	}
 }
 
@@ -321,6 +328,7 @@ func (j *PassiveSide) ownedSubtreeRoot() *zfs.DatasetPath {
 }
 
 func (j *PassiveSide) PostHook(ctx context.Context, clientIdentity string,
+	remote *pdu.PassiveHookData,
 ) error {
 	h := j.postHook
 	if h == nil {
@@ -330,7 +338,7 @@ func (j *PassiveSide) PostHook(ctx context.Context, clientIdentity string,
 	log := GetLogger(ctx)
 	log.Info("run post hook")
 
-	err := h.RunEnv(ctx, j, j.hookEnv(log, clientIdentity))
+	err := h.RunEnv(ctx, j, j.hookEnv(log, clientIdentity, remote))
 	if err != nil {
 		logger.WithError(log, err, "post hook exited with error")
 		return fmt.Errorf("post hook exited with error: %w", err)

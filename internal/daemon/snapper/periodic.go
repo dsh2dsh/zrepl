@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -471,4 +472,19 @@ func (self *PeriodicReport) CompletionProgress() (expected, completed uint64) {
 		}
 	}
 	return expected, completed
+}
+
+func (self *PeriodicReport) Snapshots() string {
+	self.SortProgress()
+
+	var sb strings.Builder
+	for _, fs := range self.Progress {
+		if sb.Len() != 0 {
+			sb.WriteByte(' ')
+		}
+		sb.WriteString(fs.Path)
+		sb.WriteByte('@')
+		sb.WriteString(fs.SnapName)
+	}
+	return sb.String()
 }

@@ -6,14 +6,15 @@ import (
 	"log/slog"
 
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
+	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 )
 
 type Connected interface {
 	Name() string
 	Endpoint() Endpoint
 
-	PreHook(ctx context.Context) error
-	PostHook(ctx context.Context) error
+	PreHook(context.Context, *pdu.PassiveHookData) error
+	PostHook(context.Context, *pdu.PassiveHookData) error
 }
 
 func newLocalConnected(listenerName, clientIdentity string,
@@ -50,8 +51,10 @@ func (self *localConnected) job() *PassiveSide {
 	return j
 }
 
-func (self *localConnected) PreHook(ctx context.Context) error {
-	return self.job().PreHook(self.hookContext(ctx), self.clientIdentity)
+func (self *localConnected) PreHook(ctx context.Context,
+	remote *pdu.PassiveHookData,
+) error {
+	return self.job().PreHook(self.hookContext(ctx), self.clientIdentity, remote)
 }
 
 func (self *localConnected) hookContext(ctx context.Context) context.Context {
@@ -60,8 +63,10 @@ func (self *localConnected) hookContext(ctx context.Context) context.Context {
 	return logging.WithLogger(ctx, log)
 }
 
-func (self *localConnected) PostHook(ctx context.Context) error {
-	return self.job().PostHook(self.hookContext(ctx), self.clientIdentity)
+func (self *localConnected) PostHook(ctx context.Context,
+	remote *pdu.PassiveHookData,
+) error {
+	return self.job().PostHook(self.hookContext(ctx), self.clientIdentity, remote)
 }
 
 func newServerConnected(name string, client *Client) *serverConnected {
@@ -79,10 +84,14 @@ func (self *serverConnected) Name() string { return self.name }
 
 func (self *serverConnected) Endpoint() Endpoint { return self.client }
 
-func (self *serverConnected) PreHook(ctx context.Context) error {
-	return self.client.PreHook(ctx)
+func (self *serverConnected) PreHook(ctx context.Context,
+	remote *pdu.PassiveHookData,
+) error {
+	return self.client.PreHook(ctx, remote)
 }
 
-func (self *serverConnected) PostHook(ctx context.Context) error {
-	return self.client.PostHook(ctx)
+func (self *serverConnected) PostHook(ctx context.Context,
+	remote *pdu.PassiveHookData,
+) error {
+	return self.client.PostHook(ctx, remote)
 }

@@ -584,7 +584,11 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
   their `post` hook after pruning.
 
   Passive jobs run their hooks with additional environment variables:
-  `ZREPL_CLIENT_IDENTITY`, `ZREPL_CLIENT_ROOT` and `ZREPL_JOB_ROOT` .
+  `ZREPL_CLIENT_IDENTITY`, `ZREPL_CLIENT_ROOT` and `ZREPL_JOB_ROOT`.
+  `ZREPL_REMOTE_SNAPSHOTS` contains list of snapshots created on remote side.
+  `ZREPL_REMOTE_REPLICATED` contains list of snapshots replicated from remote
+  side. The `source` job adds `ZREPL_LOCAL_SNAPSHOTS` env with list of
+  snapshots, created last time.
 
 * The pruning now prunes filesystems concurrently.
 

@@ -380,3 +380,8 @@ type SendDryReq struct {
 type SendDryRes struct {
 	Items []SendRes `json:"Items,omitempty"`
 }
+
+type PassiveHookData struct {
+	Snapshots  string `json:"snapshots,omitempty"`
+	Replicated string `json:"replicated,omitempty"`
+}

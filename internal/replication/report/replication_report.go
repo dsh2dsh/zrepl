@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -271,6 +272,30 @@ func (r *Report) Progress() (uint64, uint64) {
 		return expected, replicated
 	}
 	return 0, 0
+}
+
+func (r *Report) Replicated() string {
+	if len(r.Attempts) == 0 {
+		return ""
+	}
+
+	lastAttempt := r.Attempts[len(r.Attempts)-1]
+	var sb strings.Builder
+	for _, fs := range lastAttempt.Filesystems {
+		for _, step := range fs.Steps {
+			if sb.Len() != 0 {
+				sb.WriteByte(' ')
+			}
+			sb.WriteString(fs.Info.Name)
+			sb.WriteByte('@')
+			if step.IsIncremental() {
+				sb.WriteString(step.Info.From)
+				sb.WriteByte('|')
+			}
+			sb.WriteString(step.Info.To)
+		}
+	}
+	return sb.String()
 }
 
 // Returns true in case the AttemptState is a terminal

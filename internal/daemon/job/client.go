@@ -214,23 +214,27 @@ func (self *Client) ReplicationCursor(ctx context.Context,
 	}, nil
 }
 
-func (self *Client) PreHook(ctx context.Context) error {
+func (self *Client) PreHook(ctx context.Context,
+	data *pdu.PassiveHookData,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
 
 	ep := self.endpoint(EpPreHook)
-	if err := self.json().Post(ctx, ep, nil, nil); err != nil {
+	if err := self.json().Post(ctx, ep, data, nil); err != nil {
 		return fmt.Errorf("endpoint %q: %w", ep, err)
 	}
 	return nil
 }
 
-func (self *Client) PostHook(ctx context.Context) error {
+func (self *Client) PostHook(ctx context.Context,
+	data *pdu.PassiveHookData,
+) error {
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
 
 	ep := self.endpoint(EpPostHook)
-	if err := self.json().Post(ctx, ep, nil, nil); err != nil {
+	if err := self.json().Post(ctx, ep, data, nil); err != nil {
 		return fmt.Errorf("endpoint %q: %w", ep, err)
 	}
 	return nil

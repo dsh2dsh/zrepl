@@ -12,6 +12,9 @@ import (
 const (
 	envJobName = "ZREPL_JOB_NAME"
 	envJobErr  = "ZREPL_JOB_ERR"
+
+	envJobSnapshots  = "ZREPL_LOCAL_SNAPSHOTS"
+	envJobReplicated = "ZREPL_LOCAL_REPLICATED"
 )
 
 func NewHookFromConfig(in *config.HookCommand) *Hook {
@@ -32,12 +35,6 @@ type Hook struct {
 
 	timeout    time.Duration
 	errIsFatal bool
-	postHook   bool
-}
-
-func (self *Hook) WithPostHook(v bool) *Hook {
-	self.postHook = v
-	return self
 }
 
 func (self *Hook) ErrIsFatal() bool { return self.errIsFatal }
@@ -55,17 +52,16 @@ func (self *Hook) run(ctx context.Context, j Job, env map[string]string) error {
 
 func (self *Hook) makeJobEnv(j Job, runtime map[string]string,
 ) map[string]string {
-	var jobErr string
-	if self.postHook {
-		if jobStatus := j.Status(); jobStatus != nil {
-			jobErr = jobStatus.Error()
-		}
+	env := make(map[string]string, 4+len(runtime))
+	env[envJobName] = j.Name()
+
+	if jobStatus := j.Status(); jobStatus != nil {
+		env[envJobErr] = jobStatus.Error()
+		env[envJobSnapshots] = jobStatus.Snapshots()
+		env[envJobReplicated] = jobStatus.Replicated()
 	}
 
-	env := make(map[string]string, 2+len(runtime))
 	maps.Copy(env, runtime)
-	env[envJobName] = j.Name()
-	env[envJobErr] = jobErr
 	return env
 }
 

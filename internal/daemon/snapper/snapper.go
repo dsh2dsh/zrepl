@@ -74,6 +74,13 @@ func (self *Report) Progress() (uint64, uint64) {
 	return 0, 0
 }
 
+func (self *Report) Snapshots() string {
+	if p := self.Periodic; p != nil {
+		return p.Snapshots()
+	}
+	return ""
+}
+
 func FromConfig(g *config.Global, fsf *filters.DatasetFilter,
 	in config.SnapshottingEnum,
 ) (Snapper, error) {

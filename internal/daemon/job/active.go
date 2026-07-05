@@ -20,6 +20,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/driver"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic"
+	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 )
 
@@ -428,7 +429,7 @@ func activeSide(g *config.Global, in *config.ActiveJob, configJob any,
 		j.preHook = NewHookFromConfig(in.Hooks.Pre)
 	}
 	if in.Hooks.Post != nil {
-		j.postHook = NewHookFromConfig(in.Hooks.Post).WithPostHook(true)
+		j.postHook = NewHookFromConfig(in.Hooks.Post)
 	}
 
 	if j.connected, err = connecter.FromConfig(&in.Connect); err != nil {
@@ -780,7 +781,9 @@ func (j *ActiveSide) runRemotePreHook(ctx context.Context) error {
 	log := GetLogger(ctx)
 	log.Info("run remote pre hook")
 
-	err := j.connected.PreHook(ctx)
+	err := j.connected.PreHook(ctx, &pdu.PassiveHookData{
+		Snapshots: j.Status().Snapshots(),
+	})
 	if err == nil {
 		return nil
 	}
@@ -795,7 +798,11 @@ func (j *ActiveSide) runRemotePostHook(ctx context.Context) {
 	log := GetLogger(ctx)
 	log.Info("run remote post hook")
 
-	err := j.connected.PostHook(ctx)
+	st := j.Status()
+	err := j.connected.PostHook(ctx, &pdu.PassiveHookData{
+		Snapshots:  st.Snapshots(),
+		Replicated: st.Replicated(),
+	})
 	if err == nil {
 		return
 	}

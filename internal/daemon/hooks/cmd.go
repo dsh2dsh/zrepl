@@ -36,7 +36,9 @@ func (self *Cmd) WithEnv(envs ...map[string]string) *Cmd {
 
 	for _, env := range envs {
 		for k, v := range env {
-			self.env = append(self.env, k+"="+v)
+			if v != "" {
+				self.env = append(self.env, k+"="+v)
+			}
 		}
 	}
 	return self
