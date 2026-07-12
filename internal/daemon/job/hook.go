@@ -18,14 +18,18 @@ const (
 )
 
 func NewHookFromConfig(in *config.HookCommand) *Hook {
-	return &Hook{
+	self := &Hook{
 		path: in.Path,
 		args: in.Args,
 		env:  in.Env,
 
-		timeout:    in.Timeout,
 		errIsFatal: in.ErrIsFatal,
 	}
+
+	if in.Timeout != nil {
+		self.timeout = *in.Timeout
+	}
+	return self
 }
 
 type Hook struct {

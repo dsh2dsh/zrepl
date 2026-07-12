@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -247,4 +248,49 @@ jobs:
 	job := c.Jobs[0].Ret.(*PushJob)
 	require.NotNil(t, job)
 	assert.True(t, job.Send.Raw)
+}
+
+func TestHooksTimeout(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "sink"
+    root_fs: "rpool/data/replication"
+    client_keys:
+      - "xxx"
+    hooks:
+      post:
+        path: "/home/zrepl/scripts/zrepl/hooks/post_sink_hook.sh"
+        args: [ "post" ]
+        env:
+          ZREPL_CUSTOM_JOB_NAME: "nextcloud"
+
+  - name: "foo2"
+    type: "sink"
+    root_fs: "rpool/data/replication"
+    client_keys:
+      - "xxx"
+    hooks:
+      post:
+        path: "/home/zrepl/scripts/zrepl/hooks/post_sink_hook.sh"
+        args: [ "post" ]
+        env:
+          ZREPL_CUSTOM_JOB_NAME: "nextcloud"
+        timeout: "0s"
+`)
+	require.Len(t, c.Jobs, 2)
+
+	require.IsType(t, new(SinkJob), c.Jobs[0].Ret)
+	job := c.Jobs[0].Ret.(*SinkJob)
+	require.NotNil(t, job)
+	require.NotNil(t, job.Hooks.Post)
+	require.NotNil(t, job.Hooks.Post.Timeout)
+	assert.Equal(t, time.Minute, *job.Hooks.Post.Timeout)
+
+	require.IsType(t, new(SinkJob), c.Jobs[1].Ret)
+	job = c.Jobs[1].Ret.(*SinkJob)
+	require.NotNil(t, job)
+	require.NotNil(t, job.Hooks.Post)
+	require.NotNil(t, job.Hooks.Post.Timeout)
+	assert.Zero(t, *job.Hooks.Post.Timeout)
 }
