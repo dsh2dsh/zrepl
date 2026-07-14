@@ -155,7 +155,7 @@ func (s *Status) snapshotting() *snapper.Report {
 }
 
 func (s *Status) Replicated() string {
-	if v, ok := s.JobSpecific.(*ActiveSideStatus); ok {
+	if v, ok := s.JobSpecific.(*ActiveSideStatus); ok && v.Replication != nil {
 		return v.Replication.Replicated()
 	}
 	return ""

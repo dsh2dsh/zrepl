@@ -26,3 +26,10 @@ func TestStatus_MarshalJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal(b, &st2))
 	assert.Equal(t, &st, &st2)
 }
+
+func TestStatus_Replicated(t *testing.T) {
+	st := Status{
+		JobSpecific: &ActiveSideStatus{},
+	}
+	assert.Empty(t, st.Replicated())
+}
