@@ -78,7 +78,7 @@ var validate *validator.Validate
 func newValidator() *validator.Validate {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		name := strings.SplitN(fld.Tag.Get("yaml"), ",", 2)[0]
+		name, _, _ := strings.Cut(fld.Tag.Get("yaml"), ",")
 		// skip if tag key says it should be ignored
 		if name == "-" {
 			return ""
