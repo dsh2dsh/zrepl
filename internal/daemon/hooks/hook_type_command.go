@@ -24,13 +24,10 @@ func NewCommandHook(in *config.HookCommand) (*CommandHook, error) {
 	r := &CommandHook{
 		errIsFatal: in.ErrIsFatal,
 		command:    in.Path,
+		timeout:    in.Timeout,
 
 		args: in.Args,
 		env:  in.Env,
-	}
-
-	if in.Timeout != nil {
-		r.timeout = *in.Timeout
 	}
 
 	filter, err := filters.NewFromConfig(in.Filesystems, in.Datasets)

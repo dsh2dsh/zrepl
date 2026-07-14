@@ -559,19 +559,18 @@ type HookCommand struct {
 	Path        string            `yaml:"path" validate:"required"`
 	Args        []string          `yaml:"args" validate:"dive,required"`
 	Env         map[string]string `yaml:"env" validate:"dive,keys,required,endkeys,required"`
-	Timeout     *time.Duration    `yaml:"timeout" default:"1m" validate:"min=0s"`
+	Timeout     time.Duration     `yaml:"timeout" validate:"min=0s"`
 	Filesystems FilesystemsFilter `yaml:"filesystems"`
 	Datasets    []DatasetFilter   `yaml:"datasets" validate:"dive"`
 	ErrIsFatal  bool              `yaml:"err_is_fatal"`
 }
 
 func (self *HookCommand) UnmarshalYAML(value *yaml.Node) error {
-	type hookCommand HookCommand
-	v := (*hookCommand)(self)
-	if err := value.Decode(v); err != nil {
+	self.Timeout = time.Minute
+
+	type alias HookCommand
+	if err := value.Decode((*alias)(self)); err != nil {
 		return fmt.Errorf("UnmarshalYAML %T: %w", self, err)
-	} else if err := defaults.Set(v); err != nil {
-		return fmt.Errorf("set defaults for %T: %w", self, err)
 	}
 	return nil
 }

@@ -284,13 +284,31 @@ jobs:
 	job := c.Jobs[0].Ret.(*SinkJob)
 	require.NotNil(t, job)
 	require.NotNil(t, job.Hooks.Post)
-	require.NotNil(t, job.Hooks.Post.Timeout)
-	assert.Equal(t, time.Minute, *job.Hooks.Post.Timeout)
+	assert.Equal(t, time.Minute, job.Hooks.Post.Timeout)
 
 	require.IsType(t, new(SinkJob), c.Jobs[1].Ret)
 	job = c.Jobs[1].Ret.(*SinkJob)
 	require.NotNil(t, job)
 	require.NotNil(t, job.Hooks.Post)
-	require.NotNil(t, job.Hooks.Post.Timeout)
-	assert.Zero(t, *job.Hooks.Post.Timeout)
+	assert.Zero(t, job.Hooks.Post.Timeout)
+}
+
+func TestHooksRpcTimeout(t *testing.T) {
+	c := testValidConfig(t, `
+jobs:
+  - name: "foo"
+    type: "sink"
+    root_fs: "rpool/data/replication"
+`)
+	assert.Equal(t, time.Minute, c.Global.RpcTimeout)
+
+	c = testValidConfig(t, `
+global:
+  rpc_timeout: "2m30s"
+jobs:
+  - name: "foo"
+    type: "sink"
+    root_fs: "rpool/data/replication"
+`)
+	assert.Equal(t, 2*time.Minute+30*time.Second, c.Global.RpcTimeout)
 }

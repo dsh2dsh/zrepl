@@ -23,11 +23,8 @@ func NewHookFromConfig(in *config.HookCommand) *Hook {
 		args: in.Args,
 		env:  in.Env,
 
+		timeout:    in.Timeout,
 		errIsFatal: in.ErrIsFatal,
-	}
-
-	if in.Timeout != nil {
-		self.timeout = *in.Timeout
 	}
 	return self
 }
