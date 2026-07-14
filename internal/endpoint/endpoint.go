@@ -1011,6 +1011,7 @@ func (s *Receiver) Receive(ctx context.Context, req *pdu.ReceiveReq,
 		SavePartialRecvState: true,
 		InheritProperties:    s.conf.InheritProperties,
 		OverrideProperties:   s.conf.OverrideProperties,
+		Force:                req.GetReplicationConfig().Force,
 	}
 
 	var clearPlaceholderProperty bool

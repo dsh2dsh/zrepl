@@ -863,6 +863,8 @@ type RecvOptions struct {
 	// Set -s flag used for resumable send & recv
 	SavePartialRecvState bool
 
+	Force bool // set -F flag
+
 	InheritProperties  []zfsprop.Property
 	OverrideProperties map[zfsprop.Property]string
 }
@@ -871,7 +873,7 @@ func (self *RecvOptions) buildRecvFlags() []string {
 	args := make([]string, 0,
 		2+len(self.InheritProperties)*2+len(self.OverrideProperties)*2)
 
-	if self.RollbackAndForceRecv {
+	if self.RollbackAndForceRecv || self.Force {
 		args = append(args, "-F")
 	}
 

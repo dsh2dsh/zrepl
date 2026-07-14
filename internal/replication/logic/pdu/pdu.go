@@ -171,6 +171,7 @@ func (x *SendReq) GetReplicationConfig() *ReplicationConfig {
 type ReplicationConfig struct {
 	Protection *ReplicationConfigProtection `json:"protection,omitempty"`
 	Recursive  bool                         `json:"recursive,omitempty"`
+	Force      bool                         `json:"force,omitempty"`
 }
 
 type ReplicationConfigProtection struct {

@@ -92,6 +92,7 @@ func ReplicationConfigFromConfig(in *config.Replication) (*pdu.ReplicationConfig
 			Incremental: incremental,
 		},
 		Recursive: in.Recursive,
+		Force:     in.Force,
 	}, nil
 }
 

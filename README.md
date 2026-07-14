@@ -748,6 +748,18 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   For excluded descendent datasets it adds `-X dataset[,dataset]...`.
 
+* Optional use of `-F` flag for `zfs recv`
+
+  ``` yaml
+  jobs:
+    - name: "zroot-to-zdisk"
+      type: "push"
+      replication:
+        force: true
+  ```
+
+  With configuration like that the receiver side runs `zfs recv -F`.
+
 ## Upstream user documentation
 
 **User Documentation** can be found at

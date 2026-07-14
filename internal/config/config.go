@@ -236,6 +236,7 @@ type Replication struct {
 	Concurrency ReplicationOptionsConcurrency `yaml:"concurrency"`
 	Prefix      string                        `yaml:"prefix"`
 	Recursive   bool                          `yaml:"recursive"`
+	Force       bool                          `yaml:"force"`
 }
 
 type ReplicationOptionsProtection struct {
