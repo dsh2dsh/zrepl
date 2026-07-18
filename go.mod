@@ -13,7 +13,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/klauspost/compress v1.19.0
-	github.com/montanaflynn/stats v0.9.0
+	github.com/montanaflynn/stats v0.10.0
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sahilm/fuzzy v0.1.3
@@ -70,6 +70,6 @@ require (
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/text v0.39.0
+	golang.org/x/text v0.40.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
