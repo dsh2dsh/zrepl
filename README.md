@@ -746,7 +746,17 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   `recursive: true`
 
-  For excluded descendent datasets it adds `-X dataset[,dataset]...`.
+  For excluded descendent datasets it adds `-X dataset[,dataset]...`. More
+  datasets can be excluded using job configuration like this:
+
+  ```yaml
+  send:
+    exclude:
+      - "zroot/test/exclude1"
+      - "zroot/test/exclude2"
+  ```
+
+  and so on.
 
 * Optional use of `-F` flag for `zfs recv`
 

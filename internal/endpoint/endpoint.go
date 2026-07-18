@@ -40,6 +40,7 @@ type SenderConfig struct {
 	SendCompressed       bool
 	SendEmbeddedData     bool
 	SendSaved            bool
+	SendExclude          []string
 
 	ExecPipe [][]string
 }
@@ -241,7 +242,7 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 		return sendArgs, err
 	}
 
-	sendArgsUnvalidated := zfs.ZFSSendArgsUnvalidated{
+	unvalidated := zfs.ZFSSendArgsUnvalidated{
 		FS:   r.Filesystem,
 		From: uncheckedSendArgsFromPDU(r.GetFrom()), // validated by zfs.ZFSSendDry / zfs.ZFSSend
 		To:   uncheckedSendArgsFromPDU(r.GetTo()),   // validated by zfs.ZFSSendDry / zfs.ZFSSend
@@ -260,8 +261,9 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 			Exclude:          r.Exclude,
 		},
 	}
+	unvalidated.AppendExclude(s.config.SendExclude)
 
-	sendArgs, err = sendArgsUnvalidated.Validate(ctx)
+	sendArgs, err = unvalidated.Validate(ctx)
 	if err != nil {
 		return sendArgs, fmt.Errorf("validate send arguments: %w", err)
 	}

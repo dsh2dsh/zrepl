@@ -204,15 +204,16 @@ type DatasetFilter struct {
 }
 
 type SendOptions struct {
-	ListPlaceholders bool `yaml:"list_placeholders"`
-	Encrypted        bool `yaml:"encrypted"`
-	Raw              bool `yaml:"raw" default:"true"`
-	SendProperties   bool `yaml:"send_properties"`
-	BackupProperties bool `yaml:"backup_properties"`
-	LargeBlocks      bool `yaml:"large_blocks"`
-	Compressed       bool `yaml:"compressed"`
-	EmbeddedData     bool `yaml:"embedded_data"`
-	Saved            bool `yaml:"saved"`
+	ListPlaceholders bool     `yaml:"list_placeholders"`
+	Encrypted        bool     `yaml:"encrypted"`
+	Raw              bool     `yaml:"raw" default:"true"`
+	SendProperties   bool     `yaml:"send_properties"`
+	BackupProperties bool     `yaml:"backup_properties"`
+	LargeBlocks      bool     `yaml:"large_blocks"`
+	Compressed       bool     `yaml:"compressed"`
+	EmbeddedData     bool     `yaml:"embedded_data"`
+	Saved            bool     `yaml:"saved"`
+	Exclude          []string `yaml:"exclude" validate:"dive,required"`
 
 	ExecPipe [][]string `yaml:"execpipe" validate:"dive,required"`
 }

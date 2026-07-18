@@ -36,6 +36,7 @@ func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.Sen
 		SendCompressed:       sendOpts.Compressed,
 		SendEmbeddedData:     sendOpts.EmbeddedData,
 		SendSaved:            sendOpts.Saved,
+		SendExclude:          sendOpts.Exclude,
 
 		ExecPipe: sendOpts.ExecPipe,
 	}

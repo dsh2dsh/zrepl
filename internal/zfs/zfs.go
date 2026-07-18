@@ -455,6 +455,19 @@ func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
 	return validated, nil
 }
 
+func (self *ZFSSendFlags) AppendExclude(ex []string) {
+	if len(ex) == 0 {
+		return
+	}
+	s := strings.Join(ex, ",")
+
+	if self.Exclude == "" {
+		self.Exclude = s
+		return
+	}
+	self.Exclude += "," + s
+}
+
 func (self *ZFSSendFlags) Validate() error { return nil }
 
 // If ResumeToken is empty, builds a command line with the flags specified.
@@ -502,12 +515,10 @@ func (self *ZFSSendFlags) buildSendFlagsUnchecked() []string {
 
 	if self.Replicate {
 		args = append(args, "-R")
+		if self.Exclude != "" {
+			args = append(args, "-X", self.Exclude)
+		}
 	}
-
-	if self.Exclude != "" {
-		args = append(args, "-X", self.Exclude)
-	}
-
 	return args
 }
 

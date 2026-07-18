@@ -655,3 +655,51 @@ func TestZFSSendArgsValidated_env(t *testing.T) {
 		})
 	}
 }
+
+func TestZFSSendFlags_AppendExclude(t *testing.T) {
+	tests := []struct {
+		name        string
+		flags       ZFSSendFlags
+		exclude     []string
+		wantExclude string
+	}{
+		{
+			name: "both empty",
+		},
+		{
+			name:        "append nothing",
+			flags:       ZFSSendFlags{Exclude: "a"},
+			wantExclude: "a",
+		},
+		{
+			name:        "append to empty",
+			exclude:     []string{"a"},
+			wantExclude: "a",
+		},
+		{
+			name:        "append to empty2",
+			exclude:     []string{"a", "b"},
+			wantExclude: "a,b",
+		},
+		{
+			name:        "append to existing",
+			flags:       ZFSSendFlags{Exclude: "a"},
+			exclude:     []string{"b"},
+			wantExclude: "a,b",
+		},
+		{
+			name:        "append to existing2",
+			flags:       ZFSSendFlags{Exclude: "a"},
+			exclude:     []string{"b", "c"},
+			wantExclude: "a,b,c",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := tt.flags
+			flags.AppendExclude(tt.exclude)
+			assert.Equal(t, tt.wantExclude, flags.Exclude)
+		})
+	}
+}
