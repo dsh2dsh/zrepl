@@ -758,6 +758,9 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   and so on.
 
+  Recursive replication has some issues. See
+  https://github.com/dsh2dsh/zrepl/issues/73 for details.
+
 * Optional use of `-F` flag for `zfs recv`
 
   ``` yaml
