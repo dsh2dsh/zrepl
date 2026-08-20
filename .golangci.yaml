@@ -11,9 +11,12 @@ formatters:
 
   settings:
     gofumpt:
-      # Choose whether to use the extra rules.
+      # Groups function parameters with repeated types.
       # Default: false
-      extra-rules: true
+      group-params: true
+      # Clothes naked returns in functions with named results.
+      # Default: false
+      clothe-returns: true
 
     goimports:
       # A list of prefixes, which, if set, checks import paths
