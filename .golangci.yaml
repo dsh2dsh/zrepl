@@ -11,12 +11,13 @@ formatters:
 
   settings:
     gofumpt:
-      # Groups function parameters with repeated types.
-      # Default: false
-      group-params: true
-      # Clothes naked returns in functions with named results.
-      # Default: false
-      clothe-returns: true
+      extra:
+        # Groups function parameters with repeated types.
+        # Default: false
+        group-params: true
+        # Clothes naked returns in functions with named results.
+        # Default: false
+        clothe-returns: true
 
     goimports:
       # A list of prefixes, which, if set, checks import paths
