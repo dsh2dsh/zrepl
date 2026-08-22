@@ -243,23 +243,22 @@ func (s *Sender) sendMakeArgs(ctx context.Context, r *pdu.SendReq) (sendArgs zfs
 	}
 
 	unvalidated := zfs.ZFSSendArgsUnvalidated{
+		ResumeToken:      r.ResumeToken, // nil or not nil, depending on decoding success
+		Encrypted:        s.config.Encrypt,
+		Properties:       s.config.SendProperties,
+		BackupProperties: s.config.SendBackupProperties,
+		Raw:              s.config.SendRaw,
+		LargeBlocks:      s.config.SendLargeBlocks,
+		Compressed:       s.config.SendCompressed,
+		EmbeddedData:     s.config.SendEmbeddedData,
+		Saved:            s.config.SendSaved,
+		Multi:            r.Multi,
+		Replicate:        r.Replicate,
+		Exclude:          r.Exclude,
+
 		FS:   r.Filesystem,
 		From: uncheckedSendArgsFromPDU(r.GetFrom()), // validated by zfs.ZFSSendDry / zfs.ZFSSend
 		To:   uncheckedSendArgsFromPDU(r.GetTo()),   // validated by zfs.ZFSSendDry / zfs.ZFSSend
-		ZFSSendFlags: zfs.ZFSSendFlags{
-			ResumeToken:      r.ResumeToken, // nil or not nil, depending on decoding success
-			Encrypted:        s.config.Encrypt,
-			Properties:       s.config.SendProperties,
-			BackupProperties: s.config.SendBackupProperties,
-			Raw:              s.config.SendRaw,
-			LargeBlocks:      s.config.SendLargeBlocks,
-			Compressed:       s.config.SendCompressed,
-			EmbeddedData:     s.config.SendEmbeddedData,
-			Saved:            s.config.SendSaved,
-			Multi:            r.Multi,
-			Replicate:        r.Replicate,
-			Exclude:          r.Exclude,
-		},
 	}
 	unvalidated.AppendExclude(s.config.SendExclude)
 
