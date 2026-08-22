@@ -58,8 +58,9 @@ global:
       - "span"
     level: "warn"
 `)
+
 	assert.Len(t, conf.Global.Logging, 5)
-	assert.NotNil(t, (conf.Global.Logging)[3].Ret.(*TCPLoggingOutlet).TLS)
+	assert.NotNil(t, conf.Global.Logging[3].Ret.(*TCPLoggingOutlet).TLS)
 }
 
 func TestDefaultLoggingOutlet(t *testing.T) {
@@ -137,7 +138,7 @@ global:
 `, s)
 			conf := testValidGlobalSection(t, logcfg)
 			assert.Len(t, conf.Global.Logging, 1)
-			assert.Equal(t, SyslogFacility(tt.priority), (conf.Global.Logging)[0].Ret.(*SyslogLoggingOutlet).Facility)
+			assert.Equal(t, SyslogFacility(tt.priority), conf.Global.Logging[0].Ret.(*SyslogLoggingOutlet).Facility)
 		})
 	}
 }

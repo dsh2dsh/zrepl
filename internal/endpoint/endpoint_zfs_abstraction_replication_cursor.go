@@ -251,6 +251,7 @@ func (c ReplicationCursorV1) GetFS() string                               { retu
 func (c ReplicationCursorV1) GetFullPath() string                         { return fmt.Sprintf("%s#%s", c.FS, c.GetName()) }
 func (c ReplicationCursorV1) GetJobID() *JobID                            { return nil }
 func (c ReplicationCursorV1) GetFilesystemVersion() zfs.FilesystemVersion { return c.FilesystemVersion }
+
 func (c ReplicationCursorV1) MarshalJSON() ([]byte, error) {
 	return json.Marshal(AbstractionJSON{c})
 }

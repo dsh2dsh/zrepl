@@ -62,7 +62,7 @@ func ComponentNamecheck(datasetPathComponent string) error {
 		return fmt.Errorf("path component must not be longer than %d chars", MaxDatasetNameLen)
 	}
 
-	if !(isASCII(datasetPathComponent)) {
+	if !isASCII(datasetPathComponent) {
 		return errors.New("path component must be ASCII")
 	}
 
