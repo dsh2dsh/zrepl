@@ -13,7 +13,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/klauspost/compress v1.19.2
-	github.com/montanaflynn/stats v0.12.4
+	github.com/montanaflynn/stats v0.12.5
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sahilm/fuzzy v0.1.3
