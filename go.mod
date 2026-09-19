@@ -7,13 +7,13 @@ require (
 	charm.land/bubbletea/v2 v2.0.9
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/creasty/defaults v1.8.0
+	github.com/creasty/defaults v1.10.0
 	github.com/dsh2dsh/cron/v3 v3.0.3
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.19.0
 	github.com/go-playground/validator/v10 v10.30.4
 	github.com/klauspost/compress v1.20.0
-	github.com/montanaflynn/stats v0.12.5
+	github.com/montanaflynn/stats v0.12.6
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sahilm/fuzzy v0.1.3
@@ -24,7 +24,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
-	golang.org/x/text v0.41.0
+	golang.org/x/text v0.42.0
 )
 
 require (
