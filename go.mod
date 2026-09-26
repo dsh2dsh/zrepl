@@ -7,13 +7,13 @@ require (
 	charm.land/bubbletea/v2 v2.0.9
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/creasty/defaults v1.10.0
+	github.com/creasty/defaults v1.11.0
 	github.com/dsh2dsh/cron/v3 v3.0.3
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.19.0
-	github.com/go-playground/validator/v10 v10.30.4
+	github.com/go-playground/validator/v10 v10.30.5
 	github.com/klauspost/compress v1.20.0
-	github.com/montanaflynn/stats v0.12.6
+	github.com/montanaflynn/stats v0.12.7
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sahilm/fuzzy v0.1.3
@@ -62,6 +62,6 @@ require (
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect; go1.12 thinks it needs this
 	github.com/yudai/pp v2.0.1+incompatible // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
