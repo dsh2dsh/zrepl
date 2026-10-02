@@ -63,6 +63,8 @@ func (self *ListModel) init(items []ListItem, d list.ItemDelegate, w, h int,
 ) *ListModel {
 	self.items = items
 	l := list.New(makeListItems(self.items), d, w, h)
+	l.KeyMap.Quit = key.NewBinding(key.WithKeys("q", "esc"),
+		key.WithHelp("q", "quit"))
 	l.AdditionalShortHelpKeys = self.helpKeys
 	l.AdditionalFullHelpKeys = self.helpKeys
 	l.Filter = list.UnsortedFilter
