@@ -326,10 +326,12 @@ func (self *JobsList) RefreshTitle() string {
 	var sb strings.Builder
 	runCnt, withErr := self.status.JobCounts()
 	if runCnt > 0 {
-		sb.WriteString(strconv.Itoa(runCnt) + runner)
+		sb.WriteString(strconv.Itoa(runCnt))
+		sb.WriteString(runner)
 	}
 	if withErr > 0 {
-		sb.WriteString(strconv.Itoa(withErr) + crossMark)
+		sb.WriteString(strconv.Itoa(withErr))
+		sb.WriteString(crossMark)
 	}
 
 	var title string
