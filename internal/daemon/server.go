@@ -19,6 +19,8 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 )
 
+const endpointHealth = "/health"
+
 func newServerJob(log *slog.Logger, controlJob *controlJob, zfsJob *zfsJob,
 ) *serverJob {
 	j := &serverJob{
@@ -123,17 +125,26 @@ func (self *serverJob) AddServer(c *config.Listen) error {
 
 func (self *serverJob) mux(c *config.Listen) *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.Handle(endpointHealth, middleware.AppendHandler(self.middlewares,
+		http.HandlerFunc(self.healthCheck)))
+
 	if c.Control {
 		self.controlJob.Endpoints(mux, self.middlewares...)
 	}
+
 	if c.Metrics {
 		self.hasMetrics = true
 		metricsEndpoints(mux, self.middlewares...)
 	}
+
 	if c.Zfs {
 		self.zfsJob.Endpoints(mux, self.prometheus)
 	}
 	return mux
+}
+
+func (self *serverJob) healthCheck(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
 
 func (self *serverJob) Run(ctx context.Context) error {
