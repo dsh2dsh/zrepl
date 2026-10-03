@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.0.9
+	charm.land/bubbletea/v2 v2.0.10
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/creasty/defaults v1.11.0
@@ -12,7 +12,7 @@ require (
 	github.com/dsh2dsh/go-monitoringplugin/v2 v2.0.1
 	github.com/fatih/color v1.19.0
 	github.com/go-playground/validator/v10 v10.30.5
-	github.com/klauspost/compress v1.20.0
+	github.com/klauspost/compress v1.20.1
 	github.com/montanaflynn/stats v0.12.7
 	github.com/muesli/reflow v0.3.0
 	github.com/prometheus/client_golang v1.24.1
