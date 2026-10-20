@@ -69,6 +69,8 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
         # and nobody else.
   ```
 
+  `/health` endpoint just returns `200 OK` HTTP status.
+
 * All transports has been replaced by `local` and `http` transports.
 
   `local` transport configuration looks almost the same:
