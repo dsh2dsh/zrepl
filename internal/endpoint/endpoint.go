@@ -94,7 +94,7 @@ func (s *Sender) filterCheckFS(fs string) (*zfs.DatasetPath, error) {
 	if dp.Length() == 0 {
 		return nil, errors.New("empty filesystem not allowed")
 	}
-	pass, err := s.FSFilter.Filter(dp)
+	pass, err := s.FSFilter.Included(dp)
 	if err != nil {
 		return nil, err
 	}

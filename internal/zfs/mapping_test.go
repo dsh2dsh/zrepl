@@ -12,10 +12,11 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 	paths := [...]string{"zroot", "zroot/foo", "zroot/bar", "zroot/baz"}
 
 	tests := []struct {
-		name     string
-		paths    []string
-		included []bool
-		excluded []string
+		name        string
+		paths       []string
+		included    []bool
+		excluded    []string
+		selfExclude bool
 	}{
 		{
 			name:     "all included",
@@ -52,12 +53,25 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 			included: []bool{true, true, true, false},
 			excluded: []string{paths[3]},
 		},
+		{
+			name: "self-exclude",
+			paths: []string{
+				"zroot",
+				"zroot/data",
+				"zroot/data/1",
+				"zroot/data/1/2",
+				"zroot/data/1/2/3",
+			},
+			included:    []bool{true, false, true, true, true},
+			excluded:    []string{"zroot/data"},
+			selfExclude: true,
+		},
 	}
 
 	root, err := NewDatasetPath(paths[0])
 	require.NoError(t, err)
 	require.NotNil(t, root)
-	root.SetRecursive()
+	root.WithRecursive(true)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -72,6 +86,7 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 				datasets[i] = p
 				roots.Add(root, p, tt.included[i])
 				if !tt.included[i] {
+					p.WithRecursive(!tt.selfExclude)
 					wantExcluded = append(wantExcluded, p.ToString())
 				}
 			}
@@ -85,9 +100,11 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 				"top level %s has wrong HasExcluded()", top.ToString())
 
 			var excluded []string
-			for _, p := range datasets[1:] {
-				assert.False(t, p.Recursive(), "wrong Recursive() from child %s",
-					p.ToString())
+			for i, p := range datasets[1:] {
+				wantRecursive := !tt.included[i+1] && !tt.selfExclude
+				assert.Equal(t, wantRecursive, p.Recursive(),
+					"wrong Recursive() from child %s", p.ToString())
+
 				if top.Excluded(p) {
 					assert.Nil(t, p.RecursiveParent(),
 						"excluded %s has RecursiveParent()", p.ToString())

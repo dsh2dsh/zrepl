@@ -42,7 +42,7 @@ func (self *CountRule) init() (*CountRule, error) {
 
 func (self *CountRule) Skip(path *zfs.DatasetPath) (bool, error) {
 	if self.skip != nil {
-		return self.skip.Filter(path)
+		return self.skip.Included(path)
 	}
 	return false, nil
 }
@@ -85,7 +85,7 @@ func (self *AgeRule) init() (*AgeRule, error) {
 
 func (self *AgeRule) Skip(path *zfs.DatasetPath) (bool, error) {
 	if self.skip != nil {
-		return self.skip.Filter(path)
+		return self.skip.Included(path)
 	}
 	return false, nil
 }

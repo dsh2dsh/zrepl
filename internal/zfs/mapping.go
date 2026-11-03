@@ -10,9 +10,20 @@ import (
 )
 
 type DatasetFilter interface {
-	Filter2(path *DatasetPath) (*DatasetPath, bool, error)
+	Filtered(path *DatasetPath) (Filtered, error)
 	TopFilesystems() (int, iter.Seq[string])
 	UserSpecifiedDatasets() map[string]bool
+}
+
+type Filtered interface {
+	SetParent(*DatasetPath)
+	Parent() *DatasetPath
+
+	SetIncluded(bool)
+	Included() bool
+
+	SetRecursive(bool)
+	Recursive() bool
 }
 
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
@@ -49,18 +60,21 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 func filterDatasets(ctx context.Context, filter DatasetFilter,
 	all []*DatasetPath,
 ) ([]*DatasetPath, error) {
-	roots := newRecursiveDatasets()
+	parents := newRecursiveDatasets()
 	unmatched := filter.UserSpecifiedDatasets()
 
 	datasets := []*DatasetPath{}
 	for _, path := range all {
-		root, pass, err := filter.Filter2(path)
+		filtered, err := filter.Filtered(path)
 		if err != nil {
 			return nil, fmt.Errorf("error calling filter: %w", err)
 		}
-		roots.Add(root, path, pass)
-		if pass {
+
+		parents.Add(filtered.Parent(), path, filtered.Included())
+		if filtered.Included() {
 			datasets = append(datasets, path)
+		} else {
+			path.WithRecursive(filtered.Recursive())
 		}
 		delete(unmatched, path.ToString())
 	}
@@ -87,8 +101,11 @@ func (self *recursiveDatasets) Add(root, path *DatasetPath, included bool) {
 	}
 
 	if path.Equal(root) {
-		path.SetRecursive()
+		path.WithRecursive(true)
 		self.parents[root] = path
+		if !included {
+			path.WithExcluded(path)
+		}
 		return
 	}
 

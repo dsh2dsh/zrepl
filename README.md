@@ -180,12 +180,27 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
           recursive: true
         - pattern: "tank/foo"     # rule (2)
           exclude: true
-          recursive: true
         - pattern: "tank/foo/bar" # rule (3)
   ```
 
+  `tank/foo` is directly excluded by (2).
+
   `tank/foo/bar/loo` is excluded by (2), because (3) isn't matched (it isn't
-  recursive).
+  recursive) and (2) is recursive, because `exclude: true` is recursive by
+  default (it excludes this dataset and any of its children). But if would
+  change rule (2) to something like:
+
+  ```yaml
+  - pattern: "tank/foo" # rule (2)
+    exclude: true
+    recursive: false
+  ```
+
+  it'd exclude `tank/foo` as before, but instead include any children dataset,
+  because rules (1) is recursive.
+
+  So the rule is: `exclude: true` is recursive by default, but it can be changed
+  by using `recursive: false`.
 
   `tank/bar` is included by (1).
 

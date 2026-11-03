@@ -521,7 +521,7 @@ type ListAbstractionsError struct {
 	Err  error
 }
 
-func (e ListAbstractionsError) Error() string {
+func (e *ListAbstractionsError) Error() string {
 	if e.FS == "" {
 		return fmt.Sprintf("list endpoint abstractions: %s: %s", e.What, e.Err)
 	} else {

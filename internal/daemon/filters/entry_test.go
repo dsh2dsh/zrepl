@@ -161,7 +161,7 @@ func Test_filterItem_SetShellPattern(t *testing.T) {
 	entry, err := NewItem(config.DatasetFilter{
 		Pattern:   "tank/home",
 		Exclude:   false,
-		Recursive: true,
+		Recursive: new(true),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, entry)

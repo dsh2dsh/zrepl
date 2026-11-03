@@ -37,7 +37,7 @@ func (self List) CopyFilteredForFilesystem(fs *zfs.DatasetPath) (List, error) {
 			ret = append(ret, h)
 			continue
 		}
-		if ok, err := h.Filesystems().Filter(fs); err != nil {
+		if ok, err := h.Filesystems().Included(fs); err != nil {
 			return nil, err
 		} else if ok {
 			ret = append(ret, h)

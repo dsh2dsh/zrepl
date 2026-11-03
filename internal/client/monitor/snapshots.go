@@ -167,7 +167,7 @@ func (self *SnapCheck) datasetsFromFilter(
 			return nil, err
 		} else if path, err := zfs.NewDatasetPath(fields[0]); err != nil {
 			return nil, err
-		} else if ok, err := filesystems.Filter(path); err != nil {
+		} else if ok, err := filesystems.Included(path); err != nil {
 			return nil, err
 		} else if ok {
 			filtered = append(filtered, path)

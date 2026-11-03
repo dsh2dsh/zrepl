@@ -98,7 +98,7 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 	for _, in := range fspaths {
 		var res string
 		var errStr string
-		pass, err := f.Filter(in)
+		pass, err := f.Included(in)
 		switch {
 		case err != nil:
 			res = "ERROR"

@@ -199,7 +199,7 @@ type SnapJob struct {
 type DatasetFilter struct {
 	Pattern   string `yaml:"pattern"`
 	Exclude   bool   `yaml:"exclude"`
-	Recursive bool   `yaml:"recursive" validate:"excluded_with=Shell"`
+	Recursive *bool  `yaml:"recursive" validate:"excluded_with=Shell"`
 	Shell     bool   `yaml:"shell" validate:"excluded_with=Recursive"`
 }
 

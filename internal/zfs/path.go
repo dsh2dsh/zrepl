@@ -152,7 +152,10 @@ func (self *DatasetPath) RecursiveSnapshot() bool {
 	return self.recursive && !self.HasExcluded()
 }
 
-func (self *DatasetPath) SetRecursive() { self.recursive = true }
+func (self *DatasetPath) WithRecursive(v bool) *DatasetPath {
+	self.recursive = v
+	return self
+}
 
 func (self *DatasetPath) Written() uint64 { return self.written }
 
@@ -165,7 +168,7 @@ func (self *DatasetPath) WithExcluded(p *DatasetPath) *DatasetPath {
 
 func (self *DatasetPath) Excluded(p *DatasetPath) bool {
 	for _, ex := range slices.Backward(self.exclude) {
-		if p.HasPrefix(ex) {
+		if p.HasPrefix(ex) && (p.Equal(ex) || ex.Recursive()) {
 			return true
 		}
 	}

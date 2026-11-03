@@ -18,7 +18,7 @@ const (
 
 func NoFilter() (*DatasetFilter, error) {
 	f := New(1)
-	err := f.AddList([]config.DatasetFilter{{Recursive: true}})
+	err := f.AddList([]config.DatasetFilter{{Recursive: new(true)}})
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +88,11 @@ func (self *DatasetFilter) addCompat(pathPattern string, mapping bool) error {
 	// assert path glob adheres to spec
 	const subTreeSep = "<"
 	pathStr, pattern, found := strings.Cut(pathPattern, subTreeSep)
-	entry, err := NewItem(config.DatasetFilter{
-		Pattern:   pathStr,
-		Exclude:   !mapping,
-		Recursive: found,
-	})
+	in := config.DatasetFilter{Pattern: pathStr, Exclude: !mapping}
+	if found {
+		in.Recursive = new(found)
+	}
+	entry, err := NewItem(in)
 	if err != nil {
 		return err
 	}
@@ -147,27 +147,29 @@ func (self *DatasetFilter) CompatSort() {
 	}
 }
 
-func (self *DatasetFilter) Filter(p *zfs.DatasetPath) (bool, error) {
-	_, result, err := self.Filter2(p)
-	return result, err
+func (self *DatasetFilter) Included(p *zfs.DatasetPath) (bool, error) {
+	filtered, err := self.Filtered(p)
+	return filtered.Included(), err
 }
 
-func (self *DatasetFilter) Filter2(p *zfs.DatasetPath) (*zfs.DatasetPath, bool,
+func (self *DatasetFilter) Filtered(p *zfs.DatasetPath) (zfs.Filtered,
 	error,
 ) {
-	var recursiveRoot *zfs.DatasetPath
-	var result bool
+	filtered := new(filterResult)
 	for _, entry := range self.entries {
-		if matched, err := entry.Match(p); err != nil {
-			return nil, false, err
-		} else if matched {
-			result = entry.Mapping()
+		matched, err := entry.Match(p)
+		if err != nil {
+			return nil, err
+		}
+
+		if matched {
+			filtered.SetIncluded(entry.Mapping())
 			if r := entry.RecursiveDataset(); r != nil {
-				recursiveRoot = r
+				filtered.SetParent(r)
 			}
 		}
 	}
-	return recursiveRoot, result, nil
+	return filtered, nil
 }
 
 func (self *DatasetFilter) UserSpecifiedDatasets() map[string]bool {

@@ -26,7 +26,7 @@ func NewItem(in config.DatasetFilter) (*filterItem, error) {
 type filterItem struct {
 	pattern   string
 	mapping   bool
-	recursive bool
+	recursive *bool
 
 	shellPattern bool
 	shellPath    *zfs.DatasetPath
@@ -47,10 +47,7 @@ func (self *filterItem) init() error {
 			self.pattern, err)
 	}
 
-	if self.recursive {
-		path.SetRecursive()
-	}
-	self.path = path
+	self.path = path.WithRecursive(self.Recursive())
 	return nil
 }
 
@@ -102,6 +99,13 @@ func (self *filterItem) DatasetPath() *zfs.DatasetPath { return self.path }
 
 func (self *filterItem) Mapping() bool { return self.mapping }
 
+func (self *filterItem) Recursive() bool {
+	if self.recursive != nil {
+		return *self.recursive
+	}
+	return !self.mapping
+}
+
 func (self *filterItem) Clone() *filterItem {
 	cloned := *self
 	return &cloned
@@ -116,7 +120,7 @@ func (self *filterItem) Match(p *zfs.DatasetPath) (bool, error) {
 				p.ToString(), self.pattern, err)
 		}
 		return matched, nil
-	case self.recursive:
+	case self.Recursive():
 		return p.HasPrefix(self.path), nil
 	}
 	return self.path.Equal(p), nil
@@ -130,16 +134,16 @@ func (self *filterItem) CompatCompare(b *filterItem) int {
 		return -1
 	case self.path == nil && b.path != nil:
 		return 1
-	case self.recursive && !b.recursive:
+	case self.Recursive() && !b.Recursive():
 		return -1
-	case !self.recursive && b.recursive:
+	case !self.Recursive() && b.Recursive():
 		return 1
 	}
 	return cmp.Compare(self.path.Length(), b.path.Length())
 }
 
 func (self *filterItem) RecursiveDataset() *zfs.DatasetPath {
-	if self.mapping && self.recursive {
+	if self.mapping && self.Recursive() {
 		if self.path != nil && !self.path.Empty() {
 			return self.path
 		}

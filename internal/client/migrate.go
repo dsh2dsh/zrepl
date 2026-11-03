@@ -190,7 +190,7 @@ func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, f
 		if conf == nil {
 			continue
 		}
-		pass, err := conf.FSF.Filter(fs)
+		pass, err := conf.FSF.Included(fs)
 		if err != nil {
 			return fmt.Errorf("filesystem filter error in job %q for fs %q: %w", job.Name(), fs.ToString(), err)
 		}
