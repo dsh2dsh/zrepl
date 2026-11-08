@@ -120,7 +120,7 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 				excluded = excluded[:0]
 			}
 
-			for _, p := range top.exclude {
+			for _, p := range top.ExcludedPaths() {
 				excluded = append(excluded, p.ToString())
 			}
 			assert.Equal(t, tt.excluded, excluded)

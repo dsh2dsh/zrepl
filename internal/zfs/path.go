@@ -226,3 +226,7 @@ func (self *DatasetPath) writeStringTo(sb *strings.Builder) {
 		sb.WriteString(s)
 	}
 }
+
+func (self *DatasetPath) ExcludedPaths() []*DatasetPath {
+	return self.exclude
+}
