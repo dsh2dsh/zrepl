@@ -364,6 +364,26 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 				"tank/data/1/2/3": "tank/data",
 			},
 		},
+		{
+			name: "self-exclude magic",
+			datasets: []config.DatasetFilter{
+				{Pattern: "tank/data", Recursive: new(true)},
+				{Pattern: "tank/data", Exclude: true},
+			},
+			topPaths: []string{"tank/data"},
+			checkPass: map[string]bool{
+				"tank/data":       false,
+				"tank/data/1":     true,
+				"tank/data/1/2":   true,
+				"tank/data/1/2/3": true,
+			},
+			recursiveRoot: map[string]string{
+				"tank/data":       "tank/data",
+				"tank/data/1":     "tank/data",
+				"tank/data/1/2":   "tank/data",
+				"tank/data/1/2/3": "tank/data",
+			},
+		},
 	}
 
 	for _, tt := range tests {

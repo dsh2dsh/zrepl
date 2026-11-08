@@ -46,8 +46,11 @@ type DatasetFilter struct {
 }
 
 func (self *DatasetFilter) AddList(in []config.DatasetFilter) error {
-	for i := range in {
-		entry, err := NewItem(in[i])
+	for i, item := range in {
+		if i != 0 {
+			applyAutoFixes(&item, in[i-1])
+		}
+		entry, err := NewItem(item)
 		if err != nil {
 			return err
 		}
