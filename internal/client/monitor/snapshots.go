@@ -14,9 +14,9 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 func NewSnapCheck(resp *monitoringplugin.Response) *SnapCheck {
@@ -157,7 +157,7 @@ func (self *SnapCheck) datasetsFromFilter(
 	ctx context.Context, ff config.FilesystemsFilter,
 	df []config.DatasetFilter,
 ) ([]*dataset.Path, error) {
-	filesystems, err := filters.NewFromConfig(ff, df)
+	filesystems, err := filter.NewFromConfig(ff, df)
 	if err != nil {
 		return nil, fmt.Errorf("invalid filesystems: %w", err)
 	}

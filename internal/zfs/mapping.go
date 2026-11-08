@@ -3,31 +3,14 @@ package zfs
 import (
 	"context"
 	"fmt"
-	"iter"
 	"slices"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
-type DatasetFilter interface {
-	Filtered(path *dataset.Path) (Filtered, error)
-	TopFilesystems() (int, iter.Seq[string])
-	UserSpecifiedDatasets() map[string]bool
-}
-
-type Filtered interface {
-	SetParent(*dataset.Path)
-	Parent() *dataset.Path
-
-	SetIncluded(bool)
-	Included() bool
-
-	SetRecursive(bool)
-	Recursive() bool
-}
-
-func ZFSListMapping(ctx context.Context, filter DatasetFilter,
+func ZFSListMapping(ctx context.Context, filter *filter.Filter,
 ) ([]*dataset.Path, error) {
 	props := []string{"name", "written"}
 	args := []string{"-r", "-t", "filesystem,volume"}
@@ -59,7 +42,7 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 	return filterDatasets(ctx, filter, v.([]*dataset.Path))
 }
 
-func filterDatasets(ctx context.Context, filter DatasetFilter,
+func filterDatasets(ctx context.Context, filter *filter.Filter,
 	all []*dataset.Path,
 ) ([]*dataset.Path, error) {
 	parents := newRecursiveDatasets()

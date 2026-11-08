@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 type SendingJobConfig interface {
@@ -16,7 +16,7 @@ type SendingJobConfig interface {
 }
 
 func buildSenderConfig(in SendingJobConfig, jobID endpoint.JobID) (*endpoint.SenderConfig, error) {
-	fsf, err := filters.NewFromConfig(in.GetFilesystems())
+	fsf, err := filter.NewFromConfig(in.GetFilesystems())
 	if err != nil {
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}

@@ -12,19 +12,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/pruner"
 	"github.com/dsh2dsh/zrepl/internal/daemon/snapper"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob,
 	err error,
 ) {
 	j = &SnapJob{pruneConcurrency: int(in.Pruning.Concurrency)}
-	fsf, err := filters.NewFromConfig(in.Filesystems, in.Datasets)
+	fsf, err := filter.NewFromConfig(in.Filesystems, in.Datasets)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build filesystem filter: %w", err)
 	}
@@ -54,7 +54,7 @@ func snapJobFromConfig(g *config.Global, in *config.SnapJob) (j *SnapJob,
 
 type SnapJob struct {
 	name     endpoint.JobID
-	fsfilter *filters.DatasetFilter
+	fsfilter *filter.Filter
 	snapper  snapper.Snapper
 
 	prunerFactory *pruner.LocalPrunerFactory

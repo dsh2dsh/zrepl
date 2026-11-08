@@ -17,7 +17,6 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/config/env"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/job/signal"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
@@ -25,9 +24,10 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
-func periodicFromConfig(fsf *filters.DatasetFilter,
+func periodicFromConfig(fsf *filter.Filter,
 	in *config.SnapshottingPeriodic,
 ) (*Periodic, error) {
 	if in.Prefix == "" {
@@ -81,7 +81,7 @@ func periodicFromConfig(fsf *filters.DatasetFilter,
 type periodicArgs struct {
 	ctx              context.Context
 	interval         time.Duration
-	fsf              *filters.DatasetFilter
+	fsf              *filter.Filter
 	planArgs         planArgs
 	writtenThreshold uint64
 }

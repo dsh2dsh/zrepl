@@ -5,29 +5,29 @@ import (
 	"fmt"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 type HookJobCallback func(ctx context.Context) error
 
 type CallbackHook struct {
 	cb            HookJobCallback
-	filter        *filters.DatasetFilter
+	filter        *filter.Filter
 	displayString string
 }
 
 func NewCallbackHookForFilesystem(displayString string, fs *dataset.Path,
 	cb HookJobCallback,
 ) *CallbackHook {
-	filter, _ := filters.NewFromConfig(nil, []config.DatasetFilter{
+	filter, _ := filter.NewFromConfig(nil, []config.DatasetFilter{
 		{Pattern: fs.ToString()},
 	})
 	return NewCallbackHook(displayString, cb, filter)
 }
 
 func NewCallbackHook(displayString string, cb HookJobCallback,
-	filter *filters.DatasetFilter,
+	filter *filter.Filter,
 ) *CallbackHook {
 	return &CallbackHook{
 		cb:            cb,

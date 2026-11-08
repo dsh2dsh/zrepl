@@ -18,17 +18,17 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 )
 
 type SenderConfig struct {
-	FSF   *filters.DatasetFilter
+	FSF   *filter.Filter
 	JobID JobID
 
 	ListPlaceholders bool
@@ -56,7 +56,7 @@ func (c *SenderConfig) Validate() error {
 
 // Sender implements replication.ReplicationEndpoint for a sending side
 type Sender struct {
-	FSFilter *filters.DatasetFilter
+	FSFilter *filter.Filter
 	jobId    JobID
 	config   SenderConfig
 

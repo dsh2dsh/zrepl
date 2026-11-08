@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 type Type string
@@ -81,7 +81,7 @@ func (self *Report) Snapshots() string {
 	return ""
 }
 
-func FromConfig(g *config.Global, fsf *filters.DatasetFilter,
+func FromConfig(g *config.Global, fsf *filter.Filter,
 	in config.SnapshottingEnum,
 ) (Snapper, error) {
 	switch v := in.Ret.(type) {

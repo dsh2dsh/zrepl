@@ -11,9 +11,9 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/cli"
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
 	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 var TestCmd = &cli.Subcommand{
@@ -68,7 +68,7 @@ func runTestFilterCmd(ctx context.Context, subcommand *cli.Subcommand, args []st
 		return fmt.Errorf("job type %T does not have filesystems filter", j)
 	}
 
-	f, err := filters.NewFromConfig(ff, df)
+	f, err := filter.NewFromConfig(ff, df)
 	if err != nil {
 		return fmt.Errorf("filter invalid: %w", err)
 	}

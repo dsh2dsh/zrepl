@@ -1,4 +1,4 @@
-package filters
+package filter
 
 import "github.com/dsh2dsh/zrepl/internal/config"
 

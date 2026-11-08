@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dsh2dsh/zrepl/internal/cli"
-	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
+	"github.com/dsh2dsh/zrepl/internal/zfs/filter"
 )
 
 var ZFSAbstractionsCmd = &cli.Subcommand{
@@ -115,7 +115,7 @@ func (flag *FilesystemsFilterFlag) Set(s string) error {
 		return nil
 	}
 
-	f := filters.New(len(mappings))
+	f := filter.New(len(mappings))
 	for _, m := range mappings {
 		thisMappingErr := fmt.Errorf("expecting comma-separated list of <dataset-pattern>:<ok|!> pairs, got %q", m)
 		lhsrhs := strings.SplitN(m, ":", 2)
@@ -141,7 +141,7 @@ func (flag FilesystemsFilterFlag) String() string {
 func (flag FilesystemsFilterFlag) FlagValue() endpoint.ListZFSHoldsAndBookmarksQueryFilesystemFilter {
 	var z FilesystemsFilterFlag
 	if flag == z {
-		f, err := filters.NoFilter()
+		f, err := filter.NoFilter()
 		if err != nil {
 			panic(err)
 		}
