@@ -1639,7 +1639,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion,
 	bm := FilesystemVersion{
 		Type:     Bookmark,
 		Name:     bookmark,
-		UserRefs: OptionUint64{Valid: false},
+		UserRefs: Optional[uint64]{Valid: false},
 		// bookmarks have the same createtxg, guid and creation as their origin
 		CreateTXG: v.CreateTXG,
 		Guid:      v.Guid,

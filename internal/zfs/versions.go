@@ -96,11 +96,11 @@ type FilesystemVersion struct {
 	Creation time.Time
 
 	// userrefs field (snapshots only)
-	UserRefs OptionUint64
+	UserRefs Optional[uint64]
 }
 
-type OptionUint64 struct {
-	Value uint64
+type Optional[T any] struct {
+	Value T
 	Valid bool
 }
 
@@ -211,7 +211,7 @@ func ParseFilesystemVersion(args *ParseFilesystemVersionArgs,
 				"expecting %q for bookmark property userrefs, got %q",
 				"-", args.userrefs)
 		}
-		v.UserRefs = OptionUint64{Valid: false}
+		v.UserRefs = Optional[uint64]{Valid: false}
 	case Snapshot:
 		if v.UserRefs.Value, err = strconv.ParseUint(args.userrefs, 10, 64); err != nil {
 			return v, fmt.Errorf("cannot parse userrefs %q: %w", args.userrefs, err)
