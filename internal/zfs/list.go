@@ -112,14 +112,14 @@ func listVersions(ctx context.Context, props []string, fs *DatasetPath,
 		if err != nil {
 			return nil, err
 		}
-		var args ParseFilesystemVersionArgs
-		v, err := args.
-			WithFullName(fields[0]).
-			WithGuid(fields[1]).
-			WithCreateTxg(fields[2]).
-			WithCreation(fields[3]).
-			WithUserRefs(fields[4]).
-			Parse()
+		v, err := parseFilesystemVersion(filesystemVersionArgs{
+			FullName:  fields[0],
+			Guid:      fields[1],
+			CreateTxg: fields[2],
+			Creation:  fields[3],
+			UserRefs:  fields[4],
+			Clones:    fields[5],
+		})
 		if err != nil {
 			return nil, err
 		}

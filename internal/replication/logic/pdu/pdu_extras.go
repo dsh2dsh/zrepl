@@ -50,6 +50,8 @@ func FilesystemVersionFromZFS(fsv *zfs.FilesystemVersion) *FilesystemVersion {
 		Guid:      fsv.Guid,
 		CreateTXG: fsv.CreateTXG,
 		Creation:  fsv.Creation.Format(time.RFC3339),
+		UserRefs:  fsv.UserRefs.Value,
+		Clones:    fsv.Clones,
 	}
 }
 

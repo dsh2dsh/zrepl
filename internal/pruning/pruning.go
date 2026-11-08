@@ -3,9 +3,11 @@ package pruning
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 )
 
 type KeepRule interface {
@@ -16,6 +18,7 @@ type Snapshot interface {
 	Name() string
 	Replicated() bool
 	Date() time.Time
+	Destroyable() error
 }
 
 func RulesFromConfig(in []config.PruningEnum) (rules []KeepRule, err error) {
@@ -59,8 +62,17 @@ func PruneSnapshots(ctx context.Context, snaps []Snapshot, keepRules []KeepRule,
 		}
 	}
 
+	l := logging.FromContext(ctx)
 	destroy := make([]Snapshot, 0, len(snaps))
+
 	for _, s := range snaps {
+		if err := s.Destroyable(); err != nil {
+			l.Info("skip prunning of undestroyable snapshot",
+				slog.String("name", s.Name()),
+				slog.Any("reason", err))
+			continue
+		}
+
 		if cnt, ok := remCount[s]; ok && cnt == len(keepRules) {
 			destroy = append(destroy, s)
 		}

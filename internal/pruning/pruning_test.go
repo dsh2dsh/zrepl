@@ -2,6 +2,7 @@ package pruning
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,11 +16,25 @@ type stubSnap struct {
 	date       time.Time
 }
 
+var _ Snapshot = (*stubSnap)(nil)
+
 func (s stubSnap) Name() string { return s.name }
 
 func (s stubSnap) Replicated() bool { return s.replicated }
 
 func (s stubSnap) Date() time.Time { return s.date }
+
+func (s stubSnap) Destroyable() error { return nil }
+
+type destroyable struct {
+	stubSnap
+
+	destroyable error
+}
+
+var _ Snapshot = (*destroyable)(nil)
+
+func (self *destroyable) Destroyable() error { return self.destroyable }
 
 type testCase struct {
 	inputs     []Snapshot
@@ -143,6 +158,16 @@ func TestPruneSnapshots(t *testing.T) {
 				"p1_a": true,
 				"p2_a": true,
 			},
+		},
+		"undestroyable": {
+			inputs: []Snapshot{
+				&destroyable{name: "foo_123"},
+				&destroyable{name: "foo_456"},
+				&destroyable{name: "bar_123", destroyable: errors.New("undestroyable")},
+				&destroyable{name: "bar_456"},
+			},
+			rules:      []KeepRule{MustKeepRegex("foo_", false)},
+			expDestroy: map[string]bool{"bar_456": true},
 		},
 	}
 

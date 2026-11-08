@@ -25,12 +25,8 @@ var (
 		Bookmark: true,
 		Snapshot: true,
 	}
-	Bookmarks = VersionTypeSet{
-		Bookmark: true,
-	}
-	Snapshots = VersionTypeSet{
-		Snapshot: true,
-	}
+	Bookmarks = VersionTypeSet{Bookmark: true}
+	Snapshots = VersionTypeSet{Snapshot: true}
 )
 
 func (s VersionTypeSet) zfsListTFlagRepr() string {
@@ -97,6 +93,8 @@ type FilesystemVersion struct {
 
 	// userrefs field (snapshots only)
 	UserRefs Optional[uint64]
+
+	Clones string
 }
 
 type Optional[T any] struct {
@@ -139,82 +137,53 @@ func (v FilesystemVersion) ToSendArgVersion() ZFSSendArgVersion {
 	}
 }
 
-type ParseFilesystemVersionArgs struct {
-	fullname  string
-	guid      string
-	createtxg string
-	creation  string
-	userrefs  string
+type filesystemVersionArgs struct {
+	FullName  string
+	Guid      string
+	CreateTxg string
+	Creation  string
+	UserRefs  string
+	Clones    string
 }
 
-func (self *ParseFilesystemVersionArgs) WithFullName(s string,
-) *ParseFilesystemVersionArgs {
-	self.fullname = s
-	return self
-}
-
-func (self *ParseFilesystemVersionArgs) WithGuid(s string,
-) *ParseFilesystemVersionArgs {
-	self.guid = s
-	return self
-}
-
-func (self *ParseFilesystemVersionArgs) WithCreateTxg(s string,
-) *ParseFilesystemVersionArgs {
-	self.createtxg = s
-	return self
-}
-
-func (self *ParseFilesystemVersionArgs) WithCreation(s string,
-) *ParseFilesystemVersionArgs {
-	self.creation = s
-	return self
-}
-
-func (self *ParseFilesystemVersionArgs) WithUserRefs(s string,
-) *ParseFilesystemVersionArgs {
-	self.userrefs = s
-	return self
-}
-
-func (self *ParseFilesystemVersionArgs) Parse() (FilesystemVersion, error) {
-	return ParseFilesystemVersion(self)
-}
-
-func ParseFilesystemVersion(args *ParseFilesystemVersionArgs,
+func parseFilesystemVersion(args filesystemVersionArgs,
 ) (v FilesystemVersion, err error) {
-	_, v.Type, v.Name, err = DecomposeVersionString(args.fullname)
+	_, v.Type, v.Name, err = DecomposeVersionString(args.FullName)
 	if err != nil {
 		return v, err
 	}
 
-	if v.Guid, err = strconv.ParseUint(args.guid, 10, 64); err != nil {
-		return v, fmt.Errorf("cannot parse GUID %q: %w", args.guid, err)
+	if v.Guid, err = strconv.ParseUint(args.Guid, 10, 64); err != nil {
+		return v, fmt.Errorf("cannot parse GUID %q: %w", args.Guid, err)
 	}
 
-	if v.CreateTXG, err = strconv.ParseUint(args.createtxg, 10, 64); err != nil {
-		return v, fmt.Errorf("cannot parse CreateTXG %q: %w", args.createtxg, err)
+	if v.CreateTXG, err = strconv.ParseUint(args.CreateTxg, 10, 64); err != nil {
+		return v, fmt.Errorf("cannot parse CreateTXG %q: %w", args.CreateTxg, err)
 	}
 
-	creationUnix, err := strconv.ParseInt(args.creation, 10, 64)
+	creationUnix, err := strconv.ParseInt(args.Creation, 10, 64)
 	if err != nil {
 		return v, fmt.Errorf("cannot parse creation date %q: %w",
-			args.creation, err)
+			args.Creation, err)
 	} else {
 		v.Creation = time.Unix(creationUnix, 0)
 	}
 
+	if args.Clones != "-" {
+		v.Clones = args.Clones
+	}
+
 	switch v.Type {
 	case Bookmark:
-		if args.userrefs != "-" {
+		if args.UserRefs != "-" {
 			return v, fmt.Errorf(
 				"expecting %q for bookmark property userrefs, got %q",
-				"-", args.userrefs)
+				"-", args.UserRefs)
 		}
 		v.UserRefs = Optional[uint64]{Valid: false}
 	case Snapshot:
-		if v.UserRefs.Value, err = strconv.ParseUint(args.userrefs, 10, 64); err != nil {
-			return v, fmt.Errorf("cannot parse userrefs %q: %w", args.userrefs, err)
+		if v.UserRefs.Value, err = strconv.ParseUint(args.UserRefs, 10, 64); err != nil {
+			return v, fmt.Errorf("cannot parse userrefs %q: %w", args.UserRefs, err)
 		}
 		v.UserRefs.Valid = true
 	default:
@@ -256,7 +225,15 @@ func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath,
 		prom.ZFSListFilesystemVersionDuration.WithLabelValues(fs.ToString()))
 	defer promTimer.ObserveDuration()
 
-	props := []string{"name", "guid", "createtxg", "creation", "userrefs"}
+	props := []string{
+		"name",
+		"guid",
+		"createtxg",
+		"creation",
+		"userrefs",
+		"clones",
+	}
+
 	cmd := NewListCmd(ctx, props, []string{
 		"-r", "-d", "1",
 		"-t", options.typesFlagArgs(),
@@ -287,16 +264,17 @@ func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath,
 func ZFSGetFilesystemVersion(ctx context.Context, ds string,
 ) (v FilesystemVersion, err error) {
 	props, err := zfsGet(ctx, ds,
-		[]string{"createtxg", "guid", "creation", "userrefs"}, SourceAny)
+		[]string{"createtxg", "guid", "creation", "userrefs", "clones"}, SourceAny)
 	if err != nil {
 		return v, err
 	}
-	var args ParseFilesystemVersionArgs
-	return args.
-		WithFullName(ds).
-		WithCreateTxg(props.Get("createtxg")).
-		WithGuid(props.Get("guid")).
-		WithCreation(props.Get("creation")).
-		WithUserRefs(props.Get("userrefs")).
-		Parse()
+
+	return parseFilesystemVersion(filesystemVersionArgs{
+		FullName:  ds,
+		Guid:      props.Get("guid"),
+		CreateTxg: props.Get("createtxg"),
+		Creation:  props.Get("creation"),
+		UserRefs:  props.Get("userrefs"),
+		Clones:    props.Get("clones"),
+	})
 }

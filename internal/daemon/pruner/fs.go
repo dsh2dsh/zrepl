@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/pruning"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
@@ -154,7 +155,8 @@ func (self *fs) Build(a *args, tfs *pdu.Filesystem, target Target,
 	}
 
 	// Apply prune rules
-	destroy := pruning.PruneSnapshots(ctx, self.snaps, a.rules)
+	destroy := pruning.PruneSnapshots(logging.WithLogger(ctx, l),
+		self.snaps, a.rules)
 	self.destroyCount = len(destroy)
 	self.destroyList = snapshotRanges(self.snaps, destroy)
 	return nil

@@ -70,6 +70,8 @@ type FilesystemVersion struct {
 	Guid      uint64                        `json:"Guid,omitempty"`
 	CreateTXG uint64                        `json:"CreateTXG,omitempty"`
 	Creation  string                        `json:"Creation,omitempty"` // RFC 3339
+	UserRefs  uint64                        `json:"UserRefs,omitempty"`
+	Clones    string                        `json:"Clones,omitempty"`
 }
 
 type FilesystemVersion_VersionType int32
