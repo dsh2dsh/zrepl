@@ -9,6 +9,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 const (
@@ -42,7 +43,7 @@ func New(size int) *DatasetFilter {
 
 type DatasetFilter struct {
 	entries     []*filterItem
-	parentPaths []*zfs.DatasetPath
+	parentPaths []*dataset.Path
 }
 
 func (self *DatasetFilter) AddList(in []config.DatasetFilter) error {
@@ -150,12 +151,12 @@ func (self *DatasetFilter) CompatSort() {
 	}
 }
 
-func (self *DatasetFilter) Included(p *zfs.DatasetPath) (bool, error) {
+func (self *DatasetFilter) Included(p *dataset.Path) (bool, error) {
 	filtered, err := self.Filtered(p)
 	return filtered.Included(), err
 }
 
-func (self *DatasetFilter) Filtered(p *zfs.DatasetPath) (zfs.Filtered,
+func (self *DatasetFilter) Filtered(p *dataset.Path) (zfs.Filtered,
 	error,
 ) {
 	filtered := new(filterResult)
@@ -188,7 +189,7 @@ func (self *DatasetFilter) UserSpecifiedDatasets() map[string]bool {
 
 func (self *DatasetFilter) Empty() bool { return len(self.entries) == 0 }
 
-func (self *DatasetFilter) SingleRecursiveDataset() *zfs.DatasetPath {
+func (self *DatasetFilter) SingleRecursiveDataset() *dataset.Path {
 	if len(self.entries) != 1 {
 		return nil
 	}

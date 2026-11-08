@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func NewItem(in config.DatasetFilter) (*filterItem, error) {
@@ -29,9 +29,9 @@ type filterItem struct {
 	recursive *bool
 
 	shellPattern bool
-	shellPath    *zfs.DatasetPath
+	shellPath    *dataset.Path
 
-	path *zfs.DatasetPath
+	path *dataset.Path
 }
 
 func (self *filterItem) init() error {
@@ -41,7 +41,7 @@ func (self *filterItem) init() error {
 		return nil
 	}
 
-	path, err := zfs.NewDatasetPath(self.pattern)
+	path, err := dataset.NewPath(self.pattern)
 	if err != nil {
 		return fmt.Errorf("pattern %q is not a dataset path: %w",
 			self.pattern, err)
@@ -61,7 +61,7 @@ func (self *filterItem) initShellPattern() error {
 		return nil
 	}
 
-	path, err := zfs.NewDatasetPath(base)
+	path, err := dataset.NewPath(base)
 	if err != nil {
 		return fmt.Errorf(
 			"failed extract dataset path %q from shell pattern %q: %w",
@@ -95,7 +95,7 @@ func (self *filterItem) SetShellPattern(pattern string) error {
 	return self.init()
 }
 
-func (self *filterItem) DatasetPath() *zfs.DatasetPath { return self.path }
+func (self *filterItem) DatasetPath() *dataset.Path { return self.path }
 
 func (self *filterItem) Mapping() bool { return self.mapping }
 
@@ -111,7 +111,7 @@ func (self *filterItem) Clone() *filterItem {
 	return &cloned
 }
 
-func (self *filterItem) Match(p *zfs.DatasetPath) (bool, error) {
+func (self *filterItem) Match(p *dataset.Path) (bool, error) {
 	switch {
 	case self.shellPattern:
 		matched, err := filepath.Match(self.pattern, p.ToString())
@@ -142,7 +142,7 @@ func (self *filterItem) CompatCompare(b *filterItem) int {
 	return cmp.Compare(self.path.Length(), b.path.Length())
 }
 
-func (self *filterItem) RecursiveDataset() *zfs.DatasetPath {
+func (self *filterItem) RecursiveDataset() *dataset.Path {
 	if self.mapping && self.Recursive() {
 		if self.path != nil && !self.path.Empty() {
 			return self.path
@@ -151,7 +151,7 @@ func (self *filterItem) RecursiveDataset() *zfs.DatasetPath {
 	return nil
 }
 
-func (self *filterItem) ParentFilesystem() *zfs.DatasetPath {
+func (self *filterItem) ParentFilesystem() *dataset.Path {
 	if !self.mapping {
 		return nil
 	}
@@ -167,7 +167,7 @@ func (self *filterItem) ParentFilesystem() *zfs.DatasetPath {
 	return path
 }
 
-func (self *filterItem) HasPrefix(prefix *zfs.DatasetPath) bool {
+func (self *filterItem) HasPrefix(prefix *dataset.Path) bool {
 	switch {
 	case self.shellPath != nil:
 		return self.shellPath.HasPrefix(prefix)

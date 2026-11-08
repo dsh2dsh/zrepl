@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type VersionType string
@@ -122,7 +124,7 @@ func FilesystemVersionEqualIdentity(a, b FilesystemVersion) bool {
 		a.Creation.Equal(b.Creation)
 }
 
-func (v FilesystemVersion) ToAbsPath(p *DatasetPath) string {
+func (v FilesystemVersion) ToAbsPath(p *dataset.Path) string {
 	return p.ToString() + v.Type.DelimiterChar() + v.Name
 }
 
@@ -218,7 +220,7 @@ func (o *ListFilesystemVersionsOptions) matches(v FilesystemVersion) bool {
 // ZFSListFilesystemVersions returns versions are sorted by createtxg.
 //
 // FIXME drop sort by createtxg requirement
-func ZFSListFilesystemVersions(ctx context.Context, fs *DatasetPath,
+func ZFSListFilesystemVersions(ctx context.Context, fs *dataset.Path,
 	options ListFilesystemVersionsOptions,
 ) ([]FilesystemVersion, error) {
 	promTimer := prometheus.NewTimer(

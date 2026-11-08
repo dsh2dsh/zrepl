@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 var stepHoldTagRE = regexp.MustCompile("^zrepl_STEP_J_(.+)")
@@ -61,7 +62,7 @@ func HoldStep(ctx context.Context, fs string, v zfs.FilesystemVersion, jobID Job
 
 var _ HoldExtractor = StepHoldExtractor
 
-func StepHoldExtractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion, holdTag string) Abstraction {
+func StepHoldExtractor(fs *dataset.Path, v zfs.FilesystemVersion, holdTag string) Abstraction {
 	if v.Type != zfs.Snapshot {
 		panic("impl error")
 	}

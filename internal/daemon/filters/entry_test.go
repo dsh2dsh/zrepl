@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func Test_shellBaseDir(t *testing.T) {
@@ -148,7 +148,7 @@ func Test_filterItem_HasPrefix(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, item)
 
-			prefixPath, err := zfs.NewDatasetPath(tt.prefix)
+			prefixPath, err := dataset.NewPath(tt.prefix)
 			require.NoError(t, err)
 			require.NotNil(t, prefixPath)
 

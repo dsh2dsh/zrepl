@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func TestRecursiveDatasets_Append(t *testing.T) {
@@ -68,7 +70,7 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 		},
 	}
 
-	root, err := NewDatasetPath(paths[0])
+	root, err := dataset.NewPath(paths[0])
 	require.NoError(t, err)
 	require.NotNil(t, root)
 	root.WithRecursive(true)
@@ -76,11 +78,11 @@ func TestRecursiveDatasets_Append(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			roots := newRecursiveDatasets()
-			datasets := make([]*DatasetPath, len(tt.paths))
+			datasets := make([]*dataset.Path, len(tt.paths))
 
 			var wantExcluded []string
 			for i, name := range tt.paths {
-				p, err := NewDatasetPath(name)
+				p, err := dataset.NewPath(name)
 				require.NoError(t, err)
 				require.NotNil(t, p)
 				datasets[i] = p

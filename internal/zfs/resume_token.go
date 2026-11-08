@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
@@ -149,12 +150,12 @@ func ParseResumeToken(ctx context.Context, token string) (*ResumeToken, error) {
 	return rt, nil
 }
 
-func (t *ResumeToken) ToNameSplit() (fs *DatasetPath, snapName string, err error) {
+func (t *ResumeToken) ToNameSplit() (fs *dataset.Path, snapName string, err error) {
 	comps := strings.SplitN(t.ToName, "@", 2)
 	if len(comps) != 2 {
 		return nil, "", fmt.Errorf("resume token field `toname` does not contain @: %q", t.ToName)
 	}
-	dp, err := NewDatasetPath(comps[0])
+	dp, err := dataset.NewPath(comps[0])
 	if err != nil {
 		return nil, "", fmt.Errorf("resume token field `toname` dataset path invalid: %w", err)
 	}

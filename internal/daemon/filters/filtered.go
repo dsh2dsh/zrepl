@@ -1,16 +1,16 @@
 package filters
 
-import "github.com/dsh2dsh/zrepl/internal/zfs"
+import "github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 
 type filterResult struct {
-	parent    *zfs.DatasetPath
+	parent    *dataset.Path
 	included  bool
 	recursive bool
 }
 
-func (self *filterResult) SetParent(p *zfs.DatasetPath) { self.parent = p }
+func (self *filterResult) SetParent(p *dataset.Path) { self.parent = p }
 
-func (self *filterResult) Parent() *zfs.DatasetPath { return self.parent }
+func (self *filterResult) Parent() *dataset.Path { return self.parent }
 
 func (self *filterResult) SetIncluded(included bool) {
 	self.included = included

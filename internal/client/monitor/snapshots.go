@@ -16,6 +16,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func NewSnapCheck(resp *monitoringplugin.Response) *SnapCheck {
@@ -42,8 +43,8 @@ type SnapCheck struct {
 	snapName  string
 	failed    bool
 
-	datasets        map[*zfs.DatasetPath][]zfs.FilesystemVersion
-	orderedDatasets []*zfs.DatasetPath
+	datasets        map[*dataset.Path][]zfs.FilesystemVersion
+	orderedDatasets []*dataset.Path
 	maxProcs        int
 }
 
@@ -124,7 +125,7 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 		return err
 	}
 
-	var datasets []*zfs.DatasetPath
+	var datasets []*dataset.Path
 	switch j := jobConfig.Ret.(type) {
 	case *config.PushJob:
 		datasets, err = self.datasetsFromFilter(ctx, j.Filesystems, j.Datasets)
@@ -143,11 +144,11 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 		return err
 	}
 
-	slices.SortFunc(datasets, func(a, b *zfs.DatasetPath) int {
+	slices.SortFunc(datasets, func(a, b *dataset.Path) int {
 		return strings.Compare(a.ToString(), b.ToString())
 	})
 	self.orderedDatasets = datasets
-	self.datasets = make(map[*zfs.DatasetPath][]zfs.FilesystemVersion,
+	self.datasets = make(map[*dataset.Path][]zfs.FilesystemVersion,
 		len(datasets))
 	return self.preloadSnapshots(ctx)
 }
@@ -155,17 +156,17 @@ func (self *SnapCheck) jobDatasets(ctx context.Context,
 func (self *SnapCheck) datasetsFromFilter(
 	ctx context.Context, ff config.FilesystemsFilter,
 	df []config.DatasetFilter,
-) ([]*zfs.DatasetPath, error) {
+) ([]*dataset.Path, error) {
 	filesystems, err := filters.NewFromConfig(ff, df)
 	if err != nil {
 		return nil, fmt.Errorf("invalid filesystems: %w", err)
 	}
 
-	filtered := []*zfs.DatasetPath{}
+	filtered := []*dataset.Path{}
 	for fields, err := range zfs.ZFSListIter(ctx, []string{"name"}, nil) {
 		if err != nil {
 			return nil, err
-		} else if path, err := zfs.NewDatasetPath(fields[0]); err != nil {
+		} else if path, err := dataset.NewPath(fields[0]); err != nil {
 			return nil, err
 		} else if ok, err := filesystems.Included(path); err != nil {
 			return nil, err
@@ -178,8 +179,8 @@ func (self *SnapCheck) datasetsFromFilter(
 
 func (self *SnapCheck) datasetsFromRootFs(
 	ctx context.Context, rootFs string, skipN int,
-) ([]*zfs.DatasetPath, error) {
-	rootPath, err := zfs.NewDatasetPath(rootFs)
+) ([]*dataset.Path, error) {
+	rootPath, err := dataset.NewPath(rootFs)
 	if err != nil {
 		return nil, err
 	}
@@ -191,9 +192,9 @@ func (self *SnapCheck) datasetsFromRootFs(
 		return nil, fmt.Errorf("properties of %q: %w", rootFs, err)
 	}
 
-	filtered := make([]*zfs.DatasetPath, 0, len(propsByFS))
+	filtered := make([]*dataset.Path, 0, len(propsByFS))
 	for fs, props := range propsByFS {
-		path, err := zfs.NewDatasetPath(fs)
+		path, err := dataset.NewPath(fs)
 		if err != nil {
 			return nil, err
 		} else if path.Length() < rootPath.Length()+1+skipN {
@@ -232,7 +233,7 @@ func (self *SnapCheck) preloadSnapshots(ctx context.Context,
 	return g.Wait() //nolint:wrapcheck // our error
 }
 
-func zfsListSnapshots(ctx context.Context, fs *zfs.DatasetPath,
+func zfsListSnapshots(ctx context.Context, fs *dataset.Path,
 ) ([]zfs.FilesystemVersion, error) {
 	snaps, err := zfs.ZFSListFilesystemVersions(ctx, fs,
 		zfs.ListFilesystemVersionsOptions{Types: zfs.Snapshots})
@@ -282,7 +283,7 @@ func (self *SnapCheck) overrideCountRules(j *config.JobEnum,
 }
 
 func (self *SnapCheck) checkSnapsCounts(ctx context.Context,
-	path *zfs.DatasetPath, rules []*CountRule,
+	path *dataset.Path, rules []*CountRule,
 ) error {
 	snapshots, err := self.snapshots(ctx, path)
 	if err != nil {
@@ -303,7 +304,7 @@ func (self *SnapCheck) checkSnapsCounts(ctx context.Context,
 	return nil
 }
 
-func (self *SnapCheck) snapshots(ctx context.Context, path *zfs.DatasetPath,
+func (self *SnapCheck) snapshots(ctx context.Context, path *dataset.Path,
 ) ([]zfs.FilesystemVersion, error) {
 	if snaps, ok := self.datasets[path]; ok {
 		return snaps, nil
@@ -352,7 +353,7 @@ func (self *groupItem) Snapshot(oldest bool) *zfs.FilesystemVersion {
 	return self.Latest
 }
 
-func (self *SnapCheck) applyCountRule(rule *CountRule, path *zfs.DatasetPath,
+func (self *SnapCheck) applyCountRule(rule *CountRule, path *dataset.Path,
 	g *groupItem,
 ) bool {
 	if skip, err := rule.Skip(path); err != nil {
@@ -435,7 +436,7 @@ func (self *SnapCheck) rulesByCreation(j *config.JobEnum,
 }
 
 func (self *SnapCheck) checkSnapsCreation(ctx context.Context,
-	path *zfs.DatasetPath, rules []*AgeRule,
+	path *dataset.Path, rules []*AgeRule,
 ) error {
 	snapshots, err := self.snapshots(ctx, path)
 	if err != nil {
@@ -458,7 +459,7 @@ func (self *SnapCheck) checkSnapsCreation(ctx context.Context,
 }
 
 func (self *SnapCheck) applyCreationRule(rule *AgeRule,
-	snap *zfs.FilesystemVersion, path *zfs.DatasetPath,
+	snap *zfs.FilesystemVersion, path *dataset.Path,
 ) bool {
 	if skip, err := rule.Skip(path); err != nil {
 		self.resp.UpdateStatus(monitoringplugin.UNKNOWN, fmt.Sprintf(

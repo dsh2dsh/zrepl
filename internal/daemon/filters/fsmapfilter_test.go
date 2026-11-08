@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func TestDatasetFilter_Filter_filesystems(t *testing.T) {
@@ -149,7 +149,7 @@ func TestDatasetFilter_Filter_filesystems(t *testing.T) {
 			assert.Equal(t, tt.topPaths, topPaths)
 
 			for p, checkPass := range tt.checkPass {
-				zp, err := zfs.NewDatasetPath(p)
+				zp, err := dataset.NewPath(p)
 				require.NoError(t, err)
 				require.NotNil(t, zp)
 
@@ -191,7 +191,7 @@ func TestNoFilter(t *testing.T) {
 
 	for _, s := range tests {
 		t.Run(s, func(t *testing.T) {
-			path, err := zfs.NewDatasetPath(s)
+			path, err := dataset.NewPath(s)
 			require.NoError(t, err)
 			require.NotNil(t, path)
 
@@ -393,7 +393,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 			require.NotNil(t, f)
 
 			for p, checkPass := range tt.checkPass {
-				zp, err := zfs.NewDatasetPath(p)
+				zp, err := dataset.NewPath(p)
 				require.NoError(t, err)
 				require.NotNil(t, zp)
 

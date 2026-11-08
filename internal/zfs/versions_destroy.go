@@ -8,10 +8,12 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
-func ZFSDestroyFilesystemVersion(ctx context.Context, filesystem *DatasetPath,
-	version *FilesystemVersion,
+func ZFSDestroyFilesystemVersion(ctx context.Context,
+	filesystem *dataset.Path, version *FilesystemVersion,
 ) error {
 	fullName := version.ToAbsPath(filesystem)
 	// Sanity check...

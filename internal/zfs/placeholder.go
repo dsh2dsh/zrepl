@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
@@ -33,14 +34,14 @@ const (
 //
 // We `zfs get` nowadays, which returns the property source, making the hash value no longer
 // necessary. However, we want to keep legacy compatibility.
-func computeLegacyHashBasedPlaceholderPropertyValue(p *DatasetPath) string {
+func computeLegacyHashBasedPlaceholderPropertyValue(p *dataset.Path) string {
 	ps := []byte(p.ToString())
 	sum := sha512.Sum512_256(ps)
 	return hex.EncodeToString(sum[:])
 }
 
 // the caller asserts that placeholderPropertyValue is sourceLocal
-func isLocalPlaceholderPropertyValuePlaceholder(p *DatasetPath,
+func isLocalPlaceholderPropertyValuePlaceholder(p *dataset.Path,
 	placeholderPropertyValue string,
 ) (isPlaceholder bool) {
 	legacy := computeLegacyHashBasedPlaceholderPropertyValue(p)
@@ -54,7 +55,7 @@ func isLocalPlaceholderPropertyValuePlaceholder(p *DatasetPath,
 	}
 }
 
-func NewPlaceholderState(p *DatasetPath, props *ZFSProperties,
+func NewPlaceholderState(p *dataset.Path, props *ZFSProperties,
 ) *FilesystemPlaceholderState {
 	details := props.GetDetails(PlaceholderPropertyName)
 	rawValue := details.Value
@@ -82,7 +83,7 @@ type FilesystemPlaceholderState struct {
 // `local` for the returned value to be valid.
 //
 // For nonexistent FS, err == nil and state.FSExists == false
-func ZFSGetFilesystemPlaceholderState(ctx context.Context, p *DatasetPath,
+func ZFSGetFilesystemPlaceholderState(ctx context.Context, p *dataset.Path,
 ) (*FilesystemPlaceholderState, error) {
 	props, err := zfsGet(ctx, p.ToString(),
 		[]string{PlaceholderPropertyName}, SourceLocal)
@@ -103,8 +104,8 @@ const (
 	FilesystemPlaceholderCreateEncryptionOff
 )
 
-func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *DatasetPath,
-	parent *DatasetPath, encryption FilesystemPlaceholderCreateEncryptionValue,
+func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *dataset.Path,
+	parent *dataset.Path, encryption FilesystemPlaceholderCreateEncryptionValue,
 ) error {
 	if fs.Length() == 1 {
 		return fmt.Errorf(
@@ -136,7 +137,7 @@ func ZFSCreatePlaceholderFilesystem(ctx context.Context, fs *DatasetPath,
 	return nil
 }
 
-func ZFSSetPlaceholder(ctx context.Context, p *DatasetPath, isPlaceholder bool) error {
+func ZFSSetPlaceholder(ctx context.Context, p *dataset.Path, isPlaceholder bool) error {
 	prop := placeholderPropertyOff
 	if isPlaceholder {
 		prop = placeholderPropertyOn
@@ -151,7 +152,7 @@ type MigrateHashBasedPlaceholderReport struct {
 }
 
 // fs must exist, will panic otherwise
-func ZFSMigrateHashBasedPlaceholderToCurrent(ctx context.Context, fs *DatasetPath, dryRun bool) (*MigrateHashBasedPlaceholderReport, error) {
+func ZFSMigrateHashBasedPlaceholderToCurrent(ctx context.Context, fs *dataset.Path, dryRun bool) (*MigrateHashBasedPlaceholderReport, error) {
 	st, err := ZFSGetFilesystemPlaceholderState(ctx, fs)
 	if err != nil {
 		return nil, fmt.Errorf("error getting placeholder state: %w", err)

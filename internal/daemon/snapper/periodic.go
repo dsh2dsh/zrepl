@@ -24,6 +24,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/nanosleep"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func periodicFromConfig(fsf *filters.DatasetFilter,
@@ -242,7 +243,7 @@ func periodicStatePlan(a periodicArgs, u updater) state {
 
 	if a.writtenThreshold != 0 {
 		log := getLogger(a.ctx)
-		fss = slices.DeleteFunc(fss, func(p *zfs.DatasetPath) bool {
+		fss = slices.DeleteFunc(fss, func(p *dataset.Path) bool {
 			if p.Written() < a.writtenThreshold {
 				log.Info("skip snapshotting, because 'written' below threshold",
 					slog.String("fs", p.ToString()),
@@ -281,8 +282,8 @@ func periodicStateSnapshot(a periodicArgs, u updater) state {
 }
 
 // see docs/snapshotting.rst
-func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
-	interval time.Duration,
+func findSyncPoint(ctx context.Context, fss []*dataset.Path,
+	prefix string, interval time.Duration,
 ) (syncPoint time.Time, err error) {
 	const (
 		prioHasVersions int = iota
@@ -290,7 +291,7 @@ func findSyncPoint(ctx context.Context, fss []*zfs.DatasetPath, prefix string,
 	)
 
 	type snapTime struct {
-		ds   *zfs.DatasetPath
+		ds   *dataset.Path
 		prio int // lower is higher
 		time time.Time
 	}
@@ -366,7 +367,7 @@ var findSyncPointFSNoFilesystemVersionsErr = errors.New(
 	"no filesystem versions")
 
 func findSyncPointFSNextOptimalSnapshotTime(ctx context.Context, now time.Time,
-	interval time.Duration, prefix string, d *zfs.DatasetPath,
+	interval time.Duration, prefix string, d *dataset.Path,
 ) (time.Time, error) {
 	fsvs, err := zfs.ZFSListFilesystemVersions(ctx, d,
 		zfs.ListFilesystemVersionsOptions{

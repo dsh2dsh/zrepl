@@ -7,7 +7,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type SendingJobConfig interface {
@@ -56,7 +56,7 @@ type ReceivingJobConfig interface {
 
 func buildReceiverConfig(in ReceivingJobConfig, jobID endpoint.JobID,
 ) (rc endpoint.ReceiverConfig, err error) {
-	rootFs, err := zfs.NewDatasetPath(in.GetRootFS())
+	rootFs, err := dataset.NewPath(in.GetRootFS())
 	if err != nil {
 		return rc, errors.New("root_fs is not a valid zfs filesystem path")
 	} else if rootFs.Length() <= 0 {

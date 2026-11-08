@@ -15,6 +15,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/config/env"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type AbstractionType string
@@ -186,7 +187,7 @@ func (s AbstractionTypeSet) Validate() error {
 // Abstraction types in this set that don't have a bookmark extractor are skipped.
 //
 // Panics if more than one abstraction type matches.
-func (s AbstractionTypeSet) ExtractBookmark(dp *zfs.DatasetPath, v *zfs.FilesystemVersion) Abstraction {
+func (s AbstractionTypeSet) ExtractBookmark(dp *dataset.Path, v *zfs.FilesystemVersion) Abstraction {
 	matched := make(AbstractionTypeSet, 1)
 	var matchedAbs Abstraction
 	for absType := range s {
@@ -212,7 +213,7 @@ func (s AbstractionTypeSet) ExtractBookmark(dp *zfs.DatasetPath, v *zfs.Filesyst
 	panic(fmt.Sprintf("abstraction types extractors should not overlap: %s", matched))
 }
 
-type BookmarkExtractor func(fs *zfs.DatasetPath, v zfs.FilesystemVersion) Abstraction
+type BookmarkExtractor func(fs *dataset.Path, v zfs.FilesystemVersion) Abstraction
 
 // returns nil if the abstraction type is not bookmark-based
 func (t AbstractionType) BookmarkExtractor() BookmarkExtractor {
@@ -232,7 +233,7 @@ func (t AbstractionType) BookmarkExtractor() BookmarkExtractor {
 	}
 }
 
-type HoldExtractor = func(fs *zfs.DatasetPath, v zfs.FilesystemVersion, tag string) Abstraction
+type HoldExtractor = func(fs *dataset.Path, v zfs.FilesystemVersion, tag string) Abstraction
 
 // returns nil if the abstraction type is not hold-based
 func (t AbstractionType) HoldExtractor() HoldExtractor {
@@ -637,7 +638,7 @@ func ListAbstractionsStreamed(ctx context.Context,
 }
 
 func listAbstractionsImplFS(ctx context.Context, fs string, query *ListZFSHoldsAndBookmarksQuery, emitCandidate putListAbstraction, errCb putListAbstractionErr) {
-	fsp, err := zfs.NewDatasetPath(fs)
+	fsp, err := dataset.NewPath(fs)
 	if err != nil {
 		panic(err)
 	}

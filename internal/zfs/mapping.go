@@ -6,18 +6,19 @@ import (
 	"iter"
 	"slices"
 
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
 type DatasetFilter interface {
-	Filtered(path *DatasetPath) (Filtered, error)
+	Filtered(path *dataset.Path) (Filtered, error)
 	TopFilesystems() (int, iter.Seq[string])
 	UserSpecifiedDatasets() map[string]bool
 }
 
 type Filtered interface {
-	SetParent(*DatasetPath)
-	Parent() *DatasetPath
+	SetParent(*dataset.Path)
+	Parent() *dataset.Path
 
 	SetIncluded(bool)
 	Included() bool
@@ -27,7 +28,7 @@ type Filtered interface {
 }
 
 func ZFSListMapping(ctx context.Context, filter DatasetFilter,
-) ([]*DatasetPath, error) {
+) ([]*dataset.Path, error) {
 	props := []string{"name", "written"}
 	args := []string{"-r", "-t", "filesystem,volume"}
 	n, pfs := filter.TopFilesystems()
@@ -37,12 +38,13 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 	cmd := NewListCmd(ctx, props, args)
 
 	v, err, _ := sg.Do(cmd.String(), func() (any, error) {
-		datasets := []*DatasetPath{}
+		datasets := []*dataset.Path{}
 		for fields, err := range ListIter(ctx, props, nil, cmd) {
 			if err != nil {
 				return nil, err
 			}
-			path, err := NewDatasetPath(fields[0], WithWritten(fields[1]))
+			path, err := dataset.NewPath(fields[0],
+				dataset.WithWritten(fields[1]))
 			if err != nil {
 				return nil, err
 			}
@@ -54,16 +56,16 @@ func ZFSListMapping(ctx context.Context, filter DatasetFilter,
 	if err != nil {
 		return nil, err //nolint:wrapcheck // already wrapped
 	}
-	return filterDatasets(ctx, filter, v.([]*DatasetPath))
+	return filterDatasets(ctx, filter, v.([]*dataset.Path))
 }
 
 func filterDatasets(ctx context.Context, filter DatasetFilter,
-	all []*DatasetPath,
-) ([]*DatasetPath, error) {
+	all []*dataset.Path,
+) ([]*dataset.Path, error) {
 	parents := newRecursiveDatasets()
 	unmatched := filter.UserSpecifiedDatasets()
 
-	datasets := []*DatasetPath{}
+	datasets := []*dataset.Path{}
 	for _, path := range all {
 		filtered, err := filter.Filtered(path)
 		if err != nil {
@@ -88,14 +90,14 @@ func filterDatasets(ctx context.Context, filter DatasetFilter,
 // --------------------------------------------------
 
 type recursiveDatasets struct {
-	parents map[*DatasetPath]*DatasetPath
+	parents map[*dataset.Path]*dataset.Path
 }
 
 func newRecursiveDatasets() recursiveDatasets {
-	return recursiveDatasets{parents: make(map[*DatasetPath]*DatasetPath)}
+	return recursiveDatasets{parents: make(map[*dataset.Path]*dataset.Path)}
 }
 
-func (self *recursiveDatasets) Add(root, path *DatasetPath, included bool) {
+func (self *recursiveDatasets) Add(root, path *dataset.Path, included bool) {
 	if root == nil || !root.Recursive() {
 		return
 	}

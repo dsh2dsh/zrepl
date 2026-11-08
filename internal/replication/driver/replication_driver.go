@@ -18,7 +18,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/report"
 	"github.com/dsh2dsh/zrepl/internal/util/chainlock"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type interval struct {
@@ -431,8 +431,8 @@ func (a *attempt) doGlobalPlanning(ctx context.Context, prev *attempt,
 
 	// build up parent-child relationship (FIXME (O(n^2), but who's going to have
 	// that many filesystems...))
-	mustDatasetPathOrPlanFail := func(fs string) *zfs.DatasetPath {
-		dp, err := zfs.NewDatasetPath(fs)
+	mustDatasetPathOrPlanFail := func(fs string) *dataset.Path {
+		dp, err := dataset.NewPath(fs)
 		if err != nil {
 			now := time.Now()
 			a.planErr = newTimedError(fmt.Errorf("%q: %w", fs, err), now)

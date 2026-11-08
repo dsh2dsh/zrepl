@@ -15,6 +15,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type planArgs struct {
@@ -27,12 +28,12 @@ type planArgs struct {
 
 type plan struct {
 	args  planArgs
-	snaps map[*zfs.DatasetPath]*progress
+	snaps map[*dataset.Path]*progress
 
 	hookMatchCount map[hooks.Hook]int
 }
 
-func makePlan(args planArgs, fss []*zfs.DatasetPath) *plan {
+func makePlan(args planArgs, fss []*dataset.Path) *plan {
 	p := &plan{args: args}
 	return p.init(fss)
 }
@@ -60,7 +61,7 @@ func (self SnapState) String() string {
 	return "SnapState(" + strconv.FormatInt(int64(self), 10) + ")"
 }
 
-func (self *plan) init(paths []*zfs.DatasetPath) *plan {
+func (self *plan) init(paths []*dataset.Path) *plan {
 	self.makeHooksCount()
 	self.makeSnapsProgress(paths)
 	return self
@@ -73,8 +74,8 @@ func (self *plan) makeHooksCount() {
 	}
 }
 
-func (self *plan) makeSnapsProgress(paths []*zfs.DatasetPath) {
-	self.snaps = make(map[*zfs.DatasetPath]*progress, 1)
+func (self *plan) makeSnapsProgress(paths []*dataset.Path) {
+	self.snaps = make(map[*dataset.Path]*progress, 1)
 	for _, fs := range paths {
 		parent := fs.RecursiveParent()
 		if parent == nil || parent.HasExcluded() {
@@ -138,7 +139,7 @@ func (self *plan) execute(ctx context.Context, dryRun bool) bool {
 	return !anyFsHadErr
 }
 
-func (self *plan) hookPlan(ctx context.Context, fs *zfs.DatasetPath,
+func (self *plan) hookPlan(ctx context.Context, fs *dataset.Path,
 	snapName string,
 ) *hooks.Plan {
 	filteredHooks, err := self.args.hooks.CopyFilteredForFilesystem(fs)
@@ -166,7 +167,8 @@ func (self *plan) hookPlan(ctx context.Context, fs *zfs.DatasetPath,
 	return hookPlan
 }
 
-func createSnapshot(ctx context.Context, fs *zfs.DatasetPath, snapName string,
+func createSnapshot(ctx context.Context, fs *dataset.Path,
+	snapName string,
 ) error {
 	l := getLogger(ctx)
 	l.Debug("create snapshot")

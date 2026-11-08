@@ -3,7 +3,7 @@ package monitor
 import (
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func CountRulesFromConfig(in []config.MonitorCount) ([]*CountRule, error) {
@@ -40,7 +40,7 @@ func (self *CountRule) init() (*CountRule, error) {
 	return self, nil
 }
 
-func (self *CountRule) Skip(path *zfs.DatasetPath) (bool, error) {
+func (self *CountRule) Skip(path *dataset.Path) (bool, error) {
 	if self.skip != nil {
 		return self.skip.Included(path)
 	}
@@ -83,7 +83,7 @@ func (self *AgeRule) init() (*AgeRule, error) {
 	return self, nil
 }
 
-func (self *AgeRule) Skip(path *zfs.DatasetPath) (bool, error) {
+func (self *AgeRule) Skip(path *dataset.Path) (bool, error) {
 	if self.skip != nil {
 		return self.skip.Included(path)
 	}

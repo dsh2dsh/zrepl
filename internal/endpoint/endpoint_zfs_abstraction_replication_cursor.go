@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 const replicationCursorBookmarkNamePrefix = "zrepl_CURSOR"
@@ -74,7 +75,7 @@ func ParseTentativeReplicationCursorBookmarkName(fullname string) (guid uint64, 
 
 // may return nil for both values, indicating there is no cursor
 func GetMostRecentReplicationCursorOfJob(ctx context.Context, fs string, jobID JobID) (*zfs.FilesystemVersion, error) {
-	fsp, err := zfs.NewDatasetPath(fs)
+	fsp, err := dataset.NewPath(fs)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +92,7 @@ func GetMostRecentReplicationCursorOfJob(ctx context.Context, fs string, jobID J
 	return &mostRecent, nil
 }
 
-func GetReplicationCursors(ctx context.Context, dp *zfs.DatasetPath, jobID JobID) ([]zfs.FilesystemVersion, error) {
+func GetReplicationCursors(ctx context.Context, dp *dataset.Path, jobID JobID) ([]zfs.FilesystemVersion, error) {
 	fs := dp.ToString()
 	q := ListZFSHoldsAndBookmarksQuery{
 		FS: ListZFSHoldsAndBookmarksQueryFilesystemFilter{FS: &fs},
@@ -176,7 +177,7 @@ func createBookmarkAbstraction(ctx context.Context, abstractionType AbstractionT
 	}, nil
 }
 
-func ReplicationCursorV2Extractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion) (_ Abstraction) {
+func ReplicationCursorV2Extractor(fs *dataset.Path, v zfs.FilesystemVersion) (_ Abstraction) {
 	if v.Type != zfs.Bookmark {
 		panic("impl error")
 	}
@@ -197,7 +198,7 @@ func ReplicationCursorV2Extractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion) 
 	return nil
 }
 
-func ReplicationCursorV1Extractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion) (_ Abstraction) {
+func ReplicationCursorV1Extractor(fs *dataset.Path, v zfs.FilesystemVersion) (_ Abstraction) {
 	if v.Type != zfs.Bookmark {
 		panic("impl error")
 	}
@@ -215,7 +216,7 @@ func ReplicationCursorV1Extractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion) 
 
 var _ BookmarkExtractor = TentativeReplicationCursorExtractor
 
-func TentativeReplicationCursorExtractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion) (_ Abstraction) {
+func TentativeReplicationCursorExtractor(fs *dataset.Path, v zfs.FilesystemVersion) (_ Abstraction) {
 	if v.Type != zfs.Bookmark {
 		panic("impl error")
 	}

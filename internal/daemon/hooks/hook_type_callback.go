@@ -6,7 +6,7 @@ import (
 
 	"github.com/dsh2dsh/zrepl/internal/config"
 	"github.com/dsh2dsh/zrepl/internal/daemon/filters"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type HookJobCallback func(ctx context.Context) error
@@ -17,7 +17,7 @@ type CallbackHook struct {
 	displayString string
 }
 
-func NewCallbackHookForFilesystem(displayString string, fs *zfs.DatasetPath,
+func NewCallbackHookForFilesystem(displayString string, fs *dataset.Path,
 	cb HookJobCallback,
 ) *CallbackHook {
 	filter, _ := filters.NewFromConfig(nil, []config.DatasetFilter{

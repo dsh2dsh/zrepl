@@ -16,7 +16,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/hooks"
 	"github.com/dsh2dsh/zrepl/internal/daemon/logging"
 	"github.com/dsh2dsh/zrepl/internal/logger"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 type (
@@ -391,7 +391,7 @@ jobs:
 	}
 
 	var c *config.Config
-	fs, err := zfs.NewDatasetPath(testFSName)
+	fs, err := dataset.NewPath(testFSName)
 	require.NoError(t, err)
 
 	log := logger.NewTestLogger()

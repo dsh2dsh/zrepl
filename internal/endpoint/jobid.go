@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 // JobID instances returned by MakeJobID() guarantee their JobID.String()
@@ -38,7 +39,7 @@ func MakeJobID(s string) (JobID, error) {
 
 	// FIXME replication cursor bookmark name
 
-	_, err := zfs.NewDatasetPath(s)
+	_, err := dataset.NewPath(s)
 	if err != nil {
 		return JobID{}, fmt.Errorf("must be usable in a ZFS dataset path: %w", err)
 	}

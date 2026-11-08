@@ -10,6 +10,7 @@ import (
 	"iter"
 	"strings"
 
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
 
@@ -21,7 +22,7 @@ func NewListCmd(ctx context.Context, props, zfsArgs []string) *zfscmd.Cmd {
 }
 
 func ListIter(ctx context.Context, properties []string,
-	notExistHint *DatasetPath, cmd *zfscmd.Cmd,
+	notExistHint *dataset.Path, cmd *zfscmd.Cmd,
 ) iter.Seq2[[]string, error] {
 	cmd.WithLogError(false)
 	var stderrBuf bytes.Buffer
@@ -103,7 +104,7 @@ func maybeDatasetNotExists(cmd *zfscmd.Cmd, path string, err error) error {
 	return err
 }
 
-func listVersions(ctx context.Context, props []string, fs *DatasetPath,
+func listVersions(ctx context.Context, props []string, fs *dataset.Path,
 	cmd *zfscmd.Cmd,
 ) ([]FilesystemVersion, error) {
 	snaps := []FilesystemVersion{}

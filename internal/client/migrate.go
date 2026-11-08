@@ -11,6 +11,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/daemon/job"
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 
 	"github.com/dsh2dsh/zrepl/internal/cli"
 	"github.com/dsh2dsh/zrepl/internal/config"
@@ -59,8 +60,8 @@ func doMigratePlaceholder0_1(ctx context.Context, sc *cli.Subcommand, args []str
 
 	type workItem struct {
 		jobName string
-		rootFS  *zfs.DatasetPath
-		fss     []*zfs.DatasetPath
+		rootFS  *dataset.Path
+		fss     []*dataset.Path
 	}
 	var wis []workItem
 	for i, j := range cfg.Jobs {
@@ -74,11 +75,11 @@ func doMigratePlaceholder0_1(ctx context.Context, sc *cli.Subcommand, args []str
 			fmt.Printf("ignoring job %q (%d/%d, type %T)\n", j.Name(), i, len(cfg.Jobs), j.Ret)
 			continue
 		}
-		rfs, err := zfs.NewDatasetPath(rfsS)
+		rfs, err := dataset.NewPath(rfsS)
 		if err != nil {
 			return fmt.Errorf("root fs for job %q is not a valid dataset path: %w", j.Name(), err)
 		}
-		var fss []*zfs.DatasetPath
+		var fss []*dataset.Path
 		for _, fs := range allFSS {
 			if fs.HasPrefix(rfs) {
 				fss = append(fss, fs)
@@ -183,7 +184,7 @@ func doMigrateReplicationCursor(ctx context.Context, sc *cli.Subcommand, args []
 	return nil
 }
 
-func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, fs *zfs.DatasetPath) error {
+func doMigrateReplicationCursorFS(ctx context.Context, v1CursorJobs []job.Job, fs *dataset.Path) error {
 	var owningJob job.Job = nil
 	for _, job := range v1CursorJobs {
 		conf := job.SenderConfig()

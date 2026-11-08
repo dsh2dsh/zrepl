@@ -14,7 +14,7 @@ import (
 	"github.com/dsh2dsh/zrepl/internal/endpoint"
 	"github.com/dsh2dsh/zrepl/internal/logger"
 	"github.com/dsh2dsh/zrepl/internal/replication/logic/pdu"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 const (
@@ -317,7 +317,7 @@ func (j *PassiveSide) hookEnv(log *slog.Logger, clientIdentity string,
 	}
 }
 
-func (j *PassiveSide) ownedSubtreeRoot() *zfs.DatasetPath {
+func (j *PassiveSide) ownedSubtreeRoot() *dataset.Path {
 	if sink, ok := j.mode.(*modeSink); ok {
 		return sink.receiverConfig.RootWithoutClientComponent
 	}

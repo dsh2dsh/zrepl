@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/dsh2dsh/zrepl/internal/logger"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 	zfsprop "github.com/dsh2dsh/zrepl/internal/zfs/property"
 	"github.com/dsh2dsh/zrepl/internal/zfs/zfscmd"
 )
@@ -74,15 +75,15 @@ func ZFSList(ctx context.Context, properties []string, zfsArgs ...string,
 	return res, nil
 }
 
-func ZFSListPaths(ctx context.Context) ([]*DatasetPath, error) {
-	paths := []*DatasetPath{}
+func ZFSListPaths(ctx context.Context) ([]*dataset.Path, error) {
+	paths := []*dataset.Path{}
 	zfsList := ZFSListIter(ctx, []string{"name"}, nil, "-r", "-t",
 		"filesystem,volume")
 	for fields, err := range zfsList {
 		if err != nil {
 			return nil, err
 		}
-		path, err := NewDatasetPath(fields[0])
+		path, err := dataset.NewPath(fields[0])
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +97,7 @@ func ZFSListPaths(ctx context.Context) ([]*DatasetPath, error) {
 // If notExistHint is not nil and zfs exits with an error, the stderr is
 // attempted to be interpreted as a *DatasetDoesNotExist error.
 func ZFSListIter(ctx context.Context, properties []string,
-	notExistHint *DatasetPath, zfsArgs ...string,
+	notExistHint *dataset.Path, zfsArgs ...string,
 ) iter.Seq2[[]string, error] {
 	return ListIter(ctx, properties, notExistHint,
 		NewListCmd(ctx, properties, zfsArgs))
@@ -388,7 +389,7 @@ func ZFSSendArgsSkipValidation(ctx context.Context) context.Context {
 // datasets.
 func (a ZFSSendArgsUnvalidated) Validate(ctx context.Context,
 ) (v ZFSSendArgsValidated, _ error) {
-	if dp, err := NewDatasetPath(a.FS); err != nil || dp.Length() == 0 {
+	if dp, err := dataset.NewPath(a.FS); err != nil || dp.Length() == 0 {
 		return v, newGenericValidationError(a,
 			errors.New("`FS` must be a valid non-zero dataset path"))
 	}
@@ -917,7 +918,7 @@ func ZFSRecv(
 		return errors.New("must receive into a snapshot")
 	}
 
-	fsdp, err := NewDatasetPath(fs)
+	fsdp, err := dataset.NewPath(fs)
 	if err != nil {
 		return err
 	}
@@ -971,7 +972,7 @@ func ZFSRecv(
 	return nil
 }
 
-func zfsRollbackForceRecv(ctx context.Context, fsdp *DatasetPath) error {
+func zfsRollbackForceRecv(ctx context.Context, fsdp *dataset.Path) error {
 	snaps, err := ZFSListFilesystemVersions(ctx, fsdp,
 		ListFilesystemVersionsOptions{Types: Snapshots})
 	_, errNotExist := errors.AsType[*DatasetDoesNotExist](err)
@@ -1170,8 +1171,8 @@ func (p *ZFSProperties) Fs() string { return p.fs }
 
 func (p *ZFSProperties) Order() int { return p.order }
 
-func (p *ZFSProperties) DatasetPath() (*DatasetPath, error) {
-	return NewDatasetPath(p.fs)
+func (p *ZFSProperties) DatasetPath() (*dataset.Path, error) {
+	return dataset.NewPath(p.fs)
 }
 
 func zfsSet(ctx context.Context, path string, props map[string]string) error {
@@ -1195,11 +1196,11 @@ func zfsSet(ctx context.Context, path string, props map[string]string) error {
 	return nil
 }
 
-func ZFSSet(ctx context.Context, fs *DatasetPath, props map[string]string) error {
+func ZFSSet(ctx context.Context, fs *dataset.Path, props map[string]string) error {
 	return zfsSet(ctx, fs.ToString(), props)
 }
 
-func ZFSGet(ctx context.Context, fs *DatasetPath, props []string) (*ZFSProperties, error) {
+func ZFSGet(ctx context.Context, fs *dataset.Path, props []string) (*ZFSProperties, error) {
 	return zfsGet(ctx, fs.ToString(), props, SourceAny)
 }
 
@@ -1583,7 +1584,7 @@ func ZFSDestroyIdempotent(ctx context.Context, path string) error {
 	return nil
 }
 
-func ZFSSnapshot(ctx context.Context, fs *DatasetPath, name string,
+func ZFSSnapshot(ctx context.Context, fs *dataset.Path, name string,
 	recursive bool,
 ) error {
 	promTimer := prometheus.NewTimer(
@@ -1709,7 +1710,7 @@ func ZFSBookmark(ctx context.Context, fs string, v FilesystemVersion,
 	return bm, nil
 }
 
-func ZFSRollback(ctx context.Context, fs *DatasetPath,
+func ZFSRollback(ctx context.Context, fs *dataset.Path,
 	snapshot FilesystemVersion, rollbackArgs ...string,
 ) error {
 	snapabs := snapshot.ToAbsPath(fs)

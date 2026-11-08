@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dsh2dsh/zrepl/internal/config"
-	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 func ListFromConfig(in []config.HookCommand) (List, error) {
@@ -30,7 +30,8 @@ func (self List) WithCombinedOutput() List {
 	return self
 }
 
-func (self List) CopyFilteredForFilesystem(fs *zfs.DatasetPath) (List, error) {
+func (self List) CopyFilteredForFilesystem(fs *dataset.Path,
+) (List, error) {
 	ret := make(List, 0, len(self))
 	for _, h := range self {
 		if h.Filesystems().Empty() {

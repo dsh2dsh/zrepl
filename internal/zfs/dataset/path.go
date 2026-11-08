@@ -1,4 +1,4 @@
-package zfs
+package dataset
 
 import (
 	"encoding/json"
@@ -9,18 +9,18 @@ import (
 	"strings"
 )
 
-type DatasetPath struct {
+type Path struct {
 	comps   []string
 	written uint64
 
 	recursive       bool
-	recursiveParent *DatasetPath
+	recursiveParent *Path
 
-	exclude []*DatasetPath
+	exclude []*Path
 }
 
-func NewDatasetPath(s string, opts ...DatasetPathOption) (*DatasetPath, error) {
-	p := new(DatasetPath)
+func NewPath(s string, opts ...PathOption) (*Path, error) {
+	p := new(Path)
 	if s == "" {
 		p.comps = make([]string, 0)
 		return p, nil // the empty dataset path
@@ -51,13 +51,13 @@ func NewDatasetPath(s string, opts ...DatasetPathOption) (*DatasetPath, error) {
 	return p, nil
 }
 
-type DatasetPathOption func(p *DatasetPath) error
+type PathOption func(p *Path) error
 
-func WithWritten(s string) DatasetPathOption {
-	return func(p *DatasetPath) error { return p.parseWritten(s) }
+func WithWritten(s string) PathOption {
+	return func(p *Path) error { return p.parseWritten(s) }
 }
 
-func (self *DatasetPath) parseWritten(s string) error {
+func (self *Path) parseWritten(s string) error {
 	written, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse 'written' property %q: %w", s, err)
@@ -66,17 +66,17 @@ func (self *DatasetPath) parseWritten(s string) error {
 	return nil
 }
 
-func (self *DatasetPath) ToString() string {
+func (self *Path) ToString() string {
 	return strings.Join(self.comps, "/")
 }
 
-func (self *DatasetPath) Empty() bool { return len(self.comps) == 0 }
+func (self *Path) Empty() bool { return len(self.comps) == 0 }
 
-func (self *DatasetPath) Extend(extend *DatasetPath) {
+func (self *Path) Extend(extend *Path) {
 	self.comps = append(self.comps, extend.comps...)
 }
 
-func (self *DatasetPath) HasPrefix(prefix *DatasetPath) bool {
+func (self *Path) HasPrefix(prefix *Path) bool {
 	if len(prefix.comps) > len(self.comps) {
 		return false
 	}
@@ -88,7 +88,7 @@ func (self *DatasetPath) HasPrefix(prefix *DatasetPath) bool {
 	return true
 }
 
-func (self *DatasetPath) TrimPrefix(prefix *DatasetPath) {
+func (self *Path) TrimPrefix(prefix *Path) {
 	if !self.HasPrefix(prefix) {
 		return
 	}
@@ -101,7 +101,7 @@ func (self *DatasetPath) TrimPrefix(prefix *DatasetPath) {
 	}
 }
 
-func (self *DatasetPath) Equal(q *DatasetPath) bool {
+func (self *Path) Equal(q *Path) bool {
 	if len(self.comps) != len(q.comps) {
 		return false
 	}
@@ -113,16 +113,16 @@ func (self *DatasetPath) Equal(q *DatasetPath) bool {
 	return true
 }
 
-func (self *DatasetPath) Length() int { return len(self.comps) }
+func (self *Path) Length() int { return len(self.comps) }
 
-func (self *DatasetPath) Copy() *DatasetPath {
-	c := &DatasetPath{recursiveParent: self.recursiveParent}
+func (self *Path) Copy() *Path {
+	c := &Path{recursiveParent: self.recursiveParent}
 	c.comps = make([]string, len(self.comps))
 	copy(c.comps, self.comps)
 	return c
 }
 
-func (self *DatasetPath) MarshalJSON() ([]byte, error) {
+func (self *Path) MarshalJSON() ([]byte, error) {
 	b, err := json.Marshal(self.comps)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal: %w", err)
@@ -130,7 +130,7 @@ func (self *DatasetPath) MarshalJSON() ([]byte, error) {
 	return b, nil
 }
 
-func (self *DatasetPath) UnmarshalJSON(b []byte) error {
+func (self *Path) UnmarshalJSON(b []byte) error {
 	self.comps = make([]string, 0)
 	if err := json.Unmarshal(b, &self.comps); err != nil {
 		return fmt.Errorf("marshal: %w", err)
@@ -138,35 +138,35 @@ func (self *DatasetPath) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (self *DatasetPath) RecursiveParent() *DatasetPath {
+func (self *Path) RecursiveParent() *Path {
 	return self.recursiveParent
 }
 
-func (self *DatasetPath) SetRecursiveParent(parent *DatasetPath) {
+func (self *Path) SetRecursiveParent(parent *Path) {
 	self.recursiveParent = parent
 }
 
-func (self *DatasetPath) Recursive() bool { return self.recursive }
+func (self *Path) Recursive() bool { return self.recursive }
 
-func (self *DatasetPath) RecursiveSnapshot() bool {
+func (self *Path) RecursiveSnapshot() bool {
 	return self.recursive && !self.HasExcluded()
 }
 
-func (self *DatasetPath) WithRecursive(v bool) *DatasetPath {
+func (self *Path) WithRecursive(v bool) *Path {
 	self.recursive = v
 	return self
 }
 
-func (self *DatasetPath) Written() uint64 { return self.written }
+func (self *Path) Written() uint64 { return self.written }
 
-func (self *DatasetPath) WithExcluded(p *DatasetPath) *DatasetPath {
+func (self *Path) WithExcluded(p *Path) *Path {
 	if !self.Excluded(p) {
 		self.exclude = append(self.exclude, p)
 	}
 	return self
 }
 
-func (self *DatasetPath) Excluded(p *DatasetPath) bool {
+func (self *Path) Excluded(p *Path) bool {
 	for _, ex := range slices.Backward(self.exclude) {
 		if p.HasPrefix(ex) && (p.Equal(ex) || ex.Recursive()) {
 			return true
@@ -175,9 +175,9 @@ func (self *DatasetPath) Excluded(p *DatasetPath) bool {
 	return false
 }
 
-func (self *DatasetPath) HasExcluded() bool { return len(self.exclude) != 0 }
+func (self *Path) HasExcluded() bool { return len(self.exclude) != 0 }
 
-func (self *DatasetPath) ExcludedString() string {
+func (self *Path) ExcludedString() string {
 	n := len(self.exclude)
 	switch n {
 	case 0:
@@ -202,7 +202,7 @@ func (self *DatasetPath) ExcludedString() string {
 	return sb.String()
 }
 
-func (self *DatasetPath) stringLen() int {
+func (self *Path) stringLen() int {
 	n := len(self.comps)
 	switch n {
 	case 0:
@@ -218,7 +218,7 @@ func (self *DatasetPath) stringLen() int {
 	return size
 }
 
-func (self *DatasetPath) writeStringTo(sb *strings.Builder) {
+func (self *Path) writeStringTo(sb *strings.Builder) {
 	for i, s := range self.comps {
 		if i > 0 {
 			sb.WriteByte('/')
@@ -227,6 +227,6 @@ func (self *DatasetPath) writeStringTo(sb *strings.Builder) {
 	}
 }
 
-func (self *DatasetPath) ExcludedPaths() []*DatasetPath {
+func (self *Path) ExcludedPaths() []*Path {
 	return self.exclude
 }

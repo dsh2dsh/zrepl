@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/dsh2dsh/zrepl/internal/zfs"
+	"github.com/dsh2dsh/zrepl/internal/zfs/dataset"
 )
 
 const (
@@ -16,7 +17,7 @@ var lastReceivedHoldTagRE = regexp.MustCompile("^zrepl_last_received_J_(.+)$")
 
 var _ HoldExtractor = LastReceivedHoldExtractor
 
-func LastReceivedHoldExtractor(fs *zfs.DatasetPath, v zfs.FilesystemVersion, holdTag string) Abstraction {
+func LastReceivedHoldExtractor(fs *dataset.Path, v zfs.FilesystemVersion, holdTag string) Abstraction {
 	var err error
 
 	if v.Type != zfs.Snapshot {
