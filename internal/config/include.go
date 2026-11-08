@@ -32,9 +32,12 @@ func appendYAML[T []E, E any](base, pattern string, target T) (T, error) {
 			f.Close()
 			return nil, fmt.Errorf("open %q: %w", name, err)
 		}
-		dec := yaml.NewDecoder(f)
+		dec, err := yaml.NewLoader(f)
+		if err != nil {
+			return nil, fmt.Errorf("yaml unmarshal %q: %w", name, err)
+		}
 		var v T
-		if err := dec.Decode(&v); err != nil {
+		if err := dec.Load(&v); err != nil {
 			return nil, fmt.Errorf("yaml unmarshal %q: %w", name, err)
 		}
 		f.Close()

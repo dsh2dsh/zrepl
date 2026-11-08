@@ -395,7 +395,7 @@ type LoggingOutletEnumList []LoggingOutletEnum
 func (l *LoggingOutletEnumList) SetDefaults() {
 	s := new(FileLoggingOutlet)
 	defaults.MustSet(s)
-	err := yaml.Unmarshal([]byte(`
+	err := yaml.Load([]byte(`
 type: "file"
 format: "text"
 hide_fields:

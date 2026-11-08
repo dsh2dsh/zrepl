@@ -48,7 +48,7 @@ func ParseConfigBytes(path string, bytes []byte, opts ...Option,
 	c := New(opts...)
 	if err := defaults.Set(c); err != nil {
 		return nil, fmt.Errorf("init config with defaults: %w", err)
-	} else if err := yaml.Unmarshal(bytes, &c); err != nil {
+	} else if err := yaml.Load(bytes, &c); err != nil {
 		return nil, fmt.Errorf("config unmarshal: %w", err)
 	} else if c == nil {
 		return nil, errors.New("There was no yaml document in the file")

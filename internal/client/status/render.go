@@ -217,7 +217,9 @@ func (self *JobRender) viewUnknown() {
 	self.printLn("No status view for this job type, dumping as YAML.")
 	self.newline()
 
-	b, err := yaml.Marshal(self.job.JobSpecific)
+	b, err := yaml.Dump(self.job.JobSpecific, yaml.WithV4Defaults(),
+		yaml.WithCompactSeqIndent(false),
+		yaml.WithQuotePreference(yaml.QuoteDouble))
 	if err != nil {
 		self.printLn(fmt.Errorf("marshaling job status to YAML: %w", err).Error())
 	} else {

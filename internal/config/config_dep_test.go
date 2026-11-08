@@ -81,7 +81,7 @@ b:
 
 			var a A
 			require.NoError(t, defaults.Set(&a))
-			require.NoError(t, yaml.Unmarshal([]byte(tc.yaml), &a))
+			require.NoError(t, yaml.Load([]byte(tc.yaml), &a))
 			require.NoError(t, Validator().Struct(&a))
 
 			require.Equal(t, tc.expect, &a)

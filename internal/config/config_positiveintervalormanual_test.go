@@ -29,7 +29,7 @@ func TestPositiveDurationOrManual(t *testing.T) {
 				FieldName PositiveDurationOrManual `yaml:"fieldname"`
 			}
 			input := fmt.Sprintf("\nfieldname: %s\n", tc.Input)
-			err := yaml.Unmarshal([]byte(input), &out)
+			err := yaml.Load([]byte(input), &out)
 			if tc.Result == nil {
 				require.Error(t, err)
 				t.Logf("%#v", out)
