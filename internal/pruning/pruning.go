@@ -66,14 +66,13 @@ func PruneSnapshots(ctx context.Context, snaps []Snapshot, keepRules []KeepRule,
 	destroy := make([]Snapshot, 0, len(snaps))
 
 	for _, s := range snaps {
-		if err := s.Destroyable(); err != nil {
-			l.Info("skip prunning of undestroyable snapshot",
-				slog.String("name", s.Name()),
-				slog.Any("reason", err))
-			continue
-		}
-
 		if cnt, ok := remCount[s]; ok && cnt == len(keepRules) {
+			if err := s.Destroyable(); err != nil {
+				l.Info("skip prunning of undestroyable snapshot",
+					slog.String("name", s.Name()),
+					slog.Any("reason", err))
+				continue
+			}
 			destroy = append(destroy, s)
 		}
 	}
