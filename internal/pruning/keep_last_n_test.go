@@ -8,6 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func MustKeepLastN(n int, regex string) *KeepLastN {
+	k, err := NewKeepLastN(n, regex)
+	if err != nil {
+		panic(err)
+	}
+	return k
+}
+
 func TestKeepLastN(t *testing.T) {
 	o := func(minutes int) time.Time {
 		return time.Unix(123, 0).Add(time.Duration(minutes) * time.Minute)
