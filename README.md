@@ -790,6 +790,10 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
 
   With configuration like that the receiver side runs `zfs recv -F`.
 
+* Skip undestroyable snapshots from pruning
+
+  Now pruning skips snapshots with holds or clones and logs it.
+
 ## Upstream user documentation
 
 **User Documentation** can be found at
