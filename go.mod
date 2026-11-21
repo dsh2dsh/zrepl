@@ -5,7 +5,7 @@ go 1.27
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.1.0
+	charm.land/lipgloss/v2 v2.1.1
 	github.com/caarlos0/env/v11 v11.4.2
 	github.com/creasty/defaults v1.11.0
 	github.com/dsh2dsh/cron/v3 v3.0.3
@@ -24,7 +24,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/sys v0.50.0
-	golang.org/x/text v0.43.0
+	golang.org/x/text v0.44.0
 )
 
 require (
