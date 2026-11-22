@@ -83,29 +83,34 @@ func TestDatasetFilter_Filter_filesystems(t *testing.T) {
 				"tank/home/bob":          false,
 				"tank/home/bob/foo":      true,
 				"tank/home/alice/foo":    true,
-				"tank/home/john/foo/bar": false,
+				"tank/home/john/foo":     true,
+				"tank/home/john/foo/bar": true,
 				"tank/home/john/bar":     false,
 				"tank/home/mark/foo":     false,
 			},
 			recursiveRoot: map[string]string{
-				"tank/home/bob/foo":   "tank/home",
-				"tank/home/alice/foo": "tank/home",
-				"tank/home/mark/foo":  "tank/home",
+				"tank/home/bob/foo":      "tank/home",
+				"tank/home/alice/foo":    "tank/home",
+				"tank/home/john/foo":     "tank/home",
+				"tank/home/john/foo/bar": "tank/home",
+				"tank/home/mark/foo":     "tank/home",
 			},
 		},
 		{
-			name:        "include first level",
+			name:        "recursive shell pattern",
 			filesystems: config.FilesystemsFilter{"test/app</*": true},
 			topPaths:    []string{"test/app"},
 			checkPass: map[string]bool{
 				"test/app/1":       true,
-				"test/app/1/cache": false,
+				"test/app/1/cache": true,
 				"test/app/2":       true,
-				"test/app/2/cache": false,
+				"test/app/2/cache": true,
 			},
 			recursiveRoot: map[string]string{
-				"test/app/1": "test/app",
-				"test/app/2": "test/app",
+				"test/app/1":       "test/app",
+				"test/app/1/cache": "test/app",
+				"test/app/2":       "test/app",
+				"test/app/2/cache": "test/app",
 			},
 		},
 		{
@@ -157,20 +162,20 @@ func TestDatasetFilter_Filter_filesystems(t *testing.T) {
 				require.NoError(t, err)
 				pass2, err2 := f.Included(zp)
 				require.NoError(t, err2)
-				require.Equal(t, filtered.Included(), pass2)
-				assert.Equal(t, checkPass, filtered.Included(), "pattern: %s", p)
+				require.Equal(t, filtered.Included, pass2)
+				assert.Equal(t, checkPass, filtered.Included, "pattern: %s", p)
 
 				if tt.recursiveRoot == nil {
-					assert.Nil(t, filtered.Parent(), "pattern: %s", p)
+					assert.Nil(t, filtered.Path, "pattern: %s", p)
 					continue
 				}
 
 				path := tt.recursiveRoot[p]
 				if path == "" {
-					assert.Nil(t, filtered.Parent(), "pattern: %s", p)
+					assert.Nil(t, filtered.Path, "pattern: %s", p)
 				} else {
-					require.NotNil(t, filtered.Parent())
-					assert.Equal(t, path, filtered.Parent().ToString())
+					require.NotNil(t, filtered.Path)
+					assert.Equal(t, path, filtered.Path.ToString())
 				}
 			}
 		})
@@ -223,9 +228,9 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 		{
 			name: "more_specific_path_has_precedence",
 			datasets: []config.DatasetFilter{
-				{Pattern: "tank", Recursive: new(true)},
-				{Pattern: "tank/tmp", Recursive: new(true), Exclude: true},
-				{Pattern: "tank/home/x", Recursive: new(true), Exclude: true},
+				{Pattern: "tank", Recursive: filterRecursive},
+				{Pattern: "tank/tmp", Recursive: filterRecursive, Exclude: true},
+				{Pattern: "tank/home/x", Recursive: filterRecursive, Exclude: true},
 				{Pattern: "tank/home/x/1"},
 			},
 			topPaths: []string{"tank"},
@@ -252,7 +257,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 		{
 			name: "precedence_of_specific_over_subtree_wildcard_on_same_path",
 			datasets: []config.DatasetFilter{
-				{Pattern: "tank/home/bob", Recursive: new(true), Exclude: true},
+				{Pattern: "tank/home/bob", Recursive: filterRecursive, Exclude: true},
 				{Pattern: "tank/home/bob"},
 			},
 			topPaths: []string{"tank/home/bob"},
@@ -265,7 +270,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 			name: "with shell patterns",
 			datasets: []config.DatasetFilter{
 				{Pattern: "tank/home/*/foo", Shell: true},
-				{Pattern: "tank/home/mark", Recursive: new(true), Exclude: true},
+				{Pattern: "tank/home/mark", Recursive: filterRecursive, Exclude: true},
 			},
 			topPaths: []string{"tank/home"},
 			checkPass: map[string]bool{
@@ -294,7 +299,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 		{
 			name: "exclude by shell pattern",
 			datasets: []config.DatasetFilter{
-				{Pattern: "test/app", Recursive: new(true)},
+				{Pattern: "test/app", Recursive: filterRecursive},
 				{Pattern: "test/app/*/cache", Shell: true, Exclude: true},
 			},
 			topPaths: []string{"test/app"},
@@ -313,7 +318,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 		},
 		{
 			name:     "match all",
-			datasets: []config.DatasetFilter{{Recursive: new(true)}},
+			datasets: []config.DatasetFilter{{Recursive: filterRecursive}},
 			checkPass: map[string]bool{
 				"test":             true,
 				"test/app":         true,
@@ -347,8 +352,8 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 		{
 			name: "self-exclude",
 			datasets: []config.DatasetFilter{
-				{Pattern: "tank/data", Recursive: new(true)},
-				{Pattern: "tank/data", Exclude: true, Recursive: new(false)},
+				{Pattern: "tank/data", Recursive: filterRecursive},
+				{Pattern: "tank/data", Exclude: true, Recursive: filterNotRecursive},
 			},
 			topPaths: []string{"tank/data"},
 			checkPass: map[string]bool{
@@ -367,7 +372,7 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 		{
 			name: "self-exclude magic",
 			datasets: []config.DatasetFilter{
-				{Pattern: "tank/data", Recursive: new(true)},
+				{Pattern: "tank/data", Recursive: filterRecursive},
 				{Pattern: "tank/data", Exclude: true},
 			},
 			topPaths: []string{"tank/data"},
@@ -406,20 +411,20 @@ func TestDatasetFilter_Filter_datasets(t *testing.T) {
 				require.NoError(t, err)
 				pass2, err2 := f.Included(zp)
 				require.NoError(t, err2)
-				require.Equal(t, filtered.Included(), pass2)
-				assert.Equal(t, checkPass, filtered.Included(), "pattern: %s", p)
+				require.Equal(t, filtered.Included, pass2)
+				assert.Equal(t, checkPass, filtered.Included, "pattern: %s", p)
 
 				if tt.recursiveRoot == nil {
-					assert.Nil(t, filtered.Parent())
+					assert.Nil(t, filtered.Path)
 					continue
 				}
 
 				path := tt.recursiveRoot[p]
 				if path == "" {
-					assert.Nil(t, filtered.Parent())
+					assert.Nil(t, filtered.Path)
 				} else {
-					require.NotNil(t, filtered.Parent())
-					assert.Equal(t, path, filtered.Parent().ToString())
+					require.NotNil(t, filtered.Path)
+					assert.Equal(t, path, filtered.Path.ToString())
 				}
 			}
 		})

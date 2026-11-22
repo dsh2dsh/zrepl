@@ -16,9 +16,14 @@ const (
 	filterResultOmit = "!"
 )
 
+var (
+	filterRecursive    = new(true)
+	filterNotRecursive = new(false)
+)
+
 func NoFilter() (*Filter, error) {
 	f := New(1)
-	err := f.AddList([]config.DatasetFilter{{Recursive: new(true)}})
+	err := f.AddList([]config.DatasetFilter{{Recursive: filterRecursive}})
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +98,7 @@ func (self *Filter) addCompat(pathPattern string, mapping bool) error {
 	pathStr, pattern, found := strings.Cut(pathPattern, subTreeSep)
 	in := config.DatasetFilter{Pattern: pathStr, Exclude: !mapping}
 	if found {
-		in.Recursive = new(found)
+		in.Recursive = filterRecursive
 	}
 	entry, err := NewItem(in)
 	if err != nil {
@@ -152,25 +157,27 @@ func (self *Filter) CompatSort() {
 
 func (self *Filter) Included(p *dataset.Path) (bool, error) {
 	filtered, err := self.Filtered(p)
-	return filtered.Included(), err
+	return filtered.Included, err
 }
 
-func (self *Filter) Filtered(p *dataset.Path) (*Filtered, error) {
-	filtered := new(Filtered)
+type Filtered struct {
+	Path      *dataset.Path
+	Included  bool
+	Recursive bool
+}
+
+func (self *Filter) Filtered(p *dataset.Path) (f Filtered, _ error) {
 	for _, entry := range self.entries {
 		matched, err := entry.Match(p)
 		if err != nil {
-			return nil, err
+			return f, err
 		}
 
 		if matched {
-			filtered.SetIncluded(entry.Mapping())
-			if r := entry.RecursiveDataset(); r != nil {
-				filtered.SetParent(r)
-			}
+			entry.ToFiltered(&f)
 		}
 	}
-	return filtered, nil
+	return f, nil
 }
 
 func (self *Filter) UserSpecifiedDatasets() map[string]bool {

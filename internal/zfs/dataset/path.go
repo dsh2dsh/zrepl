@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"strconv"
 	"strings"
 )
+
+const PathSep = "/"
 
 type Path struct {
 	comps   []string
@@ -38,7 +41,7 @@ func NewPath(s string, opts ...PathOption) (*Path, error) {
 			"contains forbidden characters (any of '%s')", FORBIDDEN)
 	}
 
-	p.comps = strings.Split(s, "/")
+	p.comps = strings.Split(s, PathSep)
 	if p.comps[len(p.comps)-1] == "" {
 		return nil, errors.New("must not end with a '/'")
 	}
@@ -67,7 +70,7 @@ func (self *Path) parseWritten(s string) error {
 }
 
 func (self *Path) ToString() string {
-	return strings.Join(self.comps, "/")
+	return strings.Join(self.comps, PathSep)
 }
 
 func (self *Path) Empty() bool { return len(self.comps) == 0 }
@@ -116,10 +119,10 @@ func (self *Path) Equal(q *Path) bool {
 func (self *Path) Length() int { return len(self.comps) }
 
 func (self *Path) Copy() *Path {
-	c := &Path{recursiveParent: self.recursiveParent}
-	c.comps = make([]string, len(self.comps))
-	copy(c.comps, self.comps)
-	return c
+	c := *self
+	c.comps = slices.Clone(self.comps)
+	c.exclude = slices.Clone(self.exclude)
+	return &c
 }
 
 func (self *Path) MarshalJSON() ([]byte, error) {
@@ -229,4 +232,38 @@ func (self *Path) writeStringTo(sb *strings.Builder) {
 
 func (self *Path) ExcludedPaths() []*Path {
 	return self.exclude
+}
+
+func (self *Path) AllPrefixStrings(prefix *Path) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		var i int
+		if prefix != nil {
+			i = prefix.Length()
+		}
+
+		comps := self.Length()
+		switch {
+		case i >= comps:
+			return
+		case i == comps-1:
+			yield(self.ToString())
+			return
+		}
+
+		var sb strings.Builder
+		sb.Grow(self.stringLen())
+		if prefix != nil {
+			sb.WriteString(prefix.ToString())
+		}
+
+		for ; i < comps; i++ {
+			if i != 0 {
+				sb.WriteString(PathSep)
+			}
+			sb.WriteString(self.comps[i])
+			if !yield(sb.String()) {
+				return
+			}
+		}
+	}
 }

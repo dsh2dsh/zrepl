@@ -55,11 +55,12 @@ func filterDatasets(ctx context.Context, filter *filter.Filter,
 			return nil, fmt.Errorf("error calling filter: %w", err)
 		}
 
-		parents.Add(filtered.Parent(), path, filtered.Included())
-		if filtered.Included() {
+		parents.Add(filtered.Path, path, filtered.Included)
+
+		if filtered.Included {
 			datasets = append(datasets, path)
 		} else {
-			path.WithRecursive(filtered.Recursive())
+			path.WithRecursive(filtered.Recursive)
 		}
 		delete(unmatched, path.ToString())
 	}
@@ -73,28 +74,41 @@ func filterDatasets(ctx context.Context, filter *filter.Filter,
 // --------------------------------------------------
 
 type recursiveDatasets struct {
-	parents map[*dataset.Path]*dataset.Path
+	top map[*dataset.Path][]*dataset.Path
 }
 
 func newRecursiveDatasets() recursiveDatasets {
-	return recursiveDatasets{parents: make(map[*dataset.Path]*dataset.Path)}
+	return recursiveDatasets{
+		top: make(map[*dataset.Path][]*dataset.Path),
+	}
 }
 
 func (self *recursiveDatasets) Add(root, path *dataset.Path, included bool) {
-	if root == nil || !root.Recursive() {
+	if root == nil {
 		return
 	}
 
-	if path.Equal(root) {
+	var parent *dataset.Path
+	parents, exists := self.top[root]
+
+	if exists {
+		f := func(p *dataset.Path) bool { return path.HasPrefix(p) }
+		if i := slices.IndexFunc(parents, f); i != -1 {
+			parent = parents[i]
+		} else {
+			exists = false
+		}
+	}
+
+	if !exists {
 		path.WithRecursive(true)
-		self.parents[root] = path
+		self.top[root] = append(self.top[root], path)
 		if !included {
 			path.WithExcluded(path)
 		}
 		return
 	}
 
-	parent := self.parents[root]
 	if included {
 		path.SetRecursiveParent(parent)
 	} else {

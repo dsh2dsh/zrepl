@@ -250,7 +250,7 @@ repo](https://copr.fedorainfracloud.org/coprs/fluoros/zrepl/). Thanks to
   excludes `zroot/bastille/jails/a/root`, `zroot/bastille/jails/b/root` and
   includes everything else inside `zroot/bastille/jails`.
 
-  See [Match](https://pkg.go.dev/path/filepath@go1.22.0#Match) for details about
+  See [Match](https://pkg.go.dev/path/filepath#Match) for details about
   patterns.
 
 * Added new log formatters: `json` and `text`.

@@ -67,7 +67,7 @@ func (self *item) initShellPattern() error {
 			"failed extract dataset path %q from shell pattern %q: %w",
 			base, self.pattern, err)
 	}
-	self.shellPath = path
+	self.shellPath = path.WithRecursive(self.Recursive())
 	return nil
 }
 
@@ -77,7 +77,7 @@ func shellBaseDir(pattern string) string {
 		return pattern
 	}
 
-	n = strings.LastIndex(pattern[:n], "/")
+	n = strings.LastIndex(pattern[:n], dataset.PathSep)
 	if n < 0 {
 		return ""
 	}
@@ -114,16 +114,37 @@ func (self *item) Clone() *item {
 func (self *item) Match(p *dataset.Path) (bool, error) {
 	switch {
 	case self.shellPattern:
-		matched, err := filepath.Match(self.pattern, p.ToString())
-		if err != nil {
-			return matched, fmt.Errorf("matching %q to %q: %w",
-				p.ToString(), self.pattern, err)
-		}
-		return matched, nil
+		return self.matchShellPattern(p)
 	case self.Recursive():
 		return p.HasPrefix(self.path), nil
 	}
 	return self.path.Equal(p), nil
+}
+
+func (self *item) matchShellPattern(p *dataset.Path) (bool, error) {
+	name := p.ToString()
+	matched, err := filepath.Match(self.pattern, name)
+	if err != nil {
+		return false, fmt.Errorf("matching %s: %s: %w", name, self.pattern, err)
+	}
+
+	switch {
+	case matched || !self.Recursive():
+		return matched, nil
+	case self.shellPath != nil && !p.HasPrefix(self.shellPath):
+		return false, nil
+	}
+
+	for s := range p.AllPrefixStrings(self.shellPath) {
+		matched, err := filepath.Match(self.pattern, s)
+		if err != nil {
+			return false, fmt.Errorf("matching %s: %s: %s: %w",
+				name, s, self.pattern, err)
+		} else if matched {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (self *item) CompatCompare(b *item) int {
@@ -143,10 +164,10 @@ func (self *item) CompatCompare(b *item) int {
 }
 
 func (self *item) RecursiveDataset() *dataset.Path {
-	if self.mapping && self.Recursive() {
-		if self.path != nil && !self.path.Empty() {
-			return self.path
-		}
+	if self.mapping && self.Recursive() &&
+		self.path != nil && !self.path.Empty() {
+
+		return self.path
 	}
 	return nil
 }
@@ -174,5 +195,14 @@ func (self *item) HasPrefix(prefix *dataset.Path) bool {
 	case self.path != nil:
 		return self.path.HasPrefix(prefix)
 	}
-	return strings.HasPrefix(self.pattern, prefix.ToString()+"/")
+	return strings.HasPrefix(self.pattern, prefix.ToString()+dataset.PathSep)
+}
+
+func (self *item) ToFiltered(f *Filtered) *Filtered {
+	f.Included = self.Mapping()
+	f.Recursive = self.Recursive()
+	if p := self.ParentFilesystem(); p != nil && self.Recursive() {
+		f.Path = p
+	}
+	return f
 }

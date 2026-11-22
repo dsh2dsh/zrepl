@@ -59,7 +59,7 @@ func Test_shellBaseDir(t *testing.T) {
 	}
 }
 
-func Test_filterItem_ParentFilesystem(t *testing.T) {
+func Test_item_ParentFilesystem(t *testing.T) {
 	tests := []struct {
 		name string
 		item config.DatasetFilter
@@ -106,7 +106,7 @@ func Test_filterItem_ParentFilesystem(t *testing.T) {
 	}
 }
 
-func Test_filterItem_HasPrefix(t *testing.T) {
+func Test_item_HasPrefix(t *testing.T) {
 	tests := []struct {
 		name   string
 		item   config.DatasetFilter
@@ -157,11 +157,11 @@ func Test_filterItem_HasPrefix(t *testing.T) {
 	}
 }
 
-func Test_filterItem_SetShellPattern(t *testing.T) {
+func Test_item_SetShellPattern(t *testing.T) {
 	entry, err := NewItem(config.DatasetFilter{
 		Pattern:   "tank/home",
 		Exclude:   false,
-		Recursive: new(true),
+		Recursive: filterRecursive,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, entry)
@@ -169,4 +169,55 @@ func Test_filterItem_SetShellPattern(t *testing.T) {
 
 	require.NoError(t, entry.SetShellPattern("tank/home/*/foo"))
 	assert.NotNil(t, entry.DatasetPath())
+}
+
+func Test_item_Match(t *testing.T) {
+	tests := []struct {
+		name     string
+		item     config.DatasetFilter
+		datasets []string
+		matched  []string
+	}{
+		{
+			name: "shell pattern",
+			item: config.DatasetFilter{
+				Pattern: "tank/*",
+				Shell:   true,
+			},
+			datasets: []string{"tank/foo", "tank/foo/bar", "tank/bar"},
+			matched:  []string{"tank/foo", "tank/bar"},
+		},
+		{
+			name: "recursive shell pattern",
+			item: config.DatasetFilter{
+				Pattern:   "tank/*",
+				Recursive: filterRecursive,
+				Shell:     true,
+			},
+			datasets: []string{"tank/foo", "tank/foo/bar", "tank/bar"},
+			matched:  []string{"tank/foo", "tank/foo/bar", "tank/bar"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			item, err := NewItem(tt.item)
+			require.NoError(t, err)
+			require.NotNil(t, item)
+
+			var got []string
+			for _, name := range tt.datasets {
+				p, err := dataset.NewPath(name)
+				require.NoError(t, err)
+				require.NotNil(t, p)
+
+				matched, err := item.Match(p)
+				require.NoError(t, err)
+				if matched {
+					got = append(got, name)
+				}
+			}
+			assert.Equal(t, tt.matched, got)
+		})
+	}
 }

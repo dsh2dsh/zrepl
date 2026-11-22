@@ -4,7 +4,7 @@ import "github.com/dsh2dsh/zrepl/internal/config"
 
 func applyAutoFixes(item *config.DatasetFilter, prev config.DatasetFilter) {
 	if selfExcluding(item, prev) {
-		item.Recursive = new(false)
+		item.Recursive = filterNotRecursive
 	}
 }
 
